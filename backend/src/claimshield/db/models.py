@@ -386,10 +386,15 @@ class Decision(Base):
     case_id: Mapped[str] = mapped_column(String(32), index=True)
     actor_id: Mapped[str] = mapped_column(String(32))
     action: Mapped[str] = mapped_column(String(32))
+    # recorded | pending_approval | approved | rejected
+    status: Mapped[str] = mapped_column(String(24), default="recorded", index=True)
+    prior_status: Mapped[str | None] = mapped_column(String(24), nullable=True)
     ladder_step: Mapped[str | None] = mapped_column(String(64), nullable=True)
     reason: Mapped[str] = mapped_column(Text)
     evidence_refs: Mapped[list[str]] = mapped_column(JSON, default=list)
     approved_by: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 

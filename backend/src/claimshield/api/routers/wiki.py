@@ -3,10 +3,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from claimshield.api.deps import check_csrf, get_db, require
+from claimshield.cases.decisions import MAX_REASON
 from claimshield.db.models import User
 from claimshield.wiki.service import (
     approve_proposal,
@@ -23,7 +24,7 @@ router = APIRouter(prefix="/api/v1/wiki", tags=["wiki"])
 
 
 class ReviewBody(BaseModel):
-    note: str = ""
+    note: str = Field(default="", max_length=MAX_REASON)
 
 
 @router.get("/proposals")

@@ -186,6 +186,7 @@ def test_decision_proposal_approval_and_brief_citation(client: TestClient) -> No
 
     _logout(client)
     _login(client, "investigator@demo.claimshield", "demo-investigator")
+    assert client.post(f"/api/v1/cases/{source}/assign", json={}).status_code == 200
     decided = client.post(
         f"/api/v1/cases/{source}/decisions",
         json={
@@ -274,6 +275,7 @@ def test_decision_proposal_approval_and_brief_citation(client: TestClient) -> No
     second = queue[1]["case_id"] if queue[1]["case_id"] != source else queue[2]["case_id"] if len(queue) > 2 else other
     if second == source:
         second = other
+    assert client.post(f"/api/v1/cases/{second}/assign", json={}).status_code == 200
     decided2 = client.post(
         f"/api/v1/cases/{second}/decisions",
         json={
@@ -282,7 +284,16 @@ def test_decision_proposal_approval_and_brief_citation(client: TestClient) -> No
         },
     )
     assert decided2.status_code == 200, decided2.text
+    assert decided2.json()["status"] == "pending_approval"
+    assert decided2.json()["proposal"] is None
     alias_id = decided2.json()["decision_id"]
+
+    _logout(client)
+    _login(client, "manager@demo.claimshield", "demo-manager")
+    escalated = client.post(f"/api/v1/decisions/{alias_id}:approve", json={"note": ""})
+    assert escalated.status_code == 200, escalated.text
+    assert escalated.json()["status"] == "escalated"
+    assert escalated.json()["proposal"]["decision_id"] == alias_id
 
     _logout(client)
     _login(client, "analyst@demo.claimshield", "demo-analyst")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
@@ -9,7 +10,7 @@ from sqlalchemy.orm import Session
 from claimshield.api.deps import check_csrf, get_current_user, get_db, require
 from claimshield.auth.rbac import has_permission
 from claimshield.cases.common import get_case_or_404
-from claimshield.cases.decisions import record_decision
+from claimshield.cases.decisions import MAX_EVIDENCE_REFS, MAX_REASON, record_decision, reopen_case
 from claimshield.cases.network import DEFAULT_REFERRAL_TOP_N, network_pack, node_detail
 from claimshield.cases.network_models import NetworkPack, NodeDetail
 from claimshield.cases.workspace import (
@@ -28,19 +29,25 @@ router = APIRouter(prefix="/api/v1/cases", tags=["cases"])
 
 
 class DecisionBody(BaseModel):
-    action: str
-    reason: str
-    ladder_step: str | None = None
-    evidence_refs: list[str] = Field(default_factory=list)
+    action: str = Field(max_length=32, description="escalate | monitor | dismiss | needs_evidence")
+    reason: str = Field(max_length=MAX_REASON)
+    ladder_step: str | None = Field(default=None, max_length=64)
+    evidence_refs: list[Annotated[str, Field(max_length=128)]] = Field(
+        default_factory=list, max_length=MAX_EVIDENCE_REFS
+    )
 
 
 class AssignBody(BaseModel):
-    assignee_id: str | None = None
+    assignee_id: str | None = Field(default=None, max_length=32)
 
 
 class RankOverrideBody(BaseModel):
-    action: str
-    reason: str
+    action: str = Field(max_length=16)
+    reason: str = Field(max_length=MAX_REASON)
+
+
+class ReopenBody(BaseModel):
+    reason: str = Field(max_length=MAX_REASON)
 
 
 @router.get("/{case_id}")
@@ -182,3 +189,15 @@ def post_decision(
         evidence_refs=body.evidence_refs,
         now=datetime.now(UTC),
     )
+
+
+@router.post("/{case_id}/reopen", dependencies=[Depends(check_csrf)])
+def post_reopen(
+    case_id: str,
+    body: ReopenBody,
+    session: Session = Depends(get_db),
+    user: User = Depends(require("decision:approve")),
+) -> dict:
+    """Reopen an escalated or dismissed case so it can be decided again (manager only)."""
+    case = get_case_or_404(session, case_id)
+    return reopen_case(session, case=case, user=user, reason=body.reason, now=datetime.now(UTC))

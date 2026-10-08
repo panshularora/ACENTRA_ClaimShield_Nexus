@@ -20,7 +20,13 @@ from claimshield.cases.common import (
     member_display,
     serialize_alert,
 )
-from claimshield.cases.decisions import serialize_decision
+from claimshield.cases.decisions import (
+    allowed_actions,
+    decision_block_reason,
+    decision_options,
+    pending_decision,
+    serialize_decision,
+)
 from claimshield.cases.network import node_detail
 from claimshield.cases.provenance import alert_lineage, case_provenance, grouping_from_alerts
 from claimshield.core.errors import Forbidden, NotFound, ValidationFailed
@@ -96,6 +102,7 @@ def serialize_case(session: Session, case: Case, user: User) -> dict[str, Any]:
         ).scalars().all()
     )
     latest = decisions[0] if decisions else None
+    pending = pending_decision(session, case.case_id)
     peers = list(session.execute(select(Case).where(Case.run_id == case.run_id)).scalars().all())
     run = session.get(PipelineRun, case.run_id)
     member_weight = float((run.summary or {}).get("member_weight") or 1.0) if run else 1.0
@@ -163,6 +170,10 @@ def serialize_case(session: Session, case: Case, user: User) -> dict[str, Any]:
         "alerts": [serialize_alert(a) for a in alerts],
         "evidence_gaps": evidence_gaps(alerts, case),
         "latest_decision": serialize_decision(latest) if latest else None,
+        "pending_decision": serialize_decision(pending) if pending else None,
+        "allowed_actions": allowed_actions(session, case, user),
+        "decision_blocked_reason": decision_block_reason(case, user),
+        "decision_options": decision_options(),
         "latest_proposal": _latest_proposal(session, case.case_id),
         "latest_label": _latest_label(session, case.case_id),
         "member_unmask_permitted": can_unmask(user),
@@ -413,9 +424,10 @@ def template_brief(session: Session, case: Case, user: User) -> dict[str, Any]:
                 {"text": action, "cites": metric_cite},
                 {
                     "text": (
-                        "Action ladder is education letter, records request, prepayment review, "
-                        "MFCU referral, then a 42 CFR 455.23 payment-suspension recommendation. "
-                        "The state decides suspension. ClaimShield does not."
+                        "Action ladder is education letter, records request, then escalation to the "
+                        "State Medicaid agency program integrity unit, which decides on MFCU referral, "
+                        "prepayment review, or a 42 CFR 455.23 payment suspension. Every escalation "
+                        "needs manager approval. ClaimShield only recommends."
                     ),
                     "cites": metric_cite,
                 },
@@ -697,6 +709,8 @@ def assign_case(
         raise Forbidden("role lacks case:assign")
     if user.role == "investigator" and assignee_id != user.id:
         raise Forbidden("investigators may only take ownership of a case")
+    if user.role == "investigator" and case.assignee_id not in (None, user.id):
+        raise Forbidden("case is owned by another investigator; ask a manager to reassign it")
     assignee = session.get(User, assignee_id)
     if assignee is None or not assignee.is_active:
         raise ValidationFailed("assignee not found")
