@@ -1,6 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import type { WikiProposal } from "../../api/types";
+import { humanize } from "../../lib/format";
+import "./wiki.css";
 
+/** A precedent proposal drafted from a human decision; compact mode links to the full page. */
 export function ProposalCard({
   proposal,
   compact = false,
@@ -16,7 +19,7 @@ export function ProposalCard({
   const pattern = body.confirmed_pattern ?? [];
 
   return (
-    <article className={`proposal-card status-${proposal.status}`}>
+    <article className={`panel proposal-card status-${proposal.status}`}>
       {proposal.banner && (
         <p className="banner warn" role="status">
           {proposal.banner}
@@ -24,7 +27,7 @@ export function ProposalCard({
       )}
       <header>
         <p className="kicker">
-          {proposal.kind} · {proposal.status}
+          {humanize(proposal.kind)} · {humanize(proposal.status)}
         </p>
         <h3>{proposal.title}</h3>
         <p className="mono muted">
