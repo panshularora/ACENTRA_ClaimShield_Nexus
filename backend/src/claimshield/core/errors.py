@@ -59,3 +59,15 @@ class RateLimited(ClaimShieldError):
     status = 429
     title = "Too many requests"
     type_uri = "https://claimshield.local/problems/rate-limited"
+
+
+class ServiceUnavailable(ClaimShieldError):
+    status = 503
+    title = "Service unavailable"
+    type_uri = "https://claimshield.local/problems/unavailable"
+
+
+class PipelineFailed(ClaimShieldError):
+    status = 500
+    title = "Pipeline failed"
+    type_uri = "https://claimshield.local/problems/pipeline"

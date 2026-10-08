@@ -35,6 +35,14 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_model: str = "grok-4.7"
     data_dir: Path = Path(__file__).resolve().parents[4] / "data"
+    internal_token: str = ""
+    aws_region: str = "ap-south-1"
+    s3_bucket: str = "claimshield-nexus-data-2026"
+    s3_incoming_prefix: str = "incoming/"
+    s3_processed_prefix: str = "processed/"
+    s3_results_prefix: str = "results/"
+    s3_local_dir: Path | None = None
+    ingest_max_bytes: int = 52_428_800
 
     @property
     def access_cookie_name(self) -> str:

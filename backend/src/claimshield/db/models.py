@@ -435,6 +435,24 @@ class WikiProposal(Base):
     page_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
 
+class IngestReceipt(Base):
+    """Idempotency record for S3/Lambda ingest events. No claim/member payload."""
+
+    __tablename__ = "ingest_receipt"
+
+    idempotency_key: Mapped[str] = mapped_column(String(128), primary_key=True)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    batch_id: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    run_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    bucket: Mapped[str] = mapped_column(String(128))
+    object_prefix: Mapped[str] = mapped_column(String(255))
+    trigger_key: Mapped[str] = mapped_column(String(512))
+    event_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class WikiPage(Base):
     __tablename__ = "wiki_page"
 
