@@ -6,6 +6,8 @@ import { useAuth } from "../../auth/AuthProvider";
 import type { SessionUser } from "../../api/types";
 import { StoryScene } from "../../three/StoryScene";
 import { usePrefersReducedMotion } from "../../three/useScrollProgress";
+// Brand lockup and shared public-page rules live in landing.css (global before routes were split).
+import "../landing/landing.css";
 import "./login.css";
 
 function homeFor(user: SessionUser): string {
