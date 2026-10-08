@@ -52,7 +52,7 @@ const CHAPTERS = [
   {
     kicker: "CMS harm first",
     title: "Beneficiary harm never waits in line.",
-    body: "A thousand cases do not become a dollar sort. ClaimShield combines scheme severity, financial exposure, member impact, evidence strength, and urgency, then packs the result into investigator hours and a top-N desk. AI recommends today's 20. Investigators decide. The rest stay open on a tracked backlog.",
+    body: "A thousand cases do not become a dollar sort. ClaimShield combines scheme severity, financial exposure, member impact, evidence strength, and urgency, then packs the result into investigator hours and a top-N desk. The ranking proposes today's 20. Investigators decide. The rest stay open on a tracked backlog.",
     points: [
       "Harm-priority cases jump the dollar queue. Vulnerable members come first.",
       "Today's queue is multi-factor inside capacity. Dollars or evidence alone never pick the set.",
@@ -67,16 +67,16 @@ const CHAPTERS = [
   {
     kicker: "30 / 60 / 90",
     title: "Risk is a clock, not a scoreboard.",
-    body: "Each case carries a discrete-time hazard: probability the pattern is still burning at 30, 60, and 90 days. The queue sorts by expected value inside the hours you actually have.",
+    body: "Each case carries a cumulative probability by each horizon: the chance the escalation event has already happened by day 30, 60, and 90. The queue sorts by expected value inside the hours you actually have.",
     points: [
-      "F30 / F60 / F90 are survival of the pattern, not a guilt score.",
+      "F30 / F60 / F90 are cumulative probabilities by the horizon, not a guilt score.",
       "Managers set horizon and capacity. The queue recomputes lanes.",
       "A longer horizon raises expected value. It does not invent new evidence.",
     ],
     facts: [
-      { value: "F30", label: "Still-burning chance at one month" },
-      { value: "F60", label: "Two-month discrete hazard" },
-      { value: "F90", label: "Three-month clock the manager can select" },
+      { value: "F30", label: "Cumulative probability by day 30" },
+      { value: "F60", label: "Cumulative probability by day 60" },
+      { value: "F90", label: "Cumulative probability by day 90" },
     ],
   },
   {
