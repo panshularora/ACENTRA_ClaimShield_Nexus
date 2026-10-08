@@ -46,7 +46,7 @@ def _p90(values: list[float]) -> float:
     if not values:
         return 1.0
     ordered = sorted(values)
-    idx = min(len(ordered) - 1, max(0, int(round(0.9 * (len(ordered) - 1)))))
+    idx = min(len(ordered) - 1, max(0, round(0.9 * (len(ordered) - 1))))
     return max(float(ordered[idx]), 1.0)
 
 

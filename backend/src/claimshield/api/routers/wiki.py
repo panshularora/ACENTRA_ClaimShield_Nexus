@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
@@ -32,7 +33,7 @@ def get_proposals(
     status: str | None = Query(default=None),
     session: Session = Depends(get_db),
     _: User = Depends(require("wiki:read")),
-) -> dict:
+) -> dict[str, Any]:
     rows = list_proposals(session, status=status)
     return {"proposals": [serialize_proposal(row) for row in rows]}
 
@@ -42,7 +43,7 @@ def get_proposal_detail(
     proposal_id: str,
     session: Session = Depends(get_db),
     _: User = Depends(require("wiki:read")),
-) -> dict:
+) -> dict[str, Any]:
     return serialize_proposal(get_proposal(session, proposal_id))
 
 
@@ -52,7 +53,7 @@ def post_approve_proposal(
     body: ReviewBody | None = None,
     session: Session = Depends(get_db),
     user: User = Depends(require("wiki:approve")),
-) -> dict:
+) -> dict[str, Any]:
     proposal = get_proposal(session, proposal_id)
     page = approve_proposal(
         session,
@@ -73,7 +74,7 @@ def post_reject_proposal(
     body: ReviewBody,
     session: Session = Depends(get_db),
     user: User = Depends(require("wiki:approve")),
-) -> dict:
+) -> dict[str, Any]:
     proposal = get_proposal(session, proposal_id)
     reject_proposal(session, proposal=proposal, user=user, note=body.note, now=datetime.now(UTC))
     return serialize_proposal(proposal)
@@ -84,7 +85,7 @@ def get_pages(
     page_type: str | None = Query(default=None, alias="type"),
     session: Session = Depends(get_db),
     _: User = Depends(require("wiki:read")),
-) -> dict:
+) -> dict[str, Any]:
     rows = list_pages(session, page_type=page_type)
     return {"pages": [serialize_page(row) for row in rows]}
 
@@ -94,5 +95,5 @@ def get_page_detail(
     slug: str,
     session: Session = Depends(get_db),
     _: User = Depends(require("wiki:read")),
-) -> dict:
+) -> dict[str, Any]:
     return serialize_page(get_page(session, slug))

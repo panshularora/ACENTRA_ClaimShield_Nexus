@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -18,7 +20,7 @@ def list_audit(
     to_ts: str | None = Query(default=None, alias="to"),
     session: Session = Depends(get_db),
     _: User = Depends(require("audit:read")),
-) -> dict:
+) -> dict[str, Any]:
     return public_log(session, actor=actor, action=action, from_ts=from_ts, to_ts=to_ts)
 
 
@@ -26,10 +28,10 @@ def list_audit(
 def verify_audit(
     session: Session = Depends(get_db),
     _: User = Depends(require("audit:read")),
-) -> dict:
+) -> dict[str, Any]:
     verify_stored_chain(session)
-    pack = public_log(session)
-    return pack["verification"]
+    verification: dict[str, Any] = public_log(session)["verification"]
+    return verification
 
 
 @router.get("/audit/{seq}")
@@ -37,5 +39,5 @@ def get_audit_event(
     seq: int,
     session: Session = Depends(get_db),
     _: User = Depends(require("audit:read")),
-) -> dict:
+) -> dict[str, Any]:
     return get_event(session, seq)

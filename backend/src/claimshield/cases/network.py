@@ -35,14 +35,14 @@ from claimshield.cases.common import (
     serialize_lines,
 )
 from claimshield.cases.network_models import (
+    ClaimVolume,
     EdgeEvidence,
     EdgeKind,
+    EntitySummary,
     NetworkEdge,
     NetworkLimits,
     NetworkNode,
     NetworkPack,
-    ClaimVolume,
-    EntitySummary,
     NodeDetail,
     NodeType,
     RelatedCase,
@@ -576,9 +576,7 @@ class _NetworkBuilder:
                     ends = {draft.source, draft.target}
                     if (draft.kind == "owns" and draft.target in ring) or ends <= ring:
                         draft.alert_ids.add(alert.alert_id)
-                elif kind == "excluded_owner" and draft.kind == "owns" and draft.source == evidence.get("owner_id"):
-                    draft.alert_ids.add(alert.alert_id)
-                elif (
+                elif (kind == "excluded_owner" and draft.kind == "owns" and draft.source == evidence.get("owner_id")) or (
                     kind == "referral_monopoly"
                     and draft.kind == "referral"
                     and draft.target == alert.entity_id

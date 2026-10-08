@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from enum import StrEnum
-from typing import Final, Mapping
+from typing import Final
 
 from claimshield.core.errors import Forbidden
 

@@ -67,19 +67,32 @@ filterwarnings = [
 ]
 
 [tool.ruff]
-line-length = 100
+line-length = 120
 target-version = "py312"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "S", "SIM", "RUF"]
 ignore = ["S101"]
+# Display copy uses the multiplication sign and en dash on purpose ("×8 referrals", "1–4").
+allowed-confusables = ["×", "–"]
 
 [tool.ruff.lint.per-file-ignores]
+# FastAPI declares dependencies as call defaults (Depends(require("perm")), Query(...)); they are
+# evaluated per request, which is what B008 warns about for ordinary functions.
+"src/claimshield/api/**" = ["B008"]
 "tests/**" = ["S105", "S106", "S311"]
 "src/claimshield/synth/**" = ["S311"]
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
+mypy_path = "src"
 packages = ["claimshield"]
+
+# pandas, networkx and boto3 ship without type information. pandas-stubs and
+# types-networkx report thousands of false positives on DataFrame indexing, so
+# these modules are treated as Any at the boundary and typed on our side.
+[[tool.mypy.overrides]]
+module = ["pandas.*", "networkx.*", "boto3.*", "botocore.*"]
+ignore_missing_imports = true

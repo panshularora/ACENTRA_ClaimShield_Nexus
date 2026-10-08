@@ -52,8 +52,7 @@ def test_em_flag_includes_peer_range_and_skips_tiny_cells() -> None:
     cid = 0
     for _, prov in providers.iterrows():
         pid = prov.provider_id
-        n = 20 if pid != "PU000" else 20
-        for j in range(n):
+        for _ in range(20):
             cid += 1
             claim_id = f"CL{cid}"
             claim_rows.append({"claim_id": claim_id, "billing_provider_id": pid, "claim_type": "professional"})

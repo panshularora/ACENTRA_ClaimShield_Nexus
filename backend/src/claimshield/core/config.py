@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 
 DEFAULT_JWT_SIGNING_KEY = "dev-only-change-me"
 PLACEHOLDER_JWT_KEYS = frozenset({DEFAULT_JWT_SIGNING_KEY, "change-me-in-compose"})
@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     jwt_access_minutes: int = 15
     refresh_hours: int = 8
     cookie_secure: bool = False
-    cookie_samesite: str = "strict"
+    cookie_samesite: Literal["lax", "strict", "none"] = "strict"
     demo_mode: bool = True
     data_profile: str = "tiny"
     evidence_strength_min: float = 0.4

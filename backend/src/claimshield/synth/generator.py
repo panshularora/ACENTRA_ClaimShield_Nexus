@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import numpy as np
@@ -129,10 +129,10 @@ def generate(profile: str = "tiny", seed: int = 7) -> Dataset:
     ds.data_card = {
         "profile": profile,
         "seed": seed,
-        "n_members": int(len(ds.tables["member"])),
-        "n_providers": int(len(ds.tables["provider"])),
-        "n_claim_lines": int(len(ds.tables["claim_line"])),
-        "n_schemes": int(len(ds.ground_truth)),
+        "n_members": len(ds.tables["member"]),
+        "n_providers": len(ds.tables["provider"]),
+        "n_claim_lines": len(ds.tables["claim_line"]),
+        "n_schemes": len(ds.ground_truth),
         "code_systems": sorted(ds.tables["claim_line"]["code_system"].unique().tolist()),
         "base_rates": "design knobs, not prevalence estimates",
         "limitations": [
@@ -261,7 +261,7 @@ def _ownership(
         bank = _rid(rng, "BK", 8)
         contacts.append({"entity_id": oid, "entity_type": "owner", "kind": "phone", "value_hash": phone})
         contacts.append({"entity_id": oid, "entity_type": "owner", "kind": "bank_token", "value_hash": bank})
-    owner_ids = [o["owner_id"] for o in owners]
+    owner_ids = [str(o["owner_id"]) for o in owners]
     for _, prov in providers.iterrows():
         oid = owner_ids[int(rng.integers(0, len(owner_ids)))]
         links.append(
@@ -320,7 +320,7 @@ def _pick_code(rng: np.random.Generator, line: str) -> tuple[str, str, str, int 
         code = str(rng.choice(EM_LEVELS, p=[0.08, 0.22, 0.4, 0.22, 0.08]))
         return CODE_SYSTEM_SYNTH, code, POS_OFFICE, None, None
     if line == "behavioral_health":
-        code = str(rng.choice(BH_TIMED + [ABA_HOUR]))
+        code = str(rng.choice([*BH_TIMED, ABA_HOUR]))
         minutes = {"PSY-30": 30, "PSY-45": 45, "PSY-60": 60, ABA_HOUR: 60}[code]
         return CODE_SYSTEM_SYNTH, code, POS_OFFICE, minutes, None
     if line == "laboratory":
@@ -486,7 +486,7 @@ def _attach_home_health_evv(
         loc = locations.loc[member.location_id]
         dos = pd.Timestamp(row.dos_from).date()
         hour = int(rng.integers(7, 18))
-        start_ts = datetime(dos.year, dos.month, dos.day, hour, int(rng.integers(0, 50)), tzinfo=timezone.utc)
+        start_ts = datetime(dos.year, dos.month, dos.day, hour, int(rng.integers(0, 50)), tzinfo=UTC)
         minutes = int(row.minutes) if pd.notna(row.minutes) and row.minutes else 45
         rows.append(
             {

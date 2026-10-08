@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from math import exp
+from typing import Any
 
 import pandas as pd
 
@@ -50,7 +51,7 @@ def build_cases(
     alerts: list[AlertDraft],
     tables: dict[str, pd.DataFrame],
     communities: dict[str, str] | dict[str, int],
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     _ = communities
     groups = _group_alerts(alerts)
     claims = tables["claim"]
@@ -159,7 +160,7 @@ def _entity_ids_for(group: list[AlertDraft]) -> list[str]:
     return seen
 
 
-def _grouping_for(group: list[AlertDraft], entity_ids: list[str]) -> dict:
+def _grouping_for(group: list[AlertDraft], entity_ids: list[str]) -> dict[str, Any]:
     kinds = {str(a.evidence.get("kind") or "") for a in group}
     held_out: list[str] = []
     subjects = set(entity_ids)

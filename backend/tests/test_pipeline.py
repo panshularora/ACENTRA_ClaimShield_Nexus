@@ -155,7 +155,6 @@ def test_persisted_audit_chain_detects_tamper(tmp_path) -> None:
     settings = Settings(database_url=url)
     engine = create_engine(settings)
     Base.metadata.create_all(bind=engine)
-    factory = session_factory(engine)
     with Session(engine) as session:
         append_event(
             session,

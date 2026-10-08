@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
@@ -12,10 +13,10 @@ from claimshield.audit.service import append_event
 from claimshield.cases.common import KIND_LABELS, RULE_TITLES, alerts_for, iso, serialize_alert
 from claimshield.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
 from claimshield.core.ids import new_id
-from claimshield.db.models import Case, Decision, Label, Provider, User, WikiPage, WikiProposal
+from claimshield.db.models import Alert, Case, Decision, Label, Provider, User, WikiPage, WikiProposal
 
 
-def _scheme_tags(alerts: list) -> list[str]:
+def _scheme_tags(alerts: Sequence[Alert]) -> list[str]:
     tags: list[str] = []
     for alert in alerts:
         kind = (alert.evidence or {}).get("kind")
@@ -24,7 +25,7 @@ def _scheme_tags(alerts: list) -> list[str]:
     return tags
 
 
-def _rule_ids(alerts: list) -> list[str]:
+def _rule_ids(alerts: Sequence[Alert]) -> list[str]:
     ids: list[str] = []
     for alert in alerts:
         if alert.rule_id and alert.rule_id not in ids:

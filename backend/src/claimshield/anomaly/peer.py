@@ -72,7 +72,7 @@ def select_peer_group(
     chosen: pd.DataFrame | None = None
     dims: list[str] = []
     label = ""
-    for dims, label in attempts:
+    for dims, label in attempts:  # noqa: B007 - the last attempted tier labels the comparison below
         mask = pd.Series(True, index=pool.index)
         if "specialty" in dims:
             mask &= pool.specialty == rec.specialty
@@ -87,7 +87,7 @@ def select_peer_group(
             break
         chosen = others
     assert chosen is not None
-    n = int(len(chosen))
+    n = len(chosen)
     relaxed = "rural" not in dims or n < MIN_PEERS_TO_FLAG
     if n < MIN_PEERS_RELAXED:
         confidence = "insufficient"

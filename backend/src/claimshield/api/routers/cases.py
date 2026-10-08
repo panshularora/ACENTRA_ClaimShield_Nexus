@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
@@ -61,7 +61,7 @@ def get_case(
     case_id: str,
     session: Session = Depends(get_db),
     user: User = Depends(require("case:read")),
-) -> dict:
+) -> dict[str, Any]:
     case = get_case_or_404(session, case_id)
     return serialize_case(session, case, user)
 
@@ -71,7 +71,7 @@ def get_brief(
     case_id: str,
     session: Session = Depends(get_db),
     user: User = Depends(require("case:read")),
-) -> dict:
+) -> dict[str, Any]:
     case = get_case_or_404(session, case_id)
     return template_brief(session, case, user)
 
@@ -82,7 +82,7 @@ def get_claims(
     unmask: bool = Query(default=False),
     session: Session = Depends(get_db),
     user: User = Depends(require("case:read")),
-) -> dict:
+) -> dict[str, Any]:
     case = get_case_or_404(session, case_id)
     return claims_pack(session, case, user, unmask=unmask)
 
@@ -93,7 +93,7 @@ def get_timeline(
     unmask: bool = Query(default=False),
     session: Session = Depends(get_db),
     user: User = Depends(require("case:read")),
-) -> dict:
+) -> dict[str, Any]:
     case = get_case_or_404(session, case_id)
     return timeline_pack(session, case, user, unmask=unmask)
 
@@ -130,7 +130,7 @@ def get_decision_options(
     case_id: str,
     session: Session = Depends(get_db),
     user: User = Depends(require("case:read")),
-) -> dict:
+) -> dict[str, Any]:
     """Decision actions, ladder steps and what this user may do on this case right now."""
     case = get_case_or_404(session, case_id)
     return decision_options_for(session, case, user)
@@ -142,7 +142,7 @@ def get_evidence(
     item_id: str,
     session: Session = Depends(get_db),
     user: User = Depends(require("case:read")),
-) -> dict:
+) -> dict[str, Any]:
     case = get_case_or_404(session, case_id)
     return evidence_item(session, case, item_id, user)
 
@@ -153,7 +153,7 @@ def post_assign(
     body: AssignBody,
     session: Session = Depends(get_db),
     user: User = Depends(require("case:assign")),
-) -> dict:
+) -> dict[str, Any]:
     case = get_case_or_404(session, case_id)
     return assign_case(
         session,
@@ -170,7 +170,7 @@ def post_rank_override(
     body: RankOverrideBody,
     session: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-) -> dict:
+) -> dict[str, Any]:
     if not (
         has_permission(user.role, "queue:configure")
         or has_permission(user.role, "case:decide")
@@ -194,7 +194,7 @@ def post_decision(
     body: DecisionBody,
     session: Session = Depends(get_db),
     user: User = Depends(require("case:decide")),
-) -> dict:
+) -> dict[str, Any]:
     case = get_case_or_404(session, case_id)
     return record_decision(
         session,
@@ -214,7 +214,7 @@ def post_reopen(
     body: ReopenBody,
     session: Session = Depends(get_db),
     user: User = Depends(require("decision:approve")),
-) -> dict:
+) -> dict[str, Any]:
     """Reopen an escalated or dismissed case so it can be decided again (manager only)."""
     case = get_case_or_404(session, case_id)
     return reopen_case(session, case=case, user=user, reason=body.reason, now=datetime.now(UTC))

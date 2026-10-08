@@ -114,7 +114,7 @@ def _referral_concentration(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]
                 related_entity_ids=[top_ref],
                 evidence={
                     "kind": "referral_monopoly",
-                    "n_referrals": int(len(grp)),
+                    "n_referrals": len(grp),
                     "hhi": round(hhi, 3),
                     "top_share": round(top_share, 3),
                     "peer_ids": [top_ref],
@@ -132,7 +132,8 @@ def _owner_addresses(tables: dict[str, pd.DataFrame], provider_ids: list[str]) -
     if locations is None or locations.empty or "location_id" not in providers:
         return []
     loc_ids = set(providers[providers.provider_id.astype(str).isin(provider_ids)]["location_id"].astype(str))
-    return locations[locations.location_id.astype(str).isin(loc_ids)]["address_norm"].astype(str).tolist()
+    matched = locations[locations.location_id.astype(str).isin(loc_ids)]
+    return [str(address) for address in matched["address_norm"]]
 
 
 def _excluded_owner(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:

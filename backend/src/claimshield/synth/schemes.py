@@ -16,7 +16,7 @@ S20 principal diagnosis swap analogue (Schrupp ICD order).
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -51,7 +51,7 @@ def _rid(rng: np.random.Generator, prefix: str, n: int = 10) -> str:
 
 
 def _gt_row(**kwargs: Any) -> dict[str, Any]:
-    base = {
+    base: dict[str, Any] = {
         "scheme_id": "",
         "scheme_type": "",
         "variant": "A",
@@ -74,11 +74,12 @@ def _as_date(value: date | datetime | pd.Timestamp) -> date:
         return value.date()
     if isinstance(value, date) and not isinstance(value, datetime):
         return value
-    return pd.Timestamp(value).date()
+    converted: date = pd.Timestamp(value).date()
+    return converted
 
 
 def _append_line(
-    ds: "Dataset",
+    ds: Dataset,
     rng: np.random.Generator,
     *,
     provider_id: str,
@@ -172,7 +173,7 @@ def _providers_by_line(ds: "Dataset", line: str) -> pd.DataFrame:
 
 
 def plant_all_schemes(
-    ds: "Dataset",
+    ds: Dataset,
     rng: np.random.Generator,
     fake: Faker,
     start: date,
@@ -216,7 +217,7 @@ def plant_all_schemes(
     prof = _providers_by_line(ds, "professional").iloc[0]
     line_ids = []
     mids = []
-    for i in range(18):
+    for _ in range(18):
         mem = pick_member()
         mids.append(mem)
         line_ids.append(
@@ -250,11 +251,11 @@ def plant_all_schemes(
 
     # S04 excess units (ambulance mileage)
     amb = _providers_by_line(ds, "ambulance").iloc[0]
-    l = _append_line(ds, rng, provider_id=amb.provider_id, member_id=pick_member(), dos=pick_dos(),
+    line_id = _append_line(ds, rng, provider_id=amb.provider_id, member_id=pick_member(), dos=pick_dos(),
                      code=AMB_MILEAGE, code_system=CODE_SYSTEM_HCPCS2, units=310, mileage=310,
                      claim_type="ambulance", paid=2800, pos="41")
     gt.append(_gt_row(scheme_id="S04", scheme_type="excess_units", variant="A",
-                      provider_id=amb.provider_id, line_ids=[l], held_out=False))
+                      provider_id=amb.provider_id, line_ids=[line_id], held_out=False))
     dos = pick_dos()
     mem = pick_member()
     split = [
@@ -273,10 +274,10 @@ def plant_all_schemes(
     decedent = dead.iloc[0]
     dme = _providers_by_line(ds, "dme").iloc[0]
     after = decedent.date_of_death + timedelta(days=12)
-    l = _append_line(ds, rng, provider_id=dme.provider_id, member_id=decedent.member_id, dos=after,
+    line_id = _append_line(ds, rng, provider_id=dme.provider_id, member_id=decedent.member_id, dos=after,
                      code=DME_CATH, claim_type="dme", paid=310, pos=POS_HOME)
     gt.append(_gt_row(scheme_id="S05", scheme_type="phantom_after_death", variant="A",
-                      provider_id=dme.provider_id, line_ids=[l], member_ids=[decedent.member_id]))
+                      provider_id=dme.provider_id, line_ids=[line_id], member_ids=[decedent.member_id]))
 
     # S06 ambulance overlapping / no destination (HELD OUT)
     # With spread onsets it goes on a second ambulance supplier so the held-out type can be
@@ -299,7 +300,7 @@ def plant_all_schemes(
     bh = _providers_by_line(ds, "behavioral_health").iloc[0]
     dos = pick_dos()
     ids = []
-    for i in range(28):
+    for _ in range(28):
         ids.append(
             _append_line(ds, rng, provider_id=bh.provider_id, member_id=pick_member(), dos=dos,
                          code="PSY-60", minutes=60, units=1, claim_type="behavioral_health", paid=95)
@@ -311,21 +312,21 @@ def plant_all_schemes(
     # S08 ABA during inpatient
     if not ds.tables["inpatient_stay"].empty:
         stay = ds.tables["inpatient_stay"].iloc[0]
-        l = _append_line(ds, rng, provider_id=bh.provider_id, member_id=stay.member_id,
+        line_id = _append_line(ds, rng, provider_id=bh.provider_id, member_id=stay.member_id,
                          dos=stay.admit, code=ABA_HOUR, minutes=60, claim_type="behavioral_health",
                          paid=110, pos=POS_OFFICE)
         gt.append(_gt_row(scheme_id="S08", scheme_type="inpatient_overlap", variant="A",
-                          provider_id=bh.provider_id, line_ids=[l], member_ids=[stay.member_id]))
+                          provider_id=bh.provider_id, line_ids=[line_id], member_ids=[stay.member_id]))
 
     # S09 missing EVV — use a different agency than S10 so the case stays EVV-only
     hh_all = _providers_by_line(ds, "home_health")
     hh_s09 = hh_all.iloc[min(2, len(hh_all) - 1)]
     mem = pick_member()
     dos = pick_dos()
-    l = _append_line(ds, rng, provider_id=hh_s09.provider_id, member_id=mem, dos=dos, code=HOME_VISIT,
+    line_id = _append_line(ds, rng, provider_id=hh_s09.provider_id, member_id=mem, dos=dos, code=HOME_VISIT,
                      minutes=60, claim_type="home_health", paid=88, pos=POS_HOME)
     gt.append(_gt_row(scheme_id="S09", scheme_type="evv_missing", variant="A",
-                      provider_id=hh_s09.provider_id, line_ids=[l], member_ids=[mem],
+                      provider_id=hh_s09.provider_id, line_ids=[line_id], member_ids=[mem],
                       notes="home visit with no EVV row"))
 
     # S10 excessive home health visits vs peers
@@ -354,10 +355,10 @@ def plant_all_schemes(
     is_row = ds.tables["exclusion_record"].excl_id == excl.excl_id
     ds.tables["exclusion_record"].loc[is_row, "npi"] = npi
     ds.tables["exclusion_record"].loc[is_row, ["firstname", "lastname", "busname"]] = _leie_name(target["name"])
-    l = _append_line(ds, rng, provider_id=target.provider_id, member_id=pick_member(),
+    line_id = _append_line(ds, rng, provider_id=target.provider_id, member_id=pick_member(),
                      dos=pick_dos(), code="EM-EST-3", paid=130)
     gt.append(_gt_row(scheme_id="S11", scheme_type="excluded_party", variant="A",
-                      provider_id=target.provider_id, line_ids=[l],
+                      provider_id=target.provider_id, line_ids=[line_id],
                       notes="billing NPI matches synthetic LEIE row"))
 
     # S12 doctor shopping
@@ -413,17 +414,17 @@ def plant_all_schemes(
 
     # Extra literature schemes
     # S13 POS mismatch: office code billed inpatient
-    l = _append_line(ds, rng, provider_id=prof.provider_id, member_id=pick_member(), dos=pick_dos(),
+    line_id = _append_line(ds, rng, provider_id=prof.provider_id, member_id=pick_member(), dos=pick_dos(),
                      code="EM-EST-4", pos=POS_INPATIENT, paid=240)
     gt.append(_gt_row(scheme_id="S13", scheme_type="pos_mismatch", variant="A",
-                      provider_id=prof.provider_id, line_ids=[l]))
+                      provider_id=prof.provider_id, line_ids=[line_id]))
 
     # S14 sex-implausible: prostate-related synth code on female
     female = living[living.sex == "F"].iloc[0]
-    l = _append_line(ds, rng, provider_id=prof.provider_id, member_id=female.member_id, dos=pick_dos(),
+    line_id = _append_line(ds, rng, provider_id=prof.provider_id, member_id=female.member_id, dos=pick_dos(),
                      code="PROC-MALE-01", paid=800, dx=["SYN-DX-PROSTATE"])
     gt.append(_gt_row(scheme_id="S14", scheme_type="sex_implausible", variant="A",
-                      provider_id=prof.provider_id, line_ids=[l], member_ids=[female.member_id]))
+                      provider_id=prof.provider_id, line_ids=[line_id], member_ids=[female.member_id]))
 
     # S15 weekend mill for office-only
     weekend = start + timedelta(days=((5 - start.weekday()) % 7) + 14)
@@ -439,11 +440,11 @@ def plant_all_schemes(
                       provider_id=prof.provider_id, line_ids=ids))
 
     # S16 mileage vs plausible distance
-    l = _append_line(ds, rng, provider_id=amb.provider_id, member_id=pick_member(), dos=pick_dos(),
+    line_id = _append_line(ds, rng, provider_id=amb.provider_id, member_id=pick_member(), dos=pick_dos(),
                      code=AMB_MILEAGE, code_system=CODE_SYSTEM_HCPCS2, units=180, mileage=180,
                      claim_type="ambulance", paid=1600, pos="41")
     gt.append(_gt_row(scheme_id="S16", scheme_type="mileage_padding", variant="A",
-                      provider_id=amb.provider_id, line_ids=[l], notes="urban trip billed 180 miles"))
+                      provider_id=amb.provider_id, line_ids=[line_id], notes="urban trip billed 180 miles"))
 
     # S17 concentrated referrals
     rec = _providers_by_line(ds, "dme").iloc[0]
@@ -465,7 +466,7 @@ def plant_all_schemes(
     # S18 clone billing
     clone_ids = []
     pattern_dos = pick_dos()
-    for i in range(12):
+    for _ in range(12):
         clone_ids.append(
             _append_line(ds, rng, provider_id=prof.provider_id, member_id=pick_member(),
                          dos=pattern_dos, code="EM-EST-4", minutes=None, paid=187.37, dx=["SYN-DX-01", "SYN-DX-02"])
@@ -488,18 +489,18 @@ def plant_all_schemes(
             ignore_index=True,
         )
         fac_prov = _providers_by_line(ds, "facility").iloc[0]
-        l = _append_line(ds, rng, provider_id=fac_prov.provider_id,
+        line_id = _append_line(ds, rng, provider_id=fac_prov.provider_id,
                          member_id=stay_m, dos=same_day, code="FAC-DRG-HI", claim_type="facility",
                          paid=18000, pos=POS_INPATIENT)
         gt.append(_gt_row(scheme_id="S19", scheme_type="stay_compression", variant="A",
-                          provider_id=fac_prov.provider_id, line_ids=[l],
+                          provider_id=fac_prov.provider_id, line_ids=[line_id],
                           notes="Schrupp 2024 analogue: high DRG, same-day discharge"))
 
     # S20 diagnosis order swap analogue
-    l = _append_line(ds, rng, provider_id=prof.provider_id, member_id=pick_member(), dos=pick_dos(),
+    line_id = _append_line(ds, rng, provider_id=prof.provider_id, member_id=pick_member(), dos=pick_dos(),
                      code="EM-EST-5", paid=260, dx=["SYN-DX-COMPLEX", "SYN-DX-01"])
     gt.append(_gt_row(scheme_id="S20", scheme_type="dx_order_swap", variant="A",
-                      provider_id=prof.provider_id, line_ids=[l],
+                      provider_id=prof.provider_id, line_ids=[line_id],
                       notes="Schrupp ICD-order analogue using synthetic dx"))
 
     # S21 genetic testing mill (OIG consumer alert analogue)
@@ -541,7 +542,7 @@ def plant_all_schemes(
     ds.ground_truth = pd.DataFrame(gt)
 
 
-def fac_ok(ds: "Dataset") -> bool:
+def fac_ok(ds: Dataset) -> bool:
     return not ds.tables["facility"].empty
 
 
@@ -562,7 +563,7 @@ def _plant_ring(
     )
     ds.tables["owner"] = pd.concat([ds.tables["owner"], owners], ignore_index=True)
     new_provs = []
-    n = 3 if kind == "telefraud" else 3
+    n = 3
     line = "dme" if kind == "telefraud" else "behavioral_health"
     enrolled = dates[0] - timedelta(days=30) if spread else start + timedelta(days=10)
     linked = enrolled if spread else start
@@ -767,7 +768,7 @@ def _plant_shell(
         scheme_type="shell_cluster",
         variant="A",
         provider_id=pids[0],
-        entity_ids=pids + [owner_id],
+        entity_ids=[*pids, owner_id],
         line_ids=line_ids,
         notes="five NPIs one suite; owner name matches exclusion record",
     )

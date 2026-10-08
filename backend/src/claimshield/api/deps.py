@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 
 from fastapi import Depends, Header, Request
+from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from claimshield.auth.rbac import require_permission
@@ -14,11 +15,11 @@ from claimshield.core.errors import ClaimShieldError, Unauthorized
 from claimshield.db.models import User
 from claimshield.db.session import create_engine, session_factory
 
-_engine = None
+_engine: Engine | None = None
 _factory: sessionmaker[Session] | None = None
 
 
-def get_engine():
+def get_engine() -> Engine | None:
     return _engine
 
 
@@ -80,7 +81,7 @@ def get_current_user(
     return user_from_access(session, settings, token)
 
 
-def require(permission: str):
+def require(permission: str) -> Callable[..., User]:
     def dep(user: User = Depends(get_current_user)) -> User:
         require_permission(user.role, permission)
         return user

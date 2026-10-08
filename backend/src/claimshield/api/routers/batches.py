@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
@@ -39,8 +41,8 @@ class BatchOut(BaseModel):
     status: str
     profile: str | None
     seed: int | None
-    load_report: dict
-    run: dict | None = None
+    load_report: dict[str, Any]
+    run: dict[str, Any] | None = None
 
 
 class RecomputeBody(BaseModel):
@@ -96,7 +98,7 @@ def start_run(
     session: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
     user: User = Depends(require("run:start")),
-) -> dict:
+) -> dict[str, Any]:
     batch = session.get(Batch, body.batch_id) if body.batch_id else latest_batch(session)
     if body.batch_id and batch is None:
         raise NotFound("batch not found")
@@ -119,7 +121,7 @@ def start_run(
 def get_current_run(
     session: Session = Depends(get_db),
     _: User = Depends(require("queue:read")),
-) -> dict:
+) -> dict[str, Any]:
     run = latest_run(session)
     if run is None:
         raise NotFound("no completed run")
@@ -132,7 +134,7 @@ def get_current_run(
 def list_batches(
     session: Session = Depends(get_db),
     _: User = Depends(require("batch:read")),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     rows = session.execute(select(Batch).order_by(Batch.created_at.desc())).scalars().all()
     return [
         {
@@ -152,7 +154,7 @@ def get_batch(
     batch_id: str,
     session: Session = Depends(get_db),
     _: User = Depends(require("batch:read")),
-) -> dict:
+) -> dict[str, Any]:
     batch = session.get(Batch, batch_id)
     if batch is None:
         raise NotFound("batch not found")
@@ -181,7 +183,7 @@ def get_run(
     run_id: str,
     session: Session = Depends(get_db),
     _: User = Depends(require("queue:read")),
-) -> dict:
+) -> dict[str, Any]:
     run = session.get(PipelineRun, run_id)
     if run is None:
         raise NotFound("run not found")
@@ -195,7 +197,7 @@ def get_queue(
     run_id: str,
     session: Session = Depends(get_db),
     _: User = Depends(require("queue:read")),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     run = session.get(PipelineRun, run_id)
     if run is None:
         raise NotFound("run not found")
@@ -248,12 +250,12 @@ def get_queue(
 def _case_brief(
     case: Case,
     *,
-    factors: dict | None = None,
+    factors: dict[str, Any] | None = None,
     queue_rank: int | None = None,
     override: QueueOverride | None = None,
     n_alerts: int = 0,
     risk: CaseRisk | None = None,
-) -> dict:
+) -> dict[str, Any]:
     pack = factors or {}
     shown = override if override and override.action != "release" else None
     entity_ids = case.entity_ids or [case.primary_entity_id]

@@ -115,7 +115,7 @@ def _unit_caps(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
                     evidence={
                         "kind": "unit_cap",
                         "code": code,
-                        "n_lines": int(len(grp)),
+                        "n_lines": len(grp),
                         "max_units": float(grp["units"].max()),
                         "cap": cap,
                     },
@@ -147,7 +147,7 @@ def _after_death(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
                 score=1.0,
                 evidence={
                     "kind": "after_death",
-                    "n_lines": int(len(grp)),
+                    "n_lines": len(grp),
                     "member_ids": sorted({str(m) for m in grp["member_id"].tolist()})[:8],
                     "dod": str(grp.iloc[0]["date_of_death"]),
                 },
@@ -224,7 +224,7 @@ def _inpatient_overlap(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
                 score=1.0,
                 evidence={
                     "kind": "inpatient_overlap",
-                    "n_lines": int(len(grp)),
+                    "n_lines": len(grp),
                     "member_ids": sorted({str(m) for m in grp["member_id"].tolist()})[:8],
                 },
             )
@@ -260,7 +260,7 @@ def _evv_missing(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
     totals = lines.groupby("billing_provider_id").size()
     out: list[AlertDraft] = []
     for prov, grp in missed.groupby("billing_provider_id"):
-        n_miss = int(len(grp))
+        n_miss = len(grp)
         n_total = int(totals.get(prov, n_miss))
         miss_rate = n_miss / max(1, n_total)
         out.append(
@@ -392,7 +392,7 @@ def _doctor_shopping(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
                     "pharmacies": len(pharmacies),
                     "prescriber_ids": prescribers,
                     "pharmacy_ids": pharmacies,
-                    "n_fills": int(len(window)),
+                    "n_fills": len(window),
                     "window_start": start.date().isoformat(),
                     "window_end": end.date().isoformat(),
                     "max_mme": float(window["mme"].max()),
@@ -449,7 +449,7 @@ def _sex_implausible(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
                 score=0.3,
                 evidence={
                     "kind": "sex_implausible",
-                    "n_lines": int(len(grp)),
+                    "n_lines": len(grp),
                     "member_ids": sorted({str(m) for m in grp["member_id"].tolist()})[:8],
                     "bypass_checked": ["modifier KX", "condition code 45"],
                     "data_quality_check": True,
@@ -486,7 +486,7 @@ def _pos_mismatch(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
                 score=0.55,
                 evidence={
                     "kind": "pos_mismatch",
-                    "n_lines": int(len(grp)),
+                    "n_lines": len(grp),
                     "pos_values": sorted({str(p) for p in grp["pos"].tolist()}),
                 },
             )
@@ -540,7 +540,7 @@ def _ambulance_overlap(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
                 score=0.6,
                 evidence={
                     "kind": "ambulance_overlap",
-                    "trips": int(len(day)),
+                    "trips": len(day),
                     "minutes": minutes,
                     "dos": str(dos),
                     "trips_without_base_line": int((~day["has_base"]).sum()),
@@ -672,7 +672,7 @@ def _mileage_padding(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
                 score=0.7,
                 evidence={
                     "kind": "mileage_padding",
-                    "n_lines": int(len(grp)),
+                    "n_lines": len(grp),
                     "max_miles": float(grp["units"].max()),
                     "urban_cap": 80,
                 },

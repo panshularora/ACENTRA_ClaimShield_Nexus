@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends
 
 from claimshield.auth.service import DEMO_USERS
@@ -17,8 +19,8 @@ def readyz() -> dict[str, str]:
 
 
 @router.get("/api/v1/meta")
-def meta(settings: Settings = Depends(get_settings)) -> dict:
-    body: dict = {
+def meta(settings: Settings = Depends(get_settings)) -> dict[str, Any]:
+    body: dict[str, Any] = {
         "name": "ClaimShield Nexus",
         "version": "0.1.0",
         "demo_mode": settings.demo_mode,

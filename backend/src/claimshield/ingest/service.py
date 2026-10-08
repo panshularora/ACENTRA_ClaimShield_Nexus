@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import contextlib
+from collections.abc import Sequence
 from datetime import date, datetime
 from typing import Any
 
 import pandas as pd
-from sqlalchemy import inspect as sa_inspect, select
-from sqlalchemy.orm import Session
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy import select
+from sqlalchemy.orm import Mapper, Session
 
 from claimshield.core.ids import new_id
 from claimshield.db import models
@@ -36,9 +39,9 @@ def load_tables(session: Session) -> dict[str, pd.DataFrame]:
     """Rebuild detector tables from persisted rows so a run can re-lane without regenerating."""
     tables: dict[str, pd.DataFrame] = {}
     for name, model in TABLE_MODELS.items():
-        mapper = sa_inspect(model)
+        mapper: Mapper[Any] = sa_inspect(model)
         cols = [col.key for col in mapper.columns if col.key != "id"]
-        rows = session.execute(select(model)).scalars().all()
+        rows: Sequence[Any] = session.execute(select(model)).scalars().all()
         records = [{col: getattr(obj, col) for col in cols} for obj in rows]
         tables[name] = pd.DataFrame.from_records(records, columns=cols)
     return tables
@@ -64,7 +67,7 @@ def persist_dataset(session: Session, dataset: Dataset) -> dict[str, Any]:
                 "rejected": 0,
             }
         )
-    report["ground_truth_rows"] = int(len(dataset.ground_truth))
+    report["ground_truth_rows"] = len(dataset.ground_truth)
     report["data_card"] = dataset.data_card
     report["batch_tag"] = new_id("BAT")
     report["scheme_ids"] = sorted(
@@ -75,8 +78,8 @@ def persist_dataset(session: Session, dataset: Dataset) -> dict[str, Any]:
 
 def _new_rows(session: Session, model: type, cleaned: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Skip rows that already exist so a second load of the same seed is idempotent."""
-    mapper = sa_inspect(model)
-    pk_cols = [col.key for col in mapper.primary_key]
+    mapper: Mapper[Any] = sa_inspect(model)
+    pk_cols = [str(col.key) for col in mapper.primary_key]
     if len(pk_cols) == 1 and pk_cols[0] != "id":
         pk = pk_cols[0]
         existing = set(session.execute(select(getattr(model, pk))).scalars().all())
@@ -133,10 +136,8 @@ def _clean_record(rec: dict[str, Any]) -> dict[str, Any]:
         except (TypeError, ValueError):
             pass
         if hasattr(value, "item") and not isinstance(value, (bytes, str, datetime, date)):
-            try:
+            with contextlib.suppress(ValueError, AttributeError):
                 value = value.item()
-            except (ValueError, AttributeError):
-                pass
         if isinstance(value, pd.Timestamp):
             if value.tzinfo is not None or value.hour or value.minute or value.second:
                 out[key] = value.to_pydatetime()

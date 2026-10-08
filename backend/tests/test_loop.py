@@ -57,7 +57,7 @@ def test_audit_rbac(client: TestClient) -> None:
 
 
 def test_recompute_run_endpoint_and_current_run(client: TestClient) -> None:
-    _run_id, rows = _load_tiny(client)
+    _run_id, _rows = _load_tiny(client)
     members_before = client.get("/api/v1/batches")
     assert members_before.status_code == 200
     n_batches = len(members_before.json())
