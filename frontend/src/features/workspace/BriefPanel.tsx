@@ -1,5 +1,29 @@
 import type { CaseBrief, Cite, MatchedPrecedent } from "../../api/types";
 
+function uniqueSentences<T extends { text: string }>(sentences: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const sentence of sentences) {
+    const key = sentence.text.trim();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(sentence);
+  }
+  return out;
+}
+
+function uniqueCites<T extends { id: string; label: string }>(cites: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const cite of cites) {
+    const key = cite.label || cite.id;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(cite);
+  }
+  return out;
+}
+
 function PrecedentList({
   hits,
   onCite,
@@ -68,10 +92,10 @@ export function BriefPanel({
           {brief.sections.map((section) => (
             <article key={section.title} className="brief-section">
               <h3>{section.title}</h3>
-              {section.sentences.map((sentence, i) => (
+              {uniqueSentences(section.sentences).map((sentence, i) => (
                 <p key={i}>
                   {sentence.text}{" "}
-                  {sentence.cites.map((cite) => (
+                  {uniqueCites(sentence.cites).map((cite) => (
                     <button
                       key={cite.id}
                       type="button"

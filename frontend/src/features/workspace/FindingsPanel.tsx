@@ -10,6 +10,23 @@ const APPROACH: Record<string, string> = {
   graph: "Network graph",
 };
 
+function collapseAlerts(alerts: CaseAlert[]): CaseAlert[] {
+  const map = new Map<string, CaseAlert>();
+  for (const alert of alerts) {
+    const key = alert.rule_id ?? alert.detector ?? alert.alert_id;
+    const prev = map.get(key);
+    if (!prev) {
+      map.set(key, { ...alert, line_ids: [...alert.line_ids] });
+      continue;
+    }
+    map.set(key, {
+      ...prev,
+      line_ids: [...new Set([...prev.line_ids, ...alert.line_ids])],
+    });
+  }
+  return [...map.values()];
+}
+
 export function FindingsPanel({
   alerts,
   onOpen,
@@ -17,18 +34,25 @@ export function FindingsPanel({
   alerts: CaseAlert[];
   onOpen: (alertId: string) => void;
 }) {
+  const rows = collapseAlerts(alerts);
   return (
     <div className="findings">
-      <p className="kicker">Why it was flagged</p>
+      <header className="ws-panel-head">
+        <div>
+          <p className="kicker">Why it was flagged</p>
+          <h2>Findings</h2>
+        </div>
+        <span className="muted mono">{rows.length} signal{rows.length === 1 ? "" : "s"}</span>
+      </header>
       <p className="muted">
-        Each row is a suspicion to verify. Inspect the claims, fields, rule, or peer comparison
+        Each card is a suspicion to verify. Inspect the claims, fields, rule, or peer comparison
         before you record a disposition.
       </p>
-      {alerts.length === 0 ? (
+      {rows.length === 0 ? (
         <p className="muted">No detector findings on this case.</p>
       ) : (
         <ul className="finding-list">
-          {alerts.map((alert) => {
+          {rows.map((alert) => {
             const approach = APPROACH[alert.approach ?? alert.detector] ?? alert.detector;
             return (
               <li key={alert.alert_id}>

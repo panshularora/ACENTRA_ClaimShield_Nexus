@@ -2,6 +2,23 @@ import { useEffect, useState } from "react";
 import type { CaseAlert, DecisionResult, WikiProposal } from "../../api/types";
 import { ProposalCard } from "../wiki/ProposalCard";
 
+function groupAlerts(alerts: CaseAlert[]): { key: string; rule: string; label: string; refs: string[] }[] {
+  const map = new Map<string, { key: string; rule: string; label: string; refs: string[] }>();
+  for (const alert of alerts) {
+    const rule = alert.rule_id ?? alert.detector;
+    const label = alert.label ?? alert.rule_title ?? alert.detector;
+    const key = `${rule}|${label}`;
+    const prev = map.get(key);
+    const ref = `alert:${alert.alert_id}`;
+    if (!prev) {
+      map.set(key, { key, rule, label, refs: [ref] });
+    } else if (!prev.refs.includes(ref)) {
+      prev.refs.push(ref);
+    }
+  }
+  return [...map.values()];
+}
+
 const ACTIONS = [
   {
     id: "needs_evidence" as const,
@@ -83,8 +100,12 @@ export function DecisionBar({
     setLadder(DEFAULT_LADDER[action]);
   }, [action]);
 
-  function toggle(ref: string) {
-    setRefs((prev) => (prev.includes(ref) ? prev.filter((x) => x !== ref) : [...prev, ref]));
+  function toggleGroup(groupRefs: string[]) {
+    setRefs((prev) => {
+      const allOn = groupRefs.every((ref) => prev.includes(ref));
+      if (allOn) return prev.filter((ref) => !groupRefs.includes(ref));
+      return [...new Set([...prev, ...groupRefs])];
+    });
   }
 
   return (
@@ -123,18 +144,18 @@ export function DecisionBar({
             <p className="muted">No findings to attach.</p>
           ) : (
             <ul className="ref-list">
-              {alerts.map((alert) => {
-                const ref = `alert:${alert.alert_id}`;
+              {groupAlerts(alerts).map((group) => {
+                const checked = group.refs.every((ref) => refs.includes(ref));
                 return (
-                  <li key={alert.alert_id}>
+                  <li key={group.key}>
                     <label>
                       <input
                         type="checkbox"
-                        checked={refs.includes(ref)}
+                        checked={checked}
                         disabled={disabled || pending}
-                        onChange={() => toggle(ref)}
+                        onChange={() => toggleGroup(group.refs)}
                       />
-                      <span className="mono">{alert.rule_id ?? alert.detector}</span> {alert.label}
+                      <span className="mono">{group.rule}</span> {group.label}
                     </label>
                   </li>
                 );
