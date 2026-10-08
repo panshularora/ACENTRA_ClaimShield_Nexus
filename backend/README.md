@@ -38,7 +38,7 @@ The pipeline loads that artifact on every run. Without it, scores fall back to a
 
 Login: `POST /api/v1/auth/login`. Cookies: `cs_access`, `cs_refresh`, `cs_csrf`.
 Manager loads data: `POST /api/v1/batches` `{"profile":"tiny","seed":7}`.
-AWS machine ingest: `POST /api/v1/aws/ingest` with `X-ClaimShield-Internal-Token` (see `../docs/AWS_INGEST.md`). Leave `CLAIMSHIELD_INTERNAL_TOKEN` empty for local-only use.
+AWS machine ingest: `POST /api/v1/aws/ingest` with `X-ClaimShield-Internal-Token` (see `../docs/AWS_INGEST.md`). Leave `CLAIMSHIELD_INTERNAL_TOKEN` empty for local-only use. Lambda `claimshield-s3-processor` in `ap-south-1` must use the same token. `GET /api/v1/aws/status` shows bucket and prefixes and never returns the secret.
 Queue: `GET /api/v1/runs/{run_id}/queue`.
 Workspace: `GET /api/v1/cases/{id}` plus `/brief`, `/claims`, `/timeline`, `/network`, `/evidence/{item_id}`.
 Decide: `POST /api/v1/cases/{id}/decisions` `{action, ladder_step, reason, evidence_refs}` (escalate | monitor | dismiss | needs_evidence; reason 20–4000 chars). Options and the allowed steps per action: `GET /api/v1/cases/{id}/decision-options`. Escalations wait in `pending_approval` until a different manager calls `POST /api/v1/decisions/{id}:approve` or `:reject`. Never an automatic fraud label.

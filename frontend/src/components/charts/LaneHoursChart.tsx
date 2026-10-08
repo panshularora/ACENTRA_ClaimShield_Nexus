@@ -105,8 +105,8 @@ export function LaneHoursChart({ hoursByLane, casesByLane, capacityHours, select
             isAnimationActive={false}
             cursor="pointer"
             onClick={(entry) => {
-              const lane = (entry.payload as LaneDatum | undefined)?.lane;
-              if (lane) onSelect(lane);
+              const payload = entry?.payload as LaneDatum | undefined;
+              if (payload?.lane) onSelect(payload.lane);
             }}
           >
             {data.map((d) => (

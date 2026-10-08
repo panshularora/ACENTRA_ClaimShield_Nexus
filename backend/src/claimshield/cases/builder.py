@@ -249,7 +249,7 @@ def _confirmation_probability(
         z += 0.25
     if prior:
         z += 0.5
-    return round(float(1.0 / (1.0 + exp(-z))), 3)
+    return round(min(0.99, float(1.0 / (1.0 + exp(-z)))), 3)
 
 
 def _substantiated_providers(tables: dict[str, pd.DataFrame]) -> set[str]:

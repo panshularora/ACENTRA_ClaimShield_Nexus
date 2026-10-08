@@ -16,9 +16,9 @@
 }
 
 .case-header-main {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: var(--space-4) var(--space-6);
 }
 
@@ -47,7 +47,7 @@
   align-content: flex-start;
   justify-content: flex-end;
   gap: var(--space-2);
-  max-width: 30rem;
+  max-width: 22rem;
 }
 
 .unmask-toggle,
@@ -108,8 +108,16 @@
   gap: var(--space-2);
 }
 
-.case-header-metrics .stat-grid {
+.case-header-metrics .stat-grid,
+.case-axes {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.axis-pair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
 }
 
 .case-header-metrics .stat .evidence {
@@ -117,7 +125,7 @@
   font-size: var(--font-size-14);
 }
 
-/* Section navigation */
+/* Section tabs (2–6) */
 .section-nav {
   position: sticky;
   top: var(--shell-topbar-height);
@@ -128,35 +136,49 @@
   justify-content: space-between;
   gap: var(--space-2) var(--space-4);
   margin: 0 calc(var(--space-8) * -1);
-  padding: var(--space-2) var(--space-8);
+  padding: 0 var(--space-8);
   border-bottom: 1px solid var(--color-border);
   background: rgba(247, 249, 248, 0.94);
   backdrop-filter: blur(8px);
 }
 
-.section-nav ol {
+.section-tabs {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  flex-wrap: nowrap;
+  gap: 0;
+  overflow-x: auto;
 }
 
-.app .section-nav a {
+.app .section-tabs [role="tab"] {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-sm);
-  color: var(--color-text);
+  height: 2.75rem;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-muted);
   font-size: var(--font-size-13);
   font-weight: 600;
-  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-.app .section-nav a:hover {
+.app .section-tabs [role="tab"]:hover {
+  color: var(--color-text);
   background: var(--color-surface-sunken);
+}
+
+.app .section-tabs [role="tab"].is-active {
+  color: var(--color-text);
+  border-bottom-color: var(--color-brand);
+}
+
+.app .section-tabs [role="tab"].is-active .section-index {
+  background: var(--color-brand);
+  color: var(--color-text-on-brand);
 }
 
 .section-index {
@@ -165,9 +187,13 @@
   width: 1.25rem;
   height: 1.25rem;
   border-radius: 50%;
-  background: var(--color-text);
-  color: var(--color-text-inverse);
+  background: var(--neutral-800);
+  color: var(--neutral-0);
   font-size: 0.6875rem;
+}
+
+.workspace-tab {
+  scroll-margin-top: calc(var(--shell-topbar-height) + 4rem);
 }
 
 .focus-chip {
@@ -200,6 +226,41 @@
 }
 
 /* 2 · Evidence */
+.evidence-dossier {
+  margin-bottom: var(--space-3);
+}
+
+.ev-story {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.ev-story .ev-what {
+  margin: 0;
+}
+
+.ev-story h4 {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-13);
+}
+
+.ev-tech {
+  margin-top: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+}
+
+.ev-tech summary {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.ev-tech[open] summary {
+  margin-bottom: var(--space-2);
+}
+
 .evidence-grid {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(16rem, 2fr);
@@ -294,8 +355,13 @@
 
 .source-list li {
   display: grid;
-  grid-template-columns: minmax(8rem, auto) 1fr;
+  grid-template-columns: minmax(7.5rem, 10rem) minmax(0, 1fr);
   gap: var(--space-3);
+  align-items: start;
+}
+
+.source-list.compact li {
+  grid-template-columns: minmax(7.5rem, 10rem) minmax(0, 1fr);
 }
 
 .peer-compare.is-limited {
@@ -498,6 +564,10 @@
     padding: var(--space-4);
   }
 
+  .case-header-main {
+    grid-template-columns: 1fr;
+  }
+
   .case-actions,
   .unmask-toggle,
   .unmask-note {
@@ -513,8 +583,7 @@
     padding: var(--space-2) var(--space-4);
   }
 
-  .section-nav ol {
-    flex-wrap: nowrap;
-    overflow-x: auto;
+  .section-tabs {
+    width: 100%;
   }
 }

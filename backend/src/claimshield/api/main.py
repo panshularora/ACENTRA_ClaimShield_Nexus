@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import func, select
 
 from claimshield.api.deps import configure_engine, get_engine
 from claimshield.api.routers import audit as audit_router
@@ -19,10 +20,12 @@ from claimshield.api.routers import health as health_router
 from claimshield.api.routers import models as models_router
 from claimshield.api.routers import wiki as wiki_router
 from claimshield.auth.service import seed_demo_users, seed_system_user
-from claimshield.core.config import get_settings
+from claimshield.core.config import Settings, get_settings
 from claimshield.core.errors import ClaimShieldError
 from claimshield.db import models as _models  # noqa: F401
 from claimshield.db.base import Base
+from claimshield.db.models import Batch, User
+from claimshield.pipeline.service import load_synthetic_batch
 
 
 @asynccontextmanager
@@ -39,6 +42,21 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
             seed_demo_users(session)
         seed_system_user(session)
         session.commit()
+        if settings.demo_mode and settings.auto_seed_batch:
+            n_batches = session.execute(select(func.count()).select_from(Batch)).scalar() or 0
+            manager = session.execute(select(User).where(User.email == "manager@demo.claimshield")).scalar_one_or_none()
+            if n_batches == 0 and manager is not None:
+                load_synthetic_batch(
+                    session,
+                    user=manager,
+                    settings=settings,
+                    profile=settings.data_profile or "tiny",
+                    seed=7,
+                    horizon_days=60,
+                    capacity_hours=40.0,
+                    run_now=True,
+                )
+                session.commit()
     yield
 
 
@@ -54,9 +72,11 @@ def create_app() -> FastAPI:
     async def domain_error(_: Request, exc: ClaimShieldError) -> JSONResponse:
         return JSONResponse(status_code=exc.status, content=exc.to_problem())
 
+    settings = get_settings()
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+        allow_origins=_cors_origins(settings),
+        allow_origin_regex=r"https://([a-z0-9-]+\.)*(vercel\.app|trycloudflare\.com)",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -72,6 +92,11 @@ def create_app() -> FastAPI:
     app.include_router(aws_router.router)
     app.include_router(models_router.router)
     return app
+
+
+def _cors_origins(settings: Settings) -> list[str]:
+    extra = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
+    return ["http://localhost:5173", "http://127.0.0.1:5173", *extra]
 
 
 app = create_app()

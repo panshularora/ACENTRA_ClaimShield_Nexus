@@ -52,9 +52,10 @@ export function NetworkPanel(props: NetworkPanelProps) {
   return (
     <Panel
       id="network"
+      className="workspace-tab"
       eyebrow="3 · Network"
       title="Who this subject is linked to"
-      description="Two-hop neighbourhood with typed, evidence-carrying links: ownership, shared TIN and contact, address hubs, referrals, billed and rendered claims."
+      description="Everyone linked to this subject within two steps: owners, shared tax IDs and contact details, shared addresses, referrals, and billed or rendered claims."
       actions={
         model ? (
           <span className="badge">

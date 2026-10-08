@@ -283,6 +283,23 @@
   margin: 0;
 }
 
+.case-axes {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.axis-pair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+}
+
+@media (max-width: 720px) {
+  .case-axes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .stat {
   display: grid;
   align-content: start;
@@ -387,18 +404,37 @@
   color: var(--harm-fg);
 }
 
-/* Lanes are workflow state, not risk: neutral chips with a small marker. */
-.badge.lane-harm_priority::before {
-  content: var(--harm-glyph);
+/* Lanes are workflow state, not risk: filled chips so columns stay even. */
+.badge.lane-harm_priority,
+.badge.lane-selected,
+.badge.lane-needs_evidence,
+.badge.lane-overflow {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.badge.lane-harm_priority {
+  background: var(--harm-bg);
+  border-color: var(--harm-border);
   color: var(--harm-fg);
 }
 
-.badge.lane-selected::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--color-brand-strong);
+.badge.lane-selected {
+  background: var(--green-100);
+  border-color: var(--green-500);
+  color: var(--green-800);
+}
+
+.badge.lane-needs_evidence {
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning-border);
+  color: var(--color-warning-fg);
+}
+
+.badge.lane-overflow {
+  background: var(--neutral-200);
+  border-color: var(--neutral-200);
+  color: var(--neutral-800);
 }
 
 .badge.tone-ok {
@@ -453,7 +489,11 @@
   white-space: nowrap;
 }
 
-.sla-ok,
+.sla-ok {
+  background: var(--color-success-bg);
+  color: var(--color-success-fg);
+}
+
 .sla-none {
   color: var(--color-text-muted);
 }

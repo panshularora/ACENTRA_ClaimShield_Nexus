@@ -1,16 +1,15 @@
 import type { QueueCase } from "../../api/types";
 import { ConfirmBandBadge, HarmFlag, LaneBadge, RiskBadge, StatusBadge } from "../../components/Badge";
 import { EvidenceBar } from "../../components/EvidenceBar";
-import { horizonRisk, hours, money, pct, screeningLabel, screeningShort, screeningTone, whyPriority } from "../../lib/format";
+import { money, pct, screeningLabel, screeningShort, screeningTone, whyPriority } from "../../lib/format";
 import { FactorStrip } from "./FactorBars";
-import { SCORE_LABELS } from "../../lib/scoreLabels";
+import { DASH_LABEL, SCORE_LABELS } from "../../lib/scoreLabels";
 import type { OverrideTarget } from "./OverrideForm";
 
-export type SortKey = "rank" | "ev" | "dollars" | "harm" | "hours" | "evidence" | "p";
+export type SortKey = "rank" | "p" | "severity" | "dollars" | "harm" | "evidence" | "hours";
 
 interface QueueTableProps {
   rows: QueueCase[];
-  horizon: number;
   openId: string | null;
   compareIds: string[];
   canOverride: boolean;
@@ -20,45 +19,53 @@ interface QueueTableProps {
 }
 
 /** Ranked queue as a semantic table. Each case id is a button that opens the case drawer. */
-export function QueueTable({ rows, horizon, openId, compareIds, canOverride, onOpen, onCompare, onOverride }: QueueTableProps) {
+export function QueueTable({ rows, openId, compareIds, canOverride, onOpen, onCompare, onOverride }: QueueTableProps) {
   return (
     <div className="table-wrap queue-wrap">
       <table className="grid queue-grid">
-        <caption className="sr-only">Ranked SIU cases with lane, deadlines, value, harm, evidence and rank factors</caption>
+        <caption className="sr-only">
+          Ranked SIU cases with suspicion, scheme severity, financial exposure, member impact, evidence strength and urgency
+        </caption>
+        <colgroup>
+          <col className="col-check" />
+          <col className="col-case" />
+          <col className="col-lane" />
+          <col className="col-status" />
+          <col className="col-suspicion" />
+          <col className="col-harm" />
+          <col className="col-money" />
+          <col className="col-harm" />
+          <col className="col-proof" />
+          <col className="col-num" />
+          <col className="col-why" />
+          {canOverride ? <col className="col-move" /> : null}
+        </colgroup>
         <thead>
           <tr>
             <th scope="col" className="check">
               <span className="sr-only">Compare</span>
             </th>
-            <th scope="col">Case</th>
-            <th scope="col">Lane</th>
-            <th scope="col">Status</th>
-            <th scope="col" className="num" title="Days left on the 45-day screening window">
-              45-day
+            <th scope="col">{DASH_LABEL.case}</th>
+            <th scope="col">{DASH_LABEL.lane}</th>
+            <th scope="col">{DASH_LABEL.status}</th>
+            <th scope="col" title={SCORE_LABELS.pConfirm.hint}>
+              {DASH_LABEL.chance}
             </th>
-            <th scope="col" className="num">
-              {SCORE_LABELS.pConfirm.label}
+            <th scope="col" title="How serious the billed pattern looks (1–4)">
+              {DASH_LABEL.severity}
             </th>
-            <th scope="col" className="num">
-              {SCORE_LABELS.horizon.label(horizon)}
+            <th scope="col" className="num" title="Dollars already paid on flagged claims">
+              {DASH_LABEL.paid}
             </th>
-            <th scope="col" className="num" title={SCORE_LABELS.expectedValue.hint}>
-              {SCORE_LABELS.expectedValue.label}
+            <th scope="col" title="Patient-harm level and people on flagged claims">
+              {DASH_LABEL.harm}
             </th>
-            <th scope="col" className="num">
-              Flagged
+            <th scope="col">{DASH_LABEL.proof}</th>
+            <th scope="col" className="num" title="Days left on the 45-day screening clock">
+              {DASH_LABEL.time}
             </th>
-            <th scope="col" className="num">
-              Members
-            </th>
-            <th scope="col">Risk</th>
-            <th scope="col">Harm</th>
-            <th scope="col">Evidence</th>
-            <th scope="col" className="num">
-              Hours
-            </th>
-            <th scope="col">Rank factors</th>
-            {canOverride ? <th scope="col">Override</th> : null}
+            <th scope="col">{DASH_LABEL.why}</th>
+            {canOverride ? <th scope="col">{DASH_LABEL.move}</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -66,7 +73,6 @@ export function QueueTable({ rows, horizon, openId, compareIds, canOverride, onO
             <QueueRow
               key={row.case_id}
               row={row}
-              horizon={horizon}
               open={openId === row.case_id}
               compared={compareIds.includes(row.case_id)}
               canOverride={canOverride}
@@ -83,7 +89,6 @@ export function QueueTable({ rows, horizon, openId, compareIds, canOverride, onO
 
 interface QueueRowProps {
   row: QueueCase;
-  horizon: number;
   open: boolean;
   compared: boolean;
   canOverride: boolean;
@@ -92,7 +97,7 @@ interface QueueRowProps {
   onOverride: (target: OverrideTarget) => void;
 }
 
-function QueueRow({ row, horizon, open, compared, canOverride, onOpen, onCompare, onOverride }: QueueRowProps) {
+function QueueRow({ row, open, compared, canOverride, onOpen, onCompare, onOverride }: QueueRowProps) {
   const onDesk = row.lane === "harm_priority" || row.lane === "selected";
   const group = row.alert_group;
   return (
@@ -121,8 +126,8 @@ function QueueRow({ row, horizon, open, compared, canOverride, onOpen, onCompare
         <span className="mono muted">{row.primary_entity_id}</span>
         {group ? (
           <span className="muted" title={group.text}>
-            {group.n_alerts ? `${group.n_alerts} grouped alerts` : "Grouped alerts"}
-            {group.n_entities > 1 ? ` · ${group.n_entities} linked NPIs` : ""}
+            {group.n_alerts ? `${group.n_alerts} patterns reviewed together` : "Patterns reviewed together"}
+            {group.n_entities > 1 ? ` · ${group.n_entities} linked providers` : ""}
             {group.urgent ? " · urgent" : ""}
           </span>
         ) : null}
@@ -134,29 +139,30 @@ function QueueRow({ row, horizon, open, compared, canOverride, onOpen, onCompare
       <td>
         <StatusBadge status={row.status} />
       </td>
+      <td title={SCORE_LABELS.pConfirm.hint}>
+        <span className="axis-pair">
+          <ConfirmBandBadge p={row.p_confirm} />
+          <span className="num">{pct(row.p_confirm)}</span>
+        </span>
+      </td>
+      <td>
+        <RiskBadge severity={row.severity} />
+      </td>
+      <td className="num dollars">{money(row.flagged_dollars)}</td>
+      <td>
+        <span className="axis-pair">
+          <HarmFlag harm={row.harm} />
+          <span className="muted">{row.members_affected} people</span>
+        </span>
+      </td>
+      <td>
+        <EvidenceBar value={row.evidence_strength} label={DASH_LABEL.proof} />
+      </td>
       <td className="num">
         <span className={`sla-chip sla-${screeningTone(row.screening_days_left)}`} title={screeningLabel(row.screening_days_left)}>
           {screeningShort(row.screening_days_left)}
         </span>
       </td>
-      <td className="num">
-        {pct(row.p_confirm)}
-        <ConfirmBandBadge p={row.p_confirm} />
-      </td>
-      <td className="num">{pct(horizonRisk(row, horizon))}</td>
-      <td className="num">{money(row.expected_value ?? 0)}</td>
-      <td className="num dollars">{money(row.flagged_dollars)}</td>
-      <td className="num">{row.members_affected}</td>
-      <td>
-        <RiskBadge severity={row.severity} />
-      </td>
-      <td>
-        <HarmFlag harm={row.harm} />
-      </td>
-      <td>
-        <EvidenceBar value={row.evidence_strength} />
-      </td>
-      <td className="num">{hours(row.estimated_hours)}</td>
       <td className="factors-cell">
         <FactorStrip factors={row.rank_factors} />
       </td>

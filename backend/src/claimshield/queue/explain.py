@@ -5,6 +5,7 @@ from typing import Any
 
 from claimshield.db.models import Case, PipelineRun
 from claimshield.queue.rank import recommendation_for
+from claimshield.risk.scoring import display_pct
 
 
 def screening_days_left(case: Case, *, today: date | None = None) -> int | None:
@@ -49,8 +50,8 @@ def why_rank(case: Case, factors: dict[str, Any] | None = None) -> dict[str, Any
             "code": "evidence_floor",
             "recommendation": rec,
             "text": (
-                f"High-impact concern with evidence strength {case.evidence_strength:.0%} "
-                "below the 0.40 floor. Recommend prompt information gathering, not dismissal."
+                f"High-impact concern with evidence strength {display_pct(case.evidence_strength)} "
+                "below the 40% floor. Recommend gathering more records, not closing the case."
             ),
         }
     if case.lane == "overflow":
@@ -64,8 +65,8 @@ def why_rank(case: Case, factors: dict[str, Any] | None = None) -> dict[str, Any
         }
     bits = []
     if composite is not None:
-        bits.append(f"combined rank {float(composite):.0%}")
-    bits.append(f"P(confirm) {case.p_confirm:.0%}")
+        bits.append(f"desk rank {display_pct(float(composite))} (five-score mix, not suspicion)")
+    bits.append(f"suspicion {display_pct(case.p_confirm)} (separate model score)")
     bits.append(f"${case.flagged_dollars:,.0f} flagged")
     bits.append(f"harm {case.harm} × {case.members_affected} members")
     return {

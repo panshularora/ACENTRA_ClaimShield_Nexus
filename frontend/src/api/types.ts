@@ -192,6 +192,68 @@ export interface RiskScoreFields {
   p_confirm_factors?: RiskFactor[];
 }
 
+export type HistoryKind = "case" | "investigation";
+export type HistoryOutcome = "substantiated" | "education" | "referred" | "unsubstantiated";
+
+export interface HistoryItem {
+  kind: HistoryKind;
+  id: string;
+  case_id: string | null;
+  investigation_id: string | null;
+  provider_id: string | null;
+  provider_name: string;
+  npi: string | null;
+  specialty: string | null;
+  status: string;
+  lane: Lane | null;
+  outcome: HistoryOutcome | null;
+  outcome_label: string;
+  action: string | null;
+  reason: string | null;
+  opened_at: string | null;
+  closed_at: string | null;
+  run_id: string | null;
+  current_run: boolean;
+  flagged_dollars: number | null;
+  amount_identified: number | null;
+  amount_recovered: number | null;
+  harm: number | null;
+  scheme_tag: string | null;
+  lead_source: string | null;
+  n_subjects: number;
+  source: "siu_case" | "prior_investigation";
+}
+
+export interface HistoryResponse {
+  items: HistoryItem[];
+  counts: { total: number; cases: number; investigations: number };
+  current_run_id: string | null;
+  note: string;
+}
+
+export interface AwsIngestReceipt {
+  status: string;
+  batch_id: string | null;
+  run_id: string | null;
+  bucket: string;
+  trigger_key: string;
+  updated_at: string | null;
+}
+
+export interface AwsStatus {
+  region: string;
+  bucket: string;
+  incoming_prefix: string;
+  processed_prefix: string;
+  results_prefix: string;
+  lambda_function: string;
+  token_configured: boolean;
+  credentials_configured: boolean;
+  store: "s3" | "local_dir";
+  ingest_path: string;
+  recent_ingests: AwsIngestReceipt[];
+}
+
 export interface QueueCase extends RiskScoreFields {
   case_id: string;
   lane: Lane;

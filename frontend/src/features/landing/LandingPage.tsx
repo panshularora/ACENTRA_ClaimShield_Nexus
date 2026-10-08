@@ -198,19 +198,24 @@ export function LandingPage() {
             <p className="chapter-body">
               Sign in as manager, run seed 7, watch harm / selected / needs-evidence fill 40 hours,
               then open a multi-NPI case. The product never prints the word fraud on a provider.
+              Demo: <span className="mono">investigator@demo.claimshield</span> / demo-investigator
+              · <span className="mono">manager@demo.claimshield</span> / demo-manager.
             </p>
             <ol className="demo-steps">
               <li>
                 <strong>Manager</strong>
-                <span>Load tiny, seed 7. Set hours. Recompute the queue.</span>
-              </li>
-              <li>
-                <strong>Queue</strong>
-                <span>Change hours or member impact. Watch today's 20 move. Overflow stays open.</span>
+                <span>Load tiny, seed 7. Set hours. Recompute the queue. Harm-priority jumps the dollar sort.</span>
               </li>
               <li>
                 <strong>Investigator</strong>
-                <span>Open a ring, read the brief, dispose with a cited reason.</span>
+                <span>
+                  Open Anthony Mcgee (CASE-OSERDENZID). Evidence tab: each finding is a packet — what happened,
+                  what to check, then the detector, rule id, and tables.
+                </span>
+              </li>
+              <li>
+                <strong>Decide</strong>
+                <span>Read the cited brief. Record a next step with a reason. The product never prints fraud.</span>
               </li>
             </ol>
             <Link to="/login" className="btn solid">

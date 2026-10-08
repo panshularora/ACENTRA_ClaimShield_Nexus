@@ -2,6 +2,7 @@ import type {
   AuditEvent,
   AuditLog,
   AuthSession,
+  AwsStatus,
   BatchDetail,
   BatchSummary,
   CaseBrief,
@@ -13,6 +14,7 @@ import type {
   DecisionReviewResult,
   EntitySummary,
   EvidenceItem,
+  HistoryResponse,
   Lane,
   LoadBatchResponse,
   MetaResponse,
@@ -44,19 +46,45 @@ function readCookie(name: string): string | null {
   return hit ? decodeURIComponent(hit.slice(name.length + 1)) : null;
 }
 
+let csrfMemory: string | null = null;
+
+function rememberCsrf(token: string | null | undefined): void {
+  if (token) csrfMemory = token;
+}
+
+function csrfToken(): string | null {
+  return readCookie("cs_csrf") || csrfMemory;
+}
+
+function captureCsrf(payload: unknown): void {
+  if (!payload || typeof payload !== "object") return;
+  const body = payload as { csrf_token?: unknown; user?: { csrf_token?: unknown } };
+  if (typeof body.csrf_token === "string") rememberCsrf(body.csrf_token);
+  if (typeof body.user?.csrf_token === "string") rememberCsrf(body.user.csrf_token);
+}
+
+const PROD_API = "https://claimshield-nexus-api.vercel.app";
+
+/** Local Vite uses the /api proxy. Production talks to the public FastAPI origin. */
+function apiUrl(path: string): string {
+  if (import.meta.env.DEV) return path;
+  const raw = (import.meta.env.VITE_API_BASE as string | undefined) || PROD_API;
+  return `${raw.replace(/\/$/, "")}${path}`;
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (init.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-  const csrf = readCookie("cs_csrf");
+  const csrf = csrfToken();
   const method = (init.method ?? "GET").toUpperCase();
   if (csrf && method !== "GET" && method !== "HEAD") {
     headers.set("X-CSRF-Token", csrf);
   }
 
   const send = () =>
-    fetch(path, {
+    fetch(apiUrl(path), {
       ...init,
       headers,
       credentials: "include",
@@ -70,13 +98,18 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     path !== "/api/v1/auth/session"
   ) {
     const refreshHeaders = new Headers();
-    if (csrf) refreshHeaders.set("X-CSRF-Token", csrf);
-    const refresh = await fetch("/api/v1/auth/refresh", {
+    const refreshCsrf = csrfToken();
+    if (refreshCsrf) refreshHeaders.set("X-CSRF-Token", refreshCsrf);
+    const refresh = await fetch(apiUrl("/api/v1/auth/refresh"), {
       method: "POST",
       credentials: "include",
       headers: refreshHeaders,
     });
     if (refresh.ok) {
+      const refreshed = (await refresh.json().catch(() => null)) as unknown;
+      captureCsrf(refreshed);
+      const nextCsrf = csrfToken();
+      if (nextCsrf) headers.set("X-CSRF-Token", nextCsrf);
       res = await send();
     }
   }
@@ -92,7 +125,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (res.status === 204) {
     return undefined as T;
   }
-  return (await res.json()) as T;
+  const data = (await res.json()) as T;
+  captureCsrf(data);
+  return data;
 }
 
 export const api = {
@@ -149,6 +184,8 @@ export const api = {
       body: JSON.stringify(body),
     }),
   getQueue: (runId: string) => request<QueueCase[]>(`/api/v1/runs/${runId}/queue`),
+  getCaseHistory: () => request<HistoryResponse>("/api/v1/cases/history"),
+  getAwsStatus: () => request<AwsStatus>("/api/v1/aws/status"),
   getCase: (caseId: string) => request<CaseDetail>(`/api/v1/cases/${caseId}`),
   getBrief: (caseId: string) => request<CaseBrief>(`/api/v1/cases/${caseId}/brief`),
   getClaims: (caseId: string, unmask = false) =>

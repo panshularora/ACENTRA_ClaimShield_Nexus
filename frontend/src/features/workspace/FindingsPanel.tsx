@@ -1,27 +1,11 @@
 import type { CaseAlert } from "../../api/types";
 import { EmptyState } from "../../components/ui/States";
-import { alertLabel } from "../../lib/format";
+import { findingCopy } from "../../lib/plainLanguage";
+import { APPROACH_PLAIN, EvidenceStory, storyFromAlert } from "./EvidenceStory";
 import { PeerCompare } from "./PeerCompare";
-import { AlertLineageBlock } from "./ProvenancePanel";
 
-const APPROACH: Record<string, { label: string; tone: string }> = {
-  hard_rule: { label: "Hard rule", tone: "tone-danger" },
-  rules: { label: "Hard rule", tone: "tone-danger" },
-  behavioral_anomaly: { label: "Peer anomaly", tone: "tone-warning" },
-  anomaly: { label: "Peer anomaly", tone: "tone-warning" },
-  network_graph: { label: "Network graph", tone: "tone-info" },
-  graph: { label: "Network graph", tone: "tone-info" },
-};
-
-interface Finding {
-  alert: CaseAlert;
-  /** Every alert id folded into this finding (same rule on several lines). */
-  alertIds: string[];
-  lineIds: string[];
-}
-
-function collapseAlerts(alerts: CaseAlert[]): Finding[] {
-  const map = new Map<string, Finding>();
+function collapseAlerts(alerts: CaseAlert[]): { alert: CaseAlert; alertIds: string[]; lineIds: string[] }[] {
+  const map = new Map<string, { alert: CaseAlert; alertIds: string[]; lineIds: string[] }>();
   for (const alert of alerts) {
     const key = alert.rule_id ?? alert.detector ?? alert.alert_id;
     const prev = map.get(key);
@@ -37,56 +21,52 @@ function collapseAlerts(alerts: CaseAlert[]): Finding[] {
 
 interface FindingsPanelProps {
   alerts: CaseAlert[];
-  /** Alert ids that belong to the focused network entity, or null for no focus. */
   focusAlertIds: Set<string> | null;
   focusLabel: string | null;
   onOpen: (alertId: string) => void;
 }
 
-/** Detector findings as cards; anomaly findings carry the provider-vs-peer chart. */
+/** Detector findings as packets: plain words first, technical method under a fold. */
 export function FindingsPanel({ alerts, focusAlertIds, focusLabel, onOpen }: FindingsPanelProps) {
   const all = collapseAlerts(alerts);
   const rows = focusAlertIds ? all.filter((f) => f.alertIds.some((id) => focusAlertIds.has(id))) : all;
   return (
     <section className="findings" aria-labelledby="findings-title">
       <div className="section-subhead">
-        <h3 id="findings-title">Findings</h3>
+        <h3 id="findings-title">What we noticed</h3>
         <span className="muted">
-          {focusAlertIds ? `${rows.length} of ${all.length} involve ${focusLabel}` : `${all.length} signal${all.length === 1 ? "" : "s"}`}
+          {focusAlertIds
+            ? `${rows.length} of ${all.length} involve ${focusLabel}`
+            : `${all.length} pattern${all.length === 1 ? "" : "s"} to review`}
         </span>
       </div>
       {rows.length === 0 ? (
-        <EmptyState title={focusAlertIds ? "No findings involve this entity" : "No detector findings"} compact>
-          {focusAlertIds ? "Clear the network selection to see every finding on the case." : null}
+        <EmptyState title={focusAlertIds ? "Nothing here involves this party" : "No patterns on this case"} compact>
+          {focusAlertIds ? "Clear the network selection to see every pattern on this case." : null}
         </EmptyState>
       ) : (
         <ul className="finding-list">
           {rows.map(({ alert, lineIds }) => {
-            const approach = APPROACH[alert.approach ?? alert.detector] ?? { label: alert.detector, tone: "" };
+            const approachKey = alert.approach ?? alert.detector ?? "";
+            const approach = APPROACH_PLAIN[approachKey] ?? { label: "Paid-claim check", tech: "" };
+            const story = storyFromAlert(alert);
+            const copy = findingCopy(story.kind, story.fallbackTitle);
             return (
               <li key={alert.alert_id} className="finding">
                 <div className="finding-head">
-                  <span className={`badge ${approach.tone}`}>{approach.label}</span>
-                  <span className="mono muted">{alert.rule_id ?? alert.detector}</span>
-                  {alert.policy_ref ? <span className="muted">Policy {alert.policy_ref}</span> : null}
+                  <span className={`badge ${toneFor(approachKey)}`}>{approach.label}</span>
+                  <span className="muted">{copy.source}</span>
                 </div>
-                <h4>{alertLabel(alert)}</h4>
-                {alert.review_reason ? <p>{alert.review_reason}</p> : null}
-                <p className="muted">
-                  <span className="mono">{alert.entity_id}</span> · {lineIds.length} supporting claim line
-                  {lineIds.length === 1 ? "" : "s"}
-                </p>
-                {alert.evidence?.peer_group ? <PeerCompare evidence={alert.evidence} /> : null}
+                <h4>{copy.title}</h4>
+                <EvidenceStory
+                  {...story}
+                  lineIds={lineIds}
+                  peer={alert.evidence?.peer_group ? <PeerCompare evidence={alert.evidence} /> : null}
+                />
                 <div className="finding-actions">
                   <button type="button" className="btn small" onClick={() => onOpen(alert.alert_id)}>
-                    Trace evidence
+                    Open the evidence item
                   </button>
-                  {alert.lineage ? (
-                    <details>
-                      <summary>Where this came from</summary>
-                      <AlertLineageBlock lineage={alert.lineage} />
-                    </details>
-                  ) : null}
                 </div>
               </li>
             );
@@ -95,4 +75,11 @@ export function FindingsPanel({ alerts, focusAlertIds, focusLabel, onOpen }: Fin
       )}
     </section>
   );
+}
+
+function toneFor(approach: string): string {
+  if (approach === "hard_rule" || approach === "rules") return "tone-danger";
+  if (approach === "behavioral_anomaly" || approach === "anomaly") return "tone-warning";
+  if (approach === "network_graph" || approach === "graph") return "tone-info";
+  return "";
 }

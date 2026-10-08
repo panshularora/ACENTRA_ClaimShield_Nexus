@@ -10,12 +10,18 @@ import { EmptyState, ErrorState, LoadingState } from "../../components/ui/States
 import { StatTile } from "../../components/ui/StatTile";
 import { count, hours } from "../../lib/format";
 import { readStoredRun } from "../../lib/runStore";
+import { HistoryPanel } from "./HistoryPanel";
 import { WorklistTable } from "./WorklistTable";
 import "./cases.css";
 
-type Scope = "desk" | "mine" | "open";
+type Scope = "desk" | "mine" | "open" | "history";
 
-const SCOPE_LABELS: Record<Scope, string> = { desk: "Team desk", mine: "Mine", open: "Unassigned" };
+const SCOPE_LABELS: Record<Scope, string> = {
+  desk: "Team desk",
+  mine: "Mine",
+  open: "Unassigned",
+  history: "History",
+};
 
 export function InvestigatorCasesPage() {
   const { user } = useAuth();
@@ -43,13 +49,13 @@ export function InvestigatorCasesPage() {
     enabled: Boolean(batchId),
   });
   const currentRunQuery = useQuery({
-    queryKey: ["current-run"],
+    queryKey: ["run", "current"],
     queryFn: api.getCurrentRun,
-    enabled: canQueue && !canReadBatches,
+    enabled: canQueue,
     retry: false,
   });
   const runId =
-    batchQuery.data?.runs[0]?.run_id ?? currentRunQuery.data?.run_id ?? stored?.runId ?? null;
+    currentRunQuery.data?.run_id ?? batchQuery.data?.runs[0]?.run_id ?? stored?.runId ?? null;
 
   const queueQuery = useQuery({
     queryKey: ["queue", runId],
@@ -61,6 +67,12 @@ export function InvestigatorCasesPage() {
     const rows = queueQuery.data ?? [];
     return rows.filter((r) => r.lane === "harm_priority" || r.lane === "selected");
   }, [queueQuery.data]);
+
+  const historyQuery = useQuery({
+    queryKey: ["case-history"],
+    queryFn: api.getCaseHistory,
+    enabled: canCases,
+  });
 
   const detailsQuery = useQuery({
     queryKey: ["work-details", runId, workSeed.map((r) => r.case_id)],
@@ -93,8 +105,8 @@ export function InvestigatorCasesPage() {
   const details = detailsQuery.data ?? {};
   const mine = workSeed.filter((row) => details[row.case_id]?.assignee_id === user.id);
   const unassigned = workSeed.filter((row) => !details[row.case_id]?.assignee_id);
-  const byScope: Record<Scope, QueueCase[]> = { desk: workSeed, mine, open: unassigned };
-  const source = byScope[scope];
+  const byScope: Record<Exclude<Scope, "history">, QueueCase[]> = { desk: workSeed, mine, open: unassigned };
+  const source = scope === "history" ? [] : byScope[scope];
 
   const q = queryText.trim().toLowerCase();
   const visible = source.filter((row) => {
@@ -129,80 +141,87 @@ export function InvestigatorCasesPage() {
         }
       />
 
-      {!runId ? (
+      <dl className="stat-grid">
+        <StatTile label="Desk" value={workSeed.length} hint={runId ? `${hours(deskHours)} estimated` : "No live run"} />
+        <StatTile label="Mine" value={mine.length} />
+        <StatTile label="Open" value={unassigned.length} />
+        <StatTile label="History" value={historyQuery.data?.counts.total ?? 0} hint="Past cases and investigations" />
+        <StatTile label="Harm" value={harmCount} tone="harm" />
+      </dl>
+
+      {error ? <ErrorState title="Cases could not be loaded" error={error} /> : null}
+
+      <div className="toolbar">
+        <div className="segmented" role="group" aria-label="Worklist scope">
+          {(Object.keys(SCOPE_LABELS) as Scope[]).map((key) => (
+            <button key={key} type="button" aria-pressed={scope === key} onClick={() => setScope(key)}>
+              {SCOPE_LABELS[key]}{" "}
+              <span className="count">
+                {key === "history" ? (historyQuery.data?.counts.total ?? 0) : byScope[key].length}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {scope === "history" ? (
+        <HistoryPanel compact />
+      ) : !runId ? (
         <EmptyState title="No active run">
           A manager loads a batch from the queue page. After that, this desk shows harm-priority and selected cases
-          from the live run.
+          from the live run. History is available in the History tab.
         </EmptyState>
       ) : (
-        <>
-          <dl className="stat-grid">
-            <StatTile label="On the team desk" value={workSeed.length} hint={`${hours(deskHours)} estimated`} />
-            <StatTile label="Assigned to you" value={mine.length} />
-            <StatTile label="Unassigned" value={unassigned.length} />
-            <StatTile label="Harm priority" value={harmCount} tone="harm" />
-          </dl>
-
-          {error ? <ErrorState title="Cases could not be loaded" error={error} /> : null}
-
-          <Panel
-            id="worklist"
-            eyebrow="Cases"
-            title={SCOPE_LABELS[scope]}
-            description={
-              mine.length > 0
-                ? `${count(mine.length, "case")} assigned to you. Unassigned work stays in the team list until someone takes it.`
-                : "Nothing is assigned to you yet. Open a case and take ownership, or claim it from this list."
-            }
-            actions={<span className="badge">{visible.length} shown</span>}
-          >
-            <div className="toolbar">
-              <div className="segmented" role="group" aria-label="Worklist scope">
-                {(Object.keys(SCOPE_LABELS) as Scope[]).map((key) => (
-                  <button key={key} type="button" aria-pressed={scope === key} onClick={() => setScope(key)}>
-                    {SCOPE_LABELS[key]} <span className="count">{byScope[key].length}</span>
-                  </button>
-                ))}
-              </div>
-              <label className="field grow">
-                Search
-                <input
-                  type="search"
-                  placeholder="Case, provider, specialty or owner…"
-                  value={queryText}
-                  onChange={(e) => setQueryText(e.target.value)}
-                />
-              </label>
-              <label className="field">
-                Status
-                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                  <option value="all">All</option>
-                  {[...new Set(source.map((r) => r.status))].map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            {queueQuery.isLoading || detailsQuery.isLoading ? <LoadingState label="Loading cases…" /> : null}
-            {!queueQuery.isLoading && visible.length === 0 ? (
-              <EmptyState title="No cases in this view" compact>
-                Try another scope or clear the search.
-              </EmptyState>
-            ) : null}
-            {visible.length > 0 ? (
-              <WorklistTable
-                rows={visible}
-                details={details}
-                userId={user.id}
-                canAssign={canAssign}
-                assigning={assignMut.isPending ? assignMut.variables : undefined}
-                onAssign={(caseId) => assignMut.mutate(caseId)}
+        <Panel
+          id="worklist"
+          eyebrow="Cases"
+          title={SCOPE_LABELS[scope]}
+          description={
+            mine.length > 0
+              ? `${count(mine.length, "case")} assigned to you. Unassigned work stays in the team list until someone takes it.`
+              : "Nothing is assigned to you yet. Open a case and take ownership, or claim it from this list."
+          }
+          actions={<span className="badge">{visible.length} shown</span>}
+        >
+          <div className="toolbar">
+            <label className="field grow">
+              Search
+              <input
+                type="search"
+                placeholder="Case, provider, specialty or owner…"
+                value={queryText}
+                onChange={(e) => setQueryText(e.target.value)}
               />
-            ) : null}
-          </Panel>
-        </>
+            </label>
+            <label className="field">
+              Status
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <option value="all">All</option>
+                {[...new Set(source.map((r) => r.status))].map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {queueQuery.isLoading || detailsQuery.isLoading ? <LoadingState label="Loading cases…" /> : null}
+          {!queueQuery.isLoading && visible.length === 0 ? (
+            <EmptyState title="No cases in this view" compact>
+              Try another scope or clear the search.
+            </EmptyState>
+          ) : null}
+          {visible.length > 0 ? (
+            <WorklistTable
+              rows={visible}
+              details={details}
+              userId={user.id}
+              canAssign={canAssign}
+              assigning={assignMut.isPending ? assignMut.variables : undefined}
+              onAssign={(caseId) => assignMut.mutate(caseId)}
+            />
+          ) : null}
+        </Panel>
       )}
     </main>
   );

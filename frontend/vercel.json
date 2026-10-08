@@ -1,0 +1,18 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://claimshield-nexus-api.vercel.app/api/:path*"
+    },
+    {
+      "source": "/healthz",
+      "destination": "https://claimshield-nexus-api.vercel.app/healthz"
+    },
+    {
+      "source": "/readyz",
+      "destination": "https://claimshield-nexus-api.vercel.app/readyz"
+    },
+    { "source": "/((?!api/|healthz|readyz).*)", "destination": "/index.html" }
+  ]
+}

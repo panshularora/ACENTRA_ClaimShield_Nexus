@@ -18,10 +18,10 @@ export function riskLevel(severity: number): RiskLevel {
 export type ConfirmBand = "under50" | "mid" | "high" | "nearCertain";
 
 export const CONFIRM_BAND_LABEL: Record<ConfirmBand, string> = {
-  under50: "Under 50%",
-  mid: "50–90%",
-  high: "90–99%",
-  nearCertain: "99% or more",
+  under50: "Low suspicion",
+  mid: "Medium suspicion",
+  high: "High suspicion",
+  nearCertain: "Very high suspicion",
 };
 
 export function confirmBand(p: number): ConfirmBand {

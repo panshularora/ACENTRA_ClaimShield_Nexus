@@ -11,12 +11,14 @@ import { EmptyState, ErrorState, LoadingState } from "../../components/ui/States
 import { StatTile } from "../../components/ui/StatTile";
 import { hours, LANE_ORDER, laneLabel } from "../../lib/format";
 import { readStoredRun, writeStoredRun } from "../../lib/runStore";
+import { HistoryPanel } from "../cases/HistoryPanel";
+import { AwsIngestPanel } from "./AwsIngestPanel";
 import { CompareStrip } from "./CompareStrip";
 import { DeskSettings, type DeskDraft } from "./DeskSettings";
 import { FactorStripLegend } from "./FactorBars";
 import { OverrideForm, type OverrideTarget } from "./OverrideForm";
 import { QueueTable, type SortKey } from "./QueueTable";
-import { SCORE_LABELS } from "../../lib/scoreLabels";
+import { DASH_LABEL } from "../../lib/scoreLabels";
 import "./queue.css";
 
 function sumHours(rows: QueueCase[], lane: Lane): number {
@@ -27,12 +29,12 @@ function sortRows(rows: QueueCase[], key: SortKey): QueueCase[] {
   const laneIndex = (row: QueueCase) => LANE_ORDER.indexOf(row.lane);
   const by: Record<SortKey, (a: QueueCase, b: QueueCase) => number> = {
     rank: (a, b) => laneIndex(a) - laneIndex(b) || (b.rank_factors?.composite ?? 0) - (a.rank_factors?.composite ?? 0),
-    ev: (a, b) => (b.expected_value ?? 0) - (a.expected_value ?? 0),
-    dollars: (a, b) => b.flagged_dollars - a.flagged_dollars,
-    harm: (a, b) => b.harm - a.harm,
-    hours: (a, b) => b.estimated_hours - a.estimated_hours,
-    evidence: (a, b) => b.evidence_strength - a.evidence_strength,
     p: (a, b) => b.p_confirm - a.p_confirm,
+    severity: (a, b) => b.severity - a.severity,
+    dollars: (a, b) => b.flagged_dollars - a.flagged_dollars,
+    harm: (a, b) => b.harm - a.harm || b.members_affected - a.members_affected,
+    hours: (a, b) => (a.screening_days_left ?? 99) - (b.screening_days_left ?? 99),
+    evidence: (a, b) => b.evidence_strength - a.evidence_strength,
   };
   return [...rows].sort(by[key]);
 }
@@ -56,6 +58,7 @@ export function ManagerQueuePage() {
   const [edits, setEdits] = useState<Partial<DeskDraft>>({});
   const [overrideTarget, setOverrideTarget] = useState<OverrideTarget | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
 
   const stored = readStoredRun();
 
@@ -77,7 +80,8 @@ export function ManagerQueuePage() {
     enabled: canQueue,
     retry: false,
   });
-  const runId = batchQuery.data?.runs[0]?.run_id ?? stored?.runId ?? currentRunQuery.data?.run_id ?? null;
+  const runId =
+    activeRunId ?? currentRunQuery.data?.run_id ?? batchQuery.data?.runs[0]?.run_id ?? stored?.runId ?? null;
   const runQuery = useQuery({
     queryKey: ["run", runId],
     queryFn: () => api.getRun(runId!),
@@ -129,6 +133,8 @@ export function ManagerQueuePage() {
     onSuccess: (payload, vars) => {
       setEdits({});
       if (payload.kind === "run") {
+        setActiveRunId(payload.run.run_id);
+        queryClient.setQueryData(["run", payload.run.run_id], payload.run);
         writeStoredRun({
           runId: payload.run.run_id,
           batchId: payload.run.batch_id,
@@ -137,8 +143,11 @@ export function ManagerQueuePage() {
           capacityHours: payload.run.capacity_hours ?? payload.run.summary.capacity_hours ?? vars.capacity,
           horizonDays: payload.run.horizon_days ?? payload.run.summary.horizon_days ?? vars.horizon,
         });
-        setNotice("Queue re-laned with the current hours, member-impact weight, and top-N cap. Backlog stays open.");
+        setNotice(
+          `Queue re-laned on a ${vars.horizon}-day window with ${vars.capacity.toFixed(0)} h, ${vars.slots} slots, people weight ${vars.member.toFixed(1)}×.`,
+        );
       } else if (payload.data.run) {
+        setActiveRunId(payload.data.run.run_id);
         writeStoredRun({
           runId: payload.data.run.run_id,
           batchId: payload.data.batch_id,
@@ -153,6 +162,7 @@ export function ManagerQueuePage() {
       void queryClient.invalidateQueries({ queryKey: ["run"] });
       void queryClient.invalidateQueries({ queryKey: ["queue"] });
       void queryClient.invalidateQueries({ queryKey: ["batch"] });
+      void queryClient.invalidateQueries({ queryKey: ["case-history"] });
     },
   });
 
@@ -245,15 +255,15 @@ export function ManagerQueuePage() {
 
       {runId ? (
         <dl className="stat-grid kpis">
-          <StatTile label="Alerts" value={nAlerts} hint="Raw detector hits" />
+          <StatTile label="Flags" value={nAlerts} hint="Raw detector hits" />
           <StatTile label="Cases" value={nCases} hint="After grouping" />
           <StatTile
-            label="Today's desk"
+            label="Desk"
             value={nToday}
             hint={`${hours(deskHours)} used · ${hours(capacityHours)} capacity`}
           />
-          <StatTile label="Harm priority" value={casesByLane.harm_priority} tone="harm" />
-          <StatTile label="Tracked backlog" value={casesByLane.overflow} hint="Still open, not dismissed" />
+          <StatTile label="Harm" value={casesByLane.harm_priority} tone="harm" />
+          <StatTile label="Wait" value={casesByLane.overflow} hint="Still open, not dismissed" />
         </dl>
       ) : null}
 
@@ -299,7 +309,9 @@ export function ManagerQueuePage() {
           hasExtract={hasExtract}
           pending={loadMut.isPending}
           onChange={(next) => setEdits(next)}
-          onRun={() => loadMut.mutate(draft)}
+          onRun={(next) => {
+            if (!loadMut.isPending) loadMut.mutate(next);
+          }}
         />
       </div>
 
@@ -329,7 +341,7 @@ export function ManagerQueuePage() {
           id="queue"
           eyebrow="Queue"
           title="Ranked cases"
-          description="Select a case to open its file. Tick two cases to compare their rank factors."
+          description="Select a case to open its file. Tick two cases to compare why they rank."
           actions={<span className="badge">{filtered.length} shown</span>}
         >
           <div className="toolbar">
@@ -367,12 +379,12 @@ export function ManagerQueuePage() {
               Sort
               <select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)}>
                 <option value="rank">Lane, then rank</option>
-                <option value="ev">{SCORE_LABELS.expectedValue.label}</option>
-                <option value="dollars">Flagged $</option>
-                <option value="harm">Harm</option>
-                <option value="p">{SCORE_LABELS.pConfirm.label}</option>
-                <option value="evidence">Evidence</option>
-                <option value="hours">Hours</option>
+                <option value="p">{DASH_LABEL.chance}</option>
+                <option value="severity">{DASH_LABEL.severity}</option>
+                <option value="dollars">{DASH_LABEL.paid}</option>
+                <option value="harm">{DASH_LABEL.harm}</option>
+                <option value="evidence">{DASH_LABEL.proof}</option>
+                <option value="hours">{DASH_LABEL.time}</option>
               </select>
             </label>
           </div>
@@ -386,7 +398,6 @@ export function ManagerQueuePage() {
           {filtered.length > 0 ? (
             <QueueTable
               rows={filtered}
-              horizon={applied.horizon}
               openId={openId}
               compareIds={compareIds}
               canOverride={canOverride}
@@ -420,6 +431,15 @@ export function ManagerQueuePage() {
             </ol>
           </details>
         </Panel>
+      ) : null}
+
+      {canQueue ? <AwsIngestPanel /> : null}
+
+      {canQueue ? (
+        <HistoryPanel
+          title="Case history"
+          description="Decided SIU cases, earlier runs after a recompute, and prior investigations from the extract. Ten rows per page."
+        />
       ) : null}
 
       {openId ? <CaseDrawer caseId={openId} onClose={closeDrawer} /> : null}

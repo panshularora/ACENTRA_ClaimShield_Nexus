@@ -1,0 +1,8 @@
+.venv
+tests
+__pycache__
+*.db
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.python-version

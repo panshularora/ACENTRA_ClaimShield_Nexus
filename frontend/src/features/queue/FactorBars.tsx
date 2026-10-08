@@ -1,21 +1,14 @@
 import type { RankFactors, RankingPolicy } from "../../api/types";
 import { FactorContributionChart } from "../../components/charts/FactorContributionChart";
 import {
-  DEFAULT_FACTOR_LABELS,
+  FACTOR_COLOR_TOKEN,
   FACTOR_KEYS,
+  SHORT_FACTOR_LABELS,
   factorData,
   policyLabels,
-  type FactorKey,
 } from "../../components/charts/factorData";
+import { pctNumber } from "../../lib/format";
 import { token } from "../../lib/theme";
-
-const STRIP_TOKENS: Record<FactorKey, `--${string}`> = {
-  severity: "--chart-6",
-  exposure: "--chart-4",
-  member: "--chart-5",
-  evidence: "--chart-1",
-  urgency: "--chart-3",
-};
 
 
 /** Risk-factor contributions as a labelled horizontal bar chart. */
@@ -23,15 +16,25 @@ export function FactorBars({
   factors,
   policy,
   title,
+  suspicion,
 }: {
   factors?: RankFactors;
   policy?: RankingPolicy;
   title?: string;
+  suspicion?: number | null;
 }) {
   if (!factors) {
     return <p className="muted">The API sent no rank factors for this case.</p>;
   }
-  return <FactorContributionChart factors={factors} labels={policyLabels(policy)} title={title} />;
+  return (
+    <FactorContributionChart
+      key={`${factors.composite}-${FACTOR_KEYS.map((key) => factors[key]).join("-")}`}
+      factors={factors}
+      labels={policyLabels(policy)}
+      title={title}
+      suspicionPts={pctNumber(suspicion)}
+    />
+  );
 }
 
 /**
@@ -46,7 +49,7 @@ export function FactorStrip({ factors }: { factors?: RankFactors }) {
     <span className="factor-strip" role="img" aria-label={`Combined ${Math.round(factors.composite * 100)} of 100: ${description}`}>
       <span className="factor-strip-track" aria-hidden="true">
         {data.map((d) => (
-          <i key={d.key} style={{ width: `${d.points}%`, background: token(STRIP_TOKENS[d.key]) }} title={`${d.label} ${d.points.toFixed(1)}`} />
+          <i key={d.key} style={{ width: `${d.points}%`, background: token(FACTOR_COLOR_TOKEN[d.key]) }} title={`${d.label} ${d.points.toFixed(1)}`} />
         ))}
       </span>
       <span className="mono num">{Math.round(factors.composite * 100)}</span>
@@ -60,8 +63,8 @@ export function FactorStripLegend() {
     <ul className="chart-legend factor-strip-legend" aria-label="Factor colours in the rank column">
       {FACTOR_KEYS.map((key) => (
         <li key={key}>
-          <span className="chart-swatch" style={{ color: token(STRIP_TOKENS[key]) }} aria-hidden="true" />
-          {DEFAULT_FACTOR_LABELS[key]}
+          <span className="chart-swatch" style={{ color: token(FACTOR_COLOR_TOKEN[key]) }} aria-hidden="true" />
+          {SHORT_FACTOR_LABELS[key]}
         </li>
       ))}
     </ul>

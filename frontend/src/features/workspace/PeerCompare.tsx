@@ -14,21 +14,23 @@ export function PeerCompare({ evidence }: { evidence: Record<string, unknown> })
         <PeerComparisonChart stats={stats} />
       ) : (
         <p className="muted">
-          Peer statistics (provider value, median, quartiles) were not included in this alert, so no chart is drawn.
+          We do not have enough similar-provider numbers to draw a comparison chart.
         </p>
       )}
       <p className="peer-group-text">
-        Peer group: {group.selection}. Dimensions: {(group.dimensions_used ?? []).join(", ") || "none"}
-        {group.geography ? ` · ${group.geography}` : ""}
-        {group.confidence ? (
-          <>
-            {" "}
-            · <span className={`badge ${limited ? "tone-warning" : "tone-success"}`}>{group.confidence} confidence</span>
-          </>
-        ) : null}
+        Compared with {group.n_peers} similar providers
+        {group.specialty ? ` in ${group.specialty.replaceAll("_", " ")}` : ""}
+        {group.geography ? `, ${group.geography}` : ""}.
+        {limited ? " The comparison group is small, so treat the chart as a hint." : ""}
       </p>
       {group.limitation ? <p className="muted">{group.limitation}</p> : null}
-      <p className="muted">A difference from peers is a reason to examine the evidence, not a finding.</p>
+      <p className="muted">Looking different from similar providers is a reason to open the claims, not a conclusion.</p>
+      <p className="muted mono">
+        peer_group n={group.n_peers}
+        {group.confidence ? ` · confidence=${group.confidence}` : ""}
+        {group.rural ? " · rural=true" : ""}
+        {group.relaxed ? " · relaxed match" : ""}
+      </p>
     </div>
   );
 }

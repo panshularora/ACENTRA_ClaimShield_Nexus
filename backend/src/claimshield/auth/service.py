@@ -28,36 +28,42 @@ SYSTEM_USER_EMAIL = "ingest@internal.claimshield"
 
 DEMO_USERS: list[dict[str, str]] = [
     {
+        "id": "USR-DEMO-INV1",
         "email": "investigator@demo.claimshield",
         "role": Role.INVESTIGATOR.value,
         "display_name": "SIU Investigator",
         "password": "demo-investigator",
     },
     {
+        "id": "USR-DEMO-INV2",
         "email": "investigator2@demo.claimshield",
         "role": Role.INVESTIGATOR.value,
         "display_name": "Unassigned Investigator",
         "password": "demo-investigator2",
     },
     {
+        "id": "USR-DEMO-MGR",
         "email": "manager@demo.claimshield",
         "role": Role.MANAGER.value,
         "display_name": "SIU Manager",
         "password": "demo-manager",
     },
     {
+        "id": "USR-DEMO-ANL",
         "email": "analyst@demo.claimshield",
         "role": Role.ANALYST.value,
         "display_name": "Policy Analyst",
         "password": "demo-analyst",
     },
     {
+        "id": "USR-DEMO-AUD",
         "email": "auditor@demo.claimshield",
         "role": Role.AUDITOR.value,
         "display_name": "Compliance Auditor",
         "password": "demo-auditor",
     },
     {
+        "id": "USR-DEMO-ADM",
         "email": "admin@demo.claimshield",
         "role": Role.ADMIN.value,
         "display_name": "Admin",
@@ -74,7 +80,7 @@ def seed_demo_users(session: Session, now: datetime | None = None) -> None:
             continue
         session.add(
             User(
-                id=new_id("USR"),
+                id=spec["id"],
                 email=spec["email"],
                 password_hash=hash_password(spec["password"]),
                 role=spec["role"],

@@ -61,12 +61,18 @@ class LocalDirStore:
 
 
 class S3Store:
-    def __init__(self, *, region: str) -> None:
+    """Live S3 client for incoming/processed/results. Kept even when local_dir is used in tests."""
+
+    def __init__(self, *, region: str, access_key: str = "", secret_key: str = "") -> None:
         try:
             import boto3
         except ImportError as exc:  # pragma: no cover
             raise ServiceUnavailable("s3 client is not installed") from exc
-        self._client = boto3.client("s3", region_name=region)
+        kwargs: dict[str, str] = {"region_name": region}
+        if access_key and secret_key:
+            kwargs["aws_access_key_id"] = access_key
+            kwargs["aws_secret_access_key"] = secret_key
+        self._client = boto3.client("s3", **kwargs)
 
     def get(self, bucket: str, key: str) -> StoredObject:
         try:
@@ -106,7 +112,11 @@ class S3Store:
 def build_store(settings: Settings) -> ObjectStore:
     if settings.s3_local_dir is not None:
         return LocalDirStore(Path(settings.s3_local_dir))
-    return S3Store(region=settings.aws_region)
+    return S3Store(
+        region=settings.aws_region,
+        access_key=settings.aws_access_key_id,
+        secret_key=settings.aws_secret_access_key,
+    )
 
 
 def assert_safe_key(key: str, *, incoming_prefix: str) -> None:

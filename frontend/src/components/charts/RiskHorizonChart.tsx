@@ -1,7 +1,7 @@
-import { Bar, BarChart, CartesianGrid, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, LabelList, Tooltip, XAxis, YAxis } from "recharts";
 import { pct } from "../../lib/format";
 import { categoryAxis, chartTheme, valueAxis } from "../../lib/chartTheme";
-import { ChartFrame } from "./ChartFrame";
+import { ChartFrame, ChartPlot } from "./ChartFrame";
 import { SCORE_LABELS } from "../../lib/scoreLabels";
 import { TooltipCard } from "./ChartTooltip";
 
@@ -38,10 +38,10 @@ export function RiskHorizonChart({ f30, f60, f90, appliedHorizon }: RiskHorizonC
       table={{
         caption: SCORE_LABELS.horizon.chartTitle,
         columns: ["Horizon", "Risk (%)"],
-        rows: data.map((d) => [d.horizon, d.value === null ? "Not provided" : Math.round(d.value * 100)]),
+        rows: data.map((d) => [d.horizon, d.value === null ? "Not provided" : pct(d.value)]),
       }}
     >
-      <ResponsiveContainer width="100%" height={132}>
+      <ChartPlot height={132}>
         <BarChart
           data={data}
           barCategoryGap="35%"
@@ -54,8 +54,8 @@ export function RiskHorizonChart({ f30, f60, f90, appliedHorizon }: RiskHorizonC
           <YAxis
             {...valueAxis(t)}
             domain={[0, 1]}
-            ticks={[0, 0.5, 1]}
-            tickFormatter={(value: number) => `${Math.round(value * 100)}%`}
+            ticks={[0, 0.5, 0.99]}
+            tickFormatter={(value: number) => pct(value)}
             width={44}
           />
           <Tooltip
@@ -74,14 +74,17 @@ export function RiskHorizonChart({ f30, f60, f90, appliedHorizon }: RiskHorizonC
             <LabelList
               dataKey="value"
               position="top"
-              formatter={(value) => (typeof value === "number" ? pct(value) : "n/a")}
+              formatter={(value) => {
+                const n = typeof value === "number" ? value : Number(value);
+                return Number.isFinite(n) ? pct(n) : "n/a";
+              }}
               fill={t.text}
               fontSize={12}
               fontWeight={500}
             />
           </Bar>
         </BarChart>
-      </ResponsiveContainer>
+      </ChartPlot>
     </ChartFrame>
   );
 }

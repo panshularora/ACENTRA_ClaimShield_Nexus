@@ -38,24 +38,17 @@ export function RiskLevelBadge({ level, title }: { level: RiskLevel; title?: str
 export function ConfirmBandBadge({ p }: { p: number }) {
   const band: ConfirmBand = confirmBand(p);
   return (
-    <span className={`badge confirm-${band}`} title="P(confirm) band; not a finding">
+    <span className={`badge confirm-${band}`} title="Suspicion score for review. A person still decides.">
       {CONFIRM_BAND_LABEL[band]}
     </span>
   );
 }
 
 export function HarmFlag({ harm }: { harm: number }) {
-  if (harm < 3) {
-    return (
-      <span className="harm-level num" title="Patient-harm level (separate from financial risk)">
-        <span className="sr-only">Harm </span>
-        {harm}
-      </span>
-    );
-  }
+  const tone = harm >= 4 ? "harm" : harm >= 3 ? "tone-warning" : "status";
   return (
-    <span className="badge harm" title="Patient-harm level (separate from financial risk)">
-      <span aria-hidden="true">✚</span>Harm {harm}
+    <span className={`badge ${tone}`} title="Patient-harm level (separate from money risk)">
+      Harm {harm}
     </span>
   );
 }

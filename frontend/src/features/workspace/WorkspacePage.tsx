@@ -10,9 +10,10 @@ import { PageHeader } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Panel";
 import { NotFound } from "../../components/ui/NotFound";
 import { ErrorState, LoadingState } from "../../components/ui/States";
+import { pct } from "../../lib/format";
 import { FactorBars } from "../queue/FactorBars";
 import { BriefPanel } from "./BriefPanel";
-import { CaseHeader } from "./CaseHeader";
+import { CaseHeader, FactorList } from "./CaseHeader";
 import { ClaimsTable } from "./ClaimsTable";
 import { DecisionBar } from "./DecisionBar";
 import { configsFromOptions, type DecisionAction } from "./decisionConfig";
@@ -24,7 +25,7 @@ import { CaseLineage } from "./ProvenancePanel";
 import { TimelinePanel } from "./TimelinePanel";
 import "./workspace.css";
 
-/** Sections in reading order; ids double as URL hashes. */
+/** Tabs 2–6; ids double as URL hashes. */
 const SECTIONS = [
   { id: "evidence", label: "Evidence" },
   { id: "network", label: "Network" },
@@ -33,8 +34,16 @@ const SECTIONS = [
   { id: "decide", label: "Decision" },
 ] as const;
 
-/** Hashes from the earlier tabbed workspace still land on the right section. */
-const LEGACY_HASH: Record<string, string> = { overview: "evidence", findings: "evidence", timeline: "claims" };
+type SectionId = (typeof SECTIONS)[number]["id"];
+
+/** Hashes from the earlier long-scroll workspace still land on the right tab. */
+const LEGACY_HASH: Record<string, SectionId> = { overview: "evidence", findings: "evidence", timeline: "claims" };
+
+function sectionFromHash(): SectionId {
+  const raw = window.location.hash.replace("#", "");
+  const mapped = LEGACY_HASH[raw] ?? raw;
+  return SECTIONS.some((section) => section.id === mapped) ? (mapped as SectionId) : "evidence";
+}
 
 export function WorkspacePage() {
   const { caseId } = useParams({ from: "/investigator/workspace/$caseId" });
@@ -43,6 +52,7 @@ export function WorkspacePage() {
   const [unmask, setUnmask] = useState(false);
   const [itemId, setItemId] = useState<string | null>(null);
   const [selection, setSelection] = useState<GraphSelection | null>(null);
+  const [tab, setTab] = useState<SectionId>(sectionFromHash);
 
   const canRead = can(user, "case:read");
   const canDecide = can(user, "case:decide");
@@ -90,6 +100,7 @@ export function WorkspacePage() {
       void queryClient.invalidateQueries({ queryKey: ["decision-options", caseId] });
       void queryClient.invalidateQueries({ queryKey: ["queue"] });
       void queryClient.invalidateQueries({ queryKey: ["wiki-proposals"] });
+      void queryClient.invalidateQueries({ queryKey: ["case-history"] });
     },
   });
   const reviewMut = useMutation({
@@ -101,6 +112,7 @@ export function WorkspacePage() {
       void queryClient.invalidateQueries({ queryKey: ["decision-options", caseId] });
       void queryClient.invalidateQueries({ queryKey: ["queue"] });
       void queryClient.invalidateQueries({ queryKey: ["wiki-proposals"] });
+      void queryClient.invalidateQueries({ queryKey: ["case-history"] });
     },
   });
   const reopenMut = useMutation({
@@ -109,6 +121,7 @@ export function WorkspacePage() {
       void queryClient.invalidateQueries({ queryKey: ["case", caseId] });
       void queryClient.invalidateQueries({ queryKey: ["decision-options", caseId] });
       void queryClient.invalidateQueries({ queryKey: ["queue"] });
+      void queryClient.invalidateQueries({ queryKey: ["case-history"] });
     },
   });
 
@@ -176,17 +189,22 @@ export function WorkspacePage() {
   const openProfile = useCallback((providerId: string) => setItemId(`provider:${providerId}`), []);
   const closeDrawer = useCallback(() => setItemId(null), []);
   const clearFocus = useCallback(() => setSelection(null), []);
-  const jump = useCallback((target: JumpTarget) => {
-    document.getElementById(target)?.scrollIntoView({ block: "start" });
+  const openTab = useCallback((id: SectionId) => {
+    setTab(id);
+    const hash = `#${id}`;
+    if (window.location.hash !== hash) history.replaceState(null, "", hash);
   }, []);
 
-  // Honour a section hash once the case has rendered (including legacy tab hashes).
+  const jump = useCallback(
+    (target: JumpTarget) => {
+      openTab(target);
+    },
+    [openTab],
+  );
+
   useEffect(() => {
-    if (!data) return;
-    const raw = window.location.hash.replace("#", "");
-    const id = LEGACY_HASH[raw] ?? raw;
-    if (id && SECTIONS.some((s) => s.id === id)) document.getElementById(id)?.scrollIntoView({ block: "start" });
-  }, [data]);
+    setTab(sectionFromHash());
+  }, [caseId]);
 
   if (!user) return null;
   if (!canRead) {
@@ -237,23 +255,31 @@ export function WorkspacePage() {
             canAssign={canAssign}
             assigning={assignMut.isPending}
             onAssign={() => assignMut.mutate()}
+            onDecide={() => openTab("decide")}
             unmask={unmask}
             onUnmaskChange={setUnmask}
           />
 
-          <nav className="section-nav" aria-label="Case sections">
-            <ol>
+          <nav className="section-nav" aria-label="Case file">
+            <div className="section-tabs" role="tablist">
               {SECTIONS.map((section, i) => (
-                <li key={section.id}>
-                  <a href={`#${section.id}`}>
-                    <span className="section-index" aria-hidden="true">
-                      {i + 2}
-                    </span>
-                    {section.label}
-                  </a>
-                </li>
+                <button
+                  key={section.id}
+                  type="button"
+                  role="tab"
+                  id={`tab-${section.id}`}
+                  aria-selected={tab === section.id}
+                  aria-controls={section.id}
+                  className={tab === section.id ? "is-active" : undefined}
+                  onClick={() => openTab(section.id)}
+                >
+                  <span className="section-index" aria-hidden="true">
+                    {i + 2}
+                  </span>
+                  {section.label}
+                </button>
               ))}
-            </ol>
+            </div>
             {focus ? (
               <p className="focus-chip" role="status">
                 Focused on <strong>{focus.label}</strong>
@@ -264,148 +290,190 @@ export function WorkspacePage() {
             ) : null}
           </nav>
 
-          <Panel
-            id="evidence"
-            eyebrow="2 · Evidence"
-            title="Why this case was surfaced"
-            description={data.why_rank?.text}
-          >
-            <div className="evidence-grid">
-              <FactorBars factors={data.rank_factors} />
-              <div className="evidence-summary subpanel">
-                {data.grouping ? (
-                  <>
-                    <h3>Grouped alerts</h3>
-                    <p>{data.grouping.text}</p>
-                    <p className="muted">
-                      {data.grouping.alert_count} alert{data.grouping.alert_count === 1 ? "" : "s"} across{" "}
-                      {data.grouping.entity_ids.length} NPI{data.grouping.entity_ids.length === 1 ? "" : "s"}
-                    </p>
-                  </>
-                ) : null}
-                {data.evidence_gaps && data.evidence_gaps.length > 0 ? (
-                  <>
-                    <h3>Evidence still needed</h3>
-                    <ul className="compact-list">
-                      {data.evidence_gaps.map((gap) => (
-                        <li key={gap}>{gap}</li>
-                      ))}
-                    </ul>
-                  </>
-                ) : null}
-                <p className="note">
-                  Ranked suspicion for human review. The model does not label a provider as fraudulent.
-                </p>
+          {tab === "evidence" ? (
+            <Panel
+              id="evidence"
+              className="workspace-tab"
+              eyebrow="2 · Evidence"
+              title="Why this case is on the desk"
+              description={data.why_rank?.text}
+            >
+              <dl className="evidence-dossier facts dense">
+                <div>
+                  <dt>Patterns on this file</dt>
+                  <dd>{data.alerts.length}</dd>
+                </div>
+                <div>
+                  <dt>Paid claim lines cited</dt>
+                  <dd>{new Set(data.alerts.flatMap((alert) => alert.line_ids)).size}</dd>
+                </div>
+                <div>
+                  <dt>Evidence strength</dt>
+                  <dd>{pct(data.evidence_strength)}</dd>
+                </div>
+                <div>
+                  <dt>Tables behind the packet</dt>
+                  <dd>{data.provenance?.data_sources.length ?? "—"}</dd>
+                </div>
+              </dl>
+              <p className="note">
+                Each card below is a suspicion to verify: plain words first, then the detector, rule id, and
+                tables. This packet is not a fraud label.
+              </p>
+              <div className="evidence-grid">
+                <FactorBars factors={data.rank_factors} suspicion={data.p_confirm} title="How desk rank is built" />
+                <div className="evidence-summary subpanel">
+                  {data.grouping ? (
+                    <>
+                      <h3>Why these patterns sit together</h3>
+                      <p>{data.grouping.text}</p>
+                      <p className="muted">
+                        {data.grouping.alert_count} pattern{data.grouping.alert_count === 1 ? "" : "s"} across{" "}
+                        {data.grouping.entity_ids.length} provider{data.grouping.entity_ids.length === 1 ? "" : "s"}
+                      </p>
+                    </>
+                  ) : null}
+                  {data.evidence_gaps && data.evidence_gaps.length > 0 ? (
+                    <>
+                      <h3>What to collect next</h3>
+                      <ul className="compact-list">
+                        {data.evidence_gaps.map((gap) => (
+                          <li key={gap}>{gap}</li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : null}
+                  <p className="note">
+                    Ranked for a person to review. Scores do not close the case.
+                  </p>
+                </div>
               </div>
-            </div>
-            <FindingsPanel
-              alerts={data.alerts}
-              focusAlertIds={matches?.alertIds ?? null}
-              focusLabel={focus?.label ?? null}
-              onOpen={(alertId) => setItemId(`alert:${alertId}`)}
-            />
-            {data.provenance ? (
-              <details className="lineage-details">
-                <summary>How this case was built (evidence trail)</summary>
-                <CaseLineage provenance={data.provenance} />
-              </details>
-            ) : null}
-          </Panel>
+              {(data.risk_factors && data.risk_factors.length > 0) ||
+              (data.p_confirm_factors && data.p_confirm_factors.length > 0) ? (
+                <div className="case-model-factors">
+                  <FactorList title="What is pushing 30-day suspicion" factors={data.risk_factors} />
+                  <FactorList title="What is pushing the suspicion score" factors={data.p_confirm_factors} />
+                </div>
+              ) : null}
+              <FindingsPanel
+                alerts={data.alerts}
+                focusAlertIds={matches?.alertIds ?? null}
+                focusLabel={focus?.label ?? null}
+                onOpen={(alertId) => setItemId(`alert:${alertId}`)}
+              />
+              {data.provenance ? (
+                <details className="lineage-details">
+                  <summary>How this case was built</summary>
+                  <CaseLineage provenance={data.provenance} />
+                </details>
+              ) : null}
+            </Panel>
+          ) : null}
 
-          <NetworkPanel
-            caseId={caseId}
-            unmask={unmask}
-            model={network}
-            loading={networkQuery.isLoading}
-            error={networkQuery.error}
-            onRetry={() => void networkQuery.refetch()}
-            selection={selection}
-            onSelect={setSelection}
-            focusCounts={
-              matches ? { lines: matches.lineIds.size, findings: matches.alertIds.size, citations: citeMatches } : null
-            }
-            onJump={jump}
-            onOpenProfile={openProfile}
-            onOpenEvidence={openRef}
-          />
-
-          <Panel
-            id="claims"
-            eyebrow="4 · Claims"
-            title="Flagged claims and billing over time"
-            description="Claim lines attached to this case's alerts, from the adjudicated extract."
-          >
-            <TimelinePanel
-              rows={claimsQuery.data?.rows}
-              events={timelineQuery.data?.events}
-              subjectId={data.primary_entity_id}
-              loading={claimsQuery.isLoading || timelineQuery.isLoading}
-              error={claimsQuery.error ?? timelineQuery.error}
-              onOpen={openRef}
-            />
-            <ClaimsTable
-              pack={claimsQuery.data}
-              loading={claimsQuery.isLoading}
-              error={claimsQuery.error}
-              onOpenLine={openLine}
-              focusLineIds={matches?.lineIds ?? null}
-              focusLabel={focus?.label ?? null}
-              onClearFocus={clearFocus}
-            />
-          </Panel>
-
-          <Panel
-            id="brief"
-            eyebrow="5 · Brief"
-            title="Investigation brief"
-            description="Every sentence cites the alert, claim or metric it came from. Select a citation to trace it."
-          >
-            <BriefPanel
-              brief={briefQuery.data}
-              loading={briefQuery.isLoading}
-              error={briefQuery.error}
-              onCite={openCite}
-              highlightCiteIds={matches?.citeIds ?? null}
-              focusLabel={focus?.label ?? null}
-            />
-          </Panel>
-
-          <Panel
-            id="decide"
-            eyebrow="6 · Decision · human only"
-            title="Record the next step"
-            description="An alert is suspicion, not a confirmed finding of fraud. Cite the evidence you inspected and give a reason another reviewer can follow."
-            className="decision-panel"
-          >
-            <DecisionBar
-              actions={decisionActions}
-              minReasonChars={options?.min_reason_chars}
-              disabled={!canRecord}
-              blockedReason={options?.blocked_reason}
-              gaps={data.evidence_gaps ?? briefQuery.data?.evidence_gaps ?? []}
-              pending={decideMut.isPending}
-              error={decisionError}
-              result={decideMut.data ?? null}
-              existingProposal={data.latest_proposal ?? null}
-              alerts={data.alerts}
-              pendingDecision={options?.pending_decision ?? data.pending_decision}
-              canApprove={options?.can_approve}
-              canReopen={options?.can_reopen}
-              reviewPending={reviewMut.isPending || reopenMut.isPending}
-              onSubmit={(action, reason, evidenceRefs, ladderStep) =>
-                decideMut.mutate({ action, reason, evidence_refs: evidenceRefs, ladder_step: ladderStep })
+          {tab === "network" ? (
+            <NetworkPanel
+              caseId={caseId}
+              unmask={unmask}
+              model={network}
+              loading={networkQuery.isLoading}
+              error={networkQuery.error}
+              onRetry={() => void networkQuery.refetch()}
+              selection={selection}
+              onSelect={setSelection}
+              focusCounts={
+                matches ? { lines: matches.lineIds.size, findings: matches.alertIds.size, citations: citeMatches } : null
               }
-              onApprove={(note) => {
-                const id = (options?.pending_decision ?? data.pending_decision)?.decision_id;
-                if (id) reviewMut.mutate({ kind: "approve", note, decisionId: id });
-              }}
-              onReject={(note) => {
-                const id = (options?.pending_decision ?? data.pending_decision)?.decision_id;
-                if (id) reviewMut.mutate({ kind: "reject", note, decisionId: id });
-              }}
-              onReopen={(reason) => reopenMut.mutate(reason)}
+              onJump={jump}
+              onOpenProfile={openProfile}
+              onOpenEvidence={openRef}
             />
-          </Panel>
+          ) : null}
+
+          {tab === "claims" ? (
+            <Panel
+              id="claims"
+              className="workspace-tab"
+              eyebrow="4 · Claims"
+              title="Flagged claims and billing over time"
+              description="Claim lines attached to this case's alerts, from the adjudicated extract."
+            >
+              <TimelinePanel
+                rows={claimsQuery.data?.rows}
+                events={timelineQuery.data?.events}
+                subjectId={data.primary_entity_id}
+                loading={claimsQuery.isLoading || timelineQuery.isLoading}
+                error={claimsQuery.error ?? timelineQuery.error}
+                onOpen={openRef}
+              />
+              <ClaimsTable
+                pack={claimsQuery.data}
+                loading={claimsQuery.isLoading}
+                error={claimsQuery.error}
+                onOpenLine={openLine}
+                focusLineIds={matches?.lineIds ?? null}
+                focusLabel={focus?.label ?? null}
+                onClearFocus={clearFocus}
+              />
+            </Panel>
+          ) : null}
+
+          {tab === "brief" ? (
+            <Panel
+              id="brief"
+              className="workspace-tab"
+              eyebrow="5 · Brief"
+              title="Investigation brief"
+              description="Every sentence cites the alert, claim or metric it came from. Select a citation to trace it."
+            >
+              <BriefPanel
+                brief={briefQuery.data}
+                loading={briefQuery.isLoading}
+                error={briefQuery.error}
+                onCite={openCite}
+                highlightCiteIds={matches?.citeIds ?? null}
+                focusLabel={focus?.label ?? null}
+              />
+            </Panel>
+          ) : null}
+
+          {tab === "decide" ? (
+            <Panel
+              id="decide"
+              eyebrow="6 · Decision · human only"
+              title="Record the next step"
+              description="Write what you checked and why. Another reviewer should be able to follow the same claims."
+              className="decision-panel workspace-tab"
+            >
+              <DecisionBar
+                actions={decisionActions}
+                minReasonChars={options?.min_reason_chars}
+                disabled={!canRecord}
+                blockedReason={options?.blocked_reason}
+                gaps={data.evidence_gaps ?? briefQuery.data?.evidence_gaps ?? []}
+                pending={decideMut.isPending}
+                error={decisionError}
+                result={decideMut.data ?? null}
+                existingProposal={data.latest_proposal ?? null}
+                alerts={data.alerts}
+                pendingDecision={options?.pending_decision ?? data.pending_decision}
+                canApprove={options?.can_approve}
+                canReopen={options?.can_reopen}
+                reviewPending={reviewMut.isPending || reopenMut.isPending}
+                onSubmit={(action, reason, evidenceRefs, ladderStep) =>
+                  decideMut.mutate({ action, reason, evidence_refs: evidenceRefs, ladder_step: ladderStep })
+                }
+                onApprove={(note) => {
+                  const id = (options?.pending_decision ?? data.pending_decision)?.decision_id;
+                  if (id) reviewMut.mutate({ kind: "approve", note, decisionId: id });
+                }}
+                onReject={(note) => {
+                  const id = (options?.pending_decision ?? data.pending_decision)?.decision_id;
+                  if (id) reviewMut.mutate({ kind: "reject", note, decisionId: id });
+                }}
+                onReopen={(reason) => reopenMut.mutate(reason)}
+              />
+            </Panel>
+          ) : null}
         </>
       ) : null}
 

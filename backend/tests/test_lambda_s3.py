@@ -143,6 +143,15 @@ def test_backend_unavailable_raises(handler) -> None:
         )
 
 
+def test_env_reads_s3_input_prefix(handler, monkeypatch) -> None:
+    monkeypatch.delenv("CLAIMSHIELD_S3_INCOMING_PREFIX", raising=False)
+    monkeypatch.setenv("S3_INPUT_PREFIX", "incoming/")
+    monkeypatch.delenv("CLAIMSHIELD_S3_BUCKET", raising=False)
+    monkeypatch.setenv("S3_BUCKET", "claimshield-nexus-data-2026")
+    assert handler._env("CLAIMSHIELD_S3_INCOMING_PREFIX", "S3_INPUT_PREFIX", default="x/") == "incoming/"
+    assert handler._env("CLAIMSHIELD_S3_BUCKET", "S3_BUCKET", default="other") == "claimshield-nexus-data-2026"
+
+
 def test_post_ingest_maps_url_error(handler, monkeypatch) -> None:
     def boom(_request, timeout=0):
         raise URLError("down")

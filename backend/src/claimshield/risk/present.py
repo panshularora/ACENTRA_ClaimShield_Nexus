@@ -34,6 +34,7 @@ def case_risk(session: Session, case_id: str) -> CaseRisk | None:
 
 def score_label(risk: CaseRisk | None) -> str:
     if risk is not None and risk.score_kind == "trained_model":
-        state = "calibrated" if risk.calibrated else "uncalibrated"
-        return f"{state} model {risk.model_version}, trained on synthetic data"
-    return "uncalibrated heuristic, not a probability"
+        if risk.calibrated:
+            return "learned score, adjusted to how often similar reviews were later confirmed"
+        return "learned score, not yet adjusted to past review rates"
+    return "simple score used when the learned model is unavailable"
