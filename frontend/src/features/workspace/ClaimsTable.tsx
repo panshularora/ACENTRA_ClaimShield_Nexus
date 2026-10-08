@@ -72,8 +72,8 @@ export function ClaimsTable({
           />
         </label>
         <label>
-          Signal
-          <select value={signal} onChange={(e) => setSignal(e.target.value)}>
+          <span className="sr">Signal</span>
+          <select value={signal} onChange={(e) => setSignal(e.target.value)} aria-label="Signal">
             <option value="all">All signals</option>
             {signals.map((id) => (
               <option key={id} value={id}>
@@ -83,8 +83,8 @@ export function ClaimsTable({
           </select>
         </label>
         <label>
-          Sort
-          <select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)}>
+          <span className="sr">Sort</span>
+          <select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label="Sort">
             <option value="dos">Date of service</option>
             <option value="paid">Paid</option>
             <option value="code">Code</option>
