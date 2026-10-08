@@ -5,8 +5,8 @@ SIU case platform: synthetic Medicaid-like extract, hash-chained audit, cookie J
 ## Quick start
 
 ```
-uv sync --extra dev
-copy .env.example .env
+uv sync --frozen --extra dev
+cp .env.example .env
 uv run pytest
 uv run uvicorn claimshield.api.main:app --reload --app-dir src --host 127.0.0.1 --port 8000
 ```
@@ -41,7 +41,10 @@ Manager loads data: `POST /api/v1/batches` `{"profile":"tiny","seed":7}`.
 AWS machine ingest: `POST /api/v1/aws/ingest` with `X-ClaimShield-Internal-Token` (see `../docs/AWS_INGEST.md`). Leave `CLAIMSHIELD_INTERNAL_TOKEN` empty for local-only use.
 Queue: `GET /api/v1/runs/{run_id}/queue`.
 Workspace: `GET /api/v1/cases/{id}` plus `/brief`, `/claims`, `/timeline`, `/network`, `/evidence/{item_id}`.
-Decide: `POST /api/v1/cases/{id}/decisions` `{action, reason}` (escalate | monitor | dismiss | needs_evidence; reason ≥ 20 chars). Never an automatic fraud label.
+Decide: `POST /api/v1/cases/{id}/decisions` `{action, ladder_step, reason, evidence_refs}` (escalate | monitor | dismiss | needs_evidence; reason 20–4000 chars). Options and the allowed steps per action: `GET /api/v1/cases/{id}/decision-options`. Escalations wait in `pending_approval` until a different manager calls `POST /api/v1/decisions/{id}:approve` or `:reject`. Never an automatic fraud label.
+Session probe: `GET /api/v1/auth/session` (always 200). Cookie-authenticated writes need `X-CSRF-Token` equal to the `cs_csrf` cookie.
+
+Checks: `make check` (ruff lint, ruff format check, mypy strict, pytest).
 
 ## Dataset
 
