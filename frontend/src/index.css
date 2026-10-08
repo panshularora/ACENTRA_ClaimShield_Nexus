@@ -519,3 +519,39 @@ input, select {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+.banner {
+  border: 1px solid var(--rule);
+  padding: 0.45rem 0.6rem;
+  margin: 0.5rem 0;
+}
+.banner.ok { background: var(--selected-bg); }
+.banner.warn { background: var(--monitor-bg); }
+.audit-facts { margin: 0.35rem 0; }
+.audit-grid tbody tr { cursor: default; }
+.proposal-card {
+  border: 1px solid var(--rule);
+  background: #fff;
+  padding: 0.7rem 0.8rem;
+  margin: 0.6rem 0;
+}
+.proposal-card h3 { margin: 0 0 0.2rem; }
+.proposal-card h4 {
+  margin: 0.7rem 0 0.25rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-2);
+}
+.proposal-card.status-pending { border-left: 4px solid var(--monitor); }
+.proposal-card.status-approved { border-left: 4px solid var(--selected); }
+.compact-list { margin: 0; padding-left: 1.1rem; }
+.precedent-hit {
+  border: 1px solid var(--rule);
+  background: var(--paper-2);
+  padding: 0.4rem 0.5rem;
+  margin-bottom: 0.45rem;
+}
+.review-panel textarea { width: 100%; min-height: 4.5rem; }
+.proposal-embed { margin-top: 0.7rem; }
+.proposal-page { max-width: 920px; }

@@ -29,6 +29,8 @@ export function Shell() {
 
   const showQueue = allowed("queue:read");
   const showCases = allowed("case:read");
+  const showWiki = allowed("wiki:read");
+  const showAudit = allowed("audit:read");
 
   return (
     <div className="app">
@@ -55,6 +57,16 @@ export function Shell() {
               className={pathname.startsWith("/investigator/") ? "active" : ""}
             >
               My cases
+            </Link>
+          )}
+          {showWiki && (
+            <Link to="/wiki/proposals" className={pathname.startsWith("/wiki/") ? "active" : ""}>
+              Precedents
+            </Link>
+          )}
+          {showAudit && (
+            <Link to="/audit" className={pathname.startsWith("/audit") ? "active" : ""}>
+              Audit
             </Link>
           )}
         </nav>

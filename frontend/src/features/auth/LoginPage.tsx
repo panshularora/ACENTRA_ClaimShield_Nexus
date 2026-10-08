@@ -6,11 +6,16 @@ import { useAuth } from "../../auth/AuthProvider";
 import type { SessionUser } from "../../api/types";
 
 function homeFor(user: SessionUser): string {
+  if (user.role === "auditor") return "/audit";
   if (user.permissions.includes("queue:read") || user.permissions.includes("admin:*")) {
     if (user.role === "investigator") return "/investigator/cases";
     return "/manager/queue";
   }
   if (user.permissions.includes("case:read")) return "/investigator/cases";
+  if (user.permissions.includes("wiki:read") || user.permissions.includes("wiki:approve")) {
+    return "/wiki/proposals";
+  }
+  if (user.permissions.includes("audit:read")) return "/audit";
   return "/manager/queue";
 }
 
