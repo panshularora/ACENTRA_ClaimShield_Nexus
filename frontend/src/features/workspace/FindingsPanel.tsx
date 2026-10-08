@@ -1,5 +1,6 @@
 import type { CaseAlert } from "../../api/types";
 import { PeerCompare } from "./PeerCompare";
+import { AlertLineageBlock } from "./ProvenancePanel";
 
 const APPROACH: Record<string, string> = {
   hard_rule: "Hard rule",
@@ -64,6 +65,7 @@ export function FindingsPanel({
                   <span className="muted">{alert.line_ids.length} supporting claim line(s)</span>
                   <p>{alert.review_reason}</p>
                 </button>
+                {alert.lineage ? <AlertLineageBlock lineage={alert.lineage} /> : null}
                 {alert.evidence?.peer_group ? <PeerCompare evidence={alert.evidence} /> : null}
               </li>
             );

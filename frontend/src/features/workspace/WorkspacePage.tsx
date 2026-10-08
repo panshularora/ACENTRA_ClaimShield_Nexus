@@ -14,6 +14,7 @@ import { DecisionBar } from "./DecisionBar";
 import { EvidenceDrawer } from "./EvidenceDrawer";
 import { FindingsPanel } from "./FindingsPanel";
 import { NetworkPanel } from "./NetworkPanel";
+import { CaseLineage } from "./ProvenancePanel";
 import { TimelinePanel } from "./TimelinePanel";
 import "./workspace-siu.css";
 
@@ -174,6 +175,9 @@ export function WorkspacePage() {
               <LaneBadge lane={data.lane} />
               <StatusBadge status={data.status} />
               <HarmBadge harm={data.harm} />
+              {data.provenance && data.provenance.urgent.length > 0 && (
+                <span className="urgent-chip">Urgent still visible inside this group</span>
+              )}
               <span className={`sla-chip sla-${screeningTone(data.screening_days_left)}`}>
                 {screeningLabel(data.screening_days_left)}
               </span>
@@ -271,15 +275,42 @@ export function WorkspacePage() {
                   <dd>{data.status}</dd>
                 </div>
               </dl>
+              {data.grouping && (
+                <section className="group-summary">
+                  <p className="kicker">Which alerts sit in this case</p>
+                  <p>{data.grouping.text}</p>
+                  <p className="muted">
+                    {data.grouping.alert_count} grouped alert
+                    {data.grouping.alert_count === 1 ? "" : "s"} · {data.alerts.reduce((n, a) => n + a.line_ids.length, 0)}{" "}
+                    supporting claim line(s)
+                    {data.grouping.entity_ids.length > 1
+                      ? ` · ${data.grouping.entity_ids.length} linked NPIs`
+                      : ""}
+                  </p>
+                  <ul className="grouped-alerts">
+                    {data.alerts.map((alert) => (
+                      <li key={alert.alert_id}>
+                        <button type="button" className="cite" onClick={() => setItemId(`alert:${alert.alert_id}`)}>
+                          <span className="mono">{alert.rule_id ?? alert.detector}</span> {alert.label}
+                        </button>
+                        <span className="muted">
+                          {alert.line_ids.length} line{alert.line_ids.length === 1 ? "" : "s"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
               {data.entity_ids && data.entity_ids.length > 1 && (
                 <p className="muted">
-                  Network NPIs: <span className="mono">{data.entity_ids.join(" · ")}</span>
+                  Case NPIs: <span className="mono">{data.entity_ids.join(" · ")}</span>
                 </p>
               )}
               <p className="note">
                 Ranked suspicion for human review. The model does not print fraud on a provider.
                 Member names stay masked unless you reveal them from the header.
               </p>
+              {data.provenance && <CaseLineage provenance={data.provenance} />}
             </section>
           )}
 
@@ -293,6 +324,7 @@ export function WorkspacePage() {
               loading={briefQuery.isLoading}
               error={err(briefQuery)}
               onCite={openCite}
+              provenance={data?.provenance}
             />
           )}
 

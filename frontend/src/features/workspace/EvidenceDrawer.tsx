@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
+import type { AlertLineage } from "../../api/types";
 import { api } from "../../api/client";
 import { PeerCompare } from "./PeerCompare";
+import { AlertLineageBlock } from "./ProvenancePanel";
 
 export function EvidenceDrawer({
   caseId,
@@ -45,8 +47,17 @@ export function EvidenceDrawer({
           <p className="muted">
             Kind <span className="mono">{query.data.kind}</span>
           </p>
+          {payload?.lineage && typeof payload.lineage === "object" ? (
+            <AlertLineageBlock lineage={payload.lineage as AlertLineage} />
+          ) : null}
           {evidence?.peer_group ? <PeerCompare evidence={evidence} /> : null}
           {typeof evidence?.review_reason === "string" && <p>{evidence.review_reason}</p>}
+          {typeof payload?.source_system === "string" && (
+            <p className="muted">
+              Claim source <span className="mono">{payload.source_system}</span>
+              {payload.source_ref ? <span className="mono"> {String(payload.source_ref)}</span> : null}
+            </p>
+          )}
           <pre className="evidence-json">{JSON.stringify(query.data.payload, null, 2)}</pre>
         </div>
       )}

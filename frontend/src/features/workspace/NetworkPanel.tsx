@@ -51,6 +51,10 @@ export function NetworkPanel({
           </span>
         )}
       </header>
+      <p className="muted">
+        Nodes are billed, rendered, owner, referral, and shared TIN or location links from the
+        extract. Comparison peers used only for scoring are not parties to this case.
+      </p>
       {loading && <p className="muted">Loading neighbourhood…</p>}
       {error && <p className="error-text">{error}</p>}
       {!loading && pack && pack.nodes.length === 0 && <p className="empty">No graph neighbourhood.</p>}

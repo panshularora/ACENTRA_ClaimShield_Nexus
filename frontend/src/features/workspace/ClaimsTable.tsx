@@ -61,6 +61,10 @@ export function ClaimsTable({
       {pack?.masked && (
         <p className="note">Member names are masked. IDs only, per RBAC.</p>
       )}
+      <p className="muted">
+        Each row is an adjudicated claim line from the extract. Source system and received date
+        show where the data came from. Signals name the rule or detector that pointed here.
+      </p>
       <div className="toolbar tight">
         <label className="grow">
           <span className="sr">Filter claims</span>
@@ -110,6 +114,7 @@ export function ClaimsTable({
                 <th>Billing</th>
                 <th>Member</th>
                 <th>Facility</th>
+                <th>Source</th>
                 <th>Signals</th>
               </tr>
             </thead>
@@ -138,6 +143,11 @@ export function ClaimsTable({
                   <td className="mono">{row.billing_provider_id ?? "—"}</td>
                   <td>{row.member.display}</td>
                   <td className="mono">{row.facility_id ?? "—"}</td>
+                  <td className="mono">
+                    {row.source_system ?? "—"}
+                    {row.source_ref ? <span className="muted"> {row.source_ref}</span> : null}
+                    {row.received_date ? <span className="muted"> · {row.received_date}</span> : null}
+                  </td>
                   <td>
                     {row.signals.length === 0
                       ? "—"

@@ -1,4 +1,5 @@
-import type { CaseBrief, Cite, MatchedPrecedent } from "../../api/types";
+import type { CaseBrief, CaseProvenance, Cite, MatchedPrecedent } from "../../api/types";
+import { CaseLineage } from "./ProvenancePanel";
 
 function uniqueSentences<T extends { text: string }>(sentences: T[]): T[] {
   const seen = new Set<string>();
@@ -68,11 +69,13 @@ export function BriefPanel({
   loading,
   error,
   onCite,
+  provenance,
 }: {
   brief: CaseBrief | undefined;
   loading: boolean;
   error: string | null;
   onCite: (cite: Cite) => void;
+  provenance?: CaseProvenance;
 }) {
   return (
     <section className="ws-panel ws-brief" aria-labelledby="brief-title">
@@ -111,8 +114,10 @@ export function BriefPanel({
           ))}
           <p className="muted">
             Validator: {brief.validator.cited}/{brief.validator.checked} sentences cited,{" "}
-            {brief.validator.dropped} dropped.
+            {brief.validator.dropped} dropped. Each cite opens the claim, rule, or graph
+            evidence that produced the sentence.
           </p>
+          {provenance ? <CaseLineage provenance={provenance} /> : null}
         </div>
       )}
     </section>
