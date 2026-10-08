@@ -4,6 +4,7 @@ from datetime import date, datetime
 from typing import Any
 
 import pandas as pd
+from sqlalchemy import inspect as sa_inspect, select
 from sqlalchemy.orm import Session
 
 from claimshield.core.ids import new_id
@@ -31,17 +32,38 @@ TABLE_MODELS: dict[str, type] = {
 }
 
 
+def load_tables(session: Session) -> dict[str, pd.DataFrame]:
+    """Rebuild detector tables from persisted rows so a run can re-lane without regenerating."""
+    tables: dict[str, pd.DataFrame] = {}
+    for name, model in TABLE_MODELS.items():
+        mapper = sa_inspect(model)
+        cols = [col.key for col in mapper.columns if col.key != "id"]
+        rows = session.execute(select(model)).scalars().all()
+        records = [{col: getattr(obj, col) for col in cols} for obj in rows]
+        tables[name] = pd.DataFrame.from_records(records, columns=cols)
+    return tables
+
+
 def persist_dataset(session: Session, dataset: Dataset) -> dict[str, Any]:
     report: dict[str, Any] = {"tables": []}
     for name, model in TABLE_MODELS.items():
         frame = dataset.tables.get(name)
         if frame is None or frame.empty:
-            report["tables"].append({"name": name, "loaded": 0, "rejected": 0})
+            report["tables"].append({"name": name, "loaded": 0, "skipped": 0, "rejected": 0})
             continue
         records = frame.to_dict(orient="records")
         cleaned = [_clean_record(rec) for rec in records]
-        session.bulk_insert_mappings(model, cleaned)
-        report["tables"].append({"name": name, "loaded": len(cleaned), "rejected": 0})
+        to_insert = _new_rows(session, model, cleaned)
+        if to_insert:
+            session.bulk_insert_mappings(model, to_insert)
+        report["tables"].append(
+            {
+                "name": name,
+                "loaded": len(to_insert),
+                "skipped": len(cleaned) - len(to_insert),
+                "rejected": 0,
+            }
+        )
     report["ground_truth_rows"] = int(len(dataset.ground_truth))
     report["data_card"] = dataset.data_card
     report["batch_tag"] = new_id("BAT")
@@ -49,6 +71,48 @@ def persist_dataset(session: Session, dataset: Dataset) -> dict[str, Any]:
         {str(s) for s in dataset.ground_truth.get("scheme_id", pd.Series(dtype=str)).dropna().unique()}
     )
     return report
+
+
+def _new_rows(session: Session, model: type, cleaned: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Skip rows that already exist so a second load of the same seed is idempotent."""
+    mapper = sa_inspect(model)
+    pk_cols = [col.key for col in mapper.primary_key]
+    if len(pk_cols) == 1 and pk_cols[0] != "id":
+        pk = pk_cols[0]
+        existing = set(session.execute(select(getattr(model, pk))).scalars().all())
+        return [row for row in cleaned if row.get(pk) not in existing]
+    natural_cols = [col.key for col in mapper.columns if col.key != "id"]
+    existing = {
+        tuple(_fingerprint(value) for value in db_row)
+        for db_row in session.execute(select(*(getattr(model, col) for col in natural_cols))).all()
+    }
+    fresh: list[dict[str, Any]] = []
+    for row in cleaned:
+        key = tuple(_fingerprint(row.get(col)) for col in natural_cols)
+        if key in existing:
+            continue
+        existing.add(key)
+        fresh.append(row)
+    return fresh
+
+
+def _fingerprint(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, list):
+        return tuple(_fingerprint(item) for item in value)
+    if isinstance(value, dict):
+        return tuple(sorted((k, _fingerprint(v)) for k, v in value.items()))
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    return value
 
 
 def _clean_record(rec: dict[str, Any]) -> dict[str, Any]:

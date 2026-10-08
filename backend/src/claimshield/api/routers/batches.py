@@ -9,7 +9,13 @@ from claimshield.api.deps import check_csrf, get_db, require
 from claimshield.core.config import Settings, get_settings
 from claimshield.core.errors import NotFound
 from claimshield.db.models import Alert, Batch, Case, PipelineRun, User
-from claimshield.pipeline.service import load_synthetic_batch
+from claimshield.pipeline.service import (
+    latest_batch,
+    latest_run,
+    load_synthetic_batch,
+    recompute_run,
+)
+from claimshield.queue.explain import run_payload, screening_days_left, why_rank
 
 router = APIRouter(prefix="/api/v1", tags=["batches"])
 
@@ -31,6 +37,12 @@ class BatchOut(BaseModel):
     seed: int | None
     load_report: dict
     run: dict | None = None
+
+
+class RecomputeBody(BaseModel):
+    batch_id: str | None = None
+    horizon_days: int = 60
+    capacity_hours: float = Field(default=40.0, gt=0)
 
 
 @router.post("/batches", dependencies=[Depends(check_csrf)])
@@ -57,8 +69,53 @@ def create_batch(
         profile=batch.profile,
         seed=batch.seed,
         load_report=batch.load_report,
-        run=run.summary | {"run_id": run.run_id, "status": run.status} if run else None,
+        run=(
+            run.summary
+            | {
+                "run_id": run.run_id,
+                "status": run.status,
+                "batch_id": run.batch_id,
+            }
+            if run
+            else None
+        ),
     )
+
+
+@router.post("/runs", dependencies=[Depends(check_csrf)])
+def start_run(
+    body: RecomputeBody,
+    session: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+    user: User = Depends(require("run:start")),
+) -> dict:
+    batch = session.get(Batch, body.batch_id) if body.batch_id else latest_batch(session)
+    if body.batch_id and batch is None:
+        raise NotFound("batch not found")
+    run = recompute_run(
+        session,
+        user=user,
+        settings=settings,
+        batch=batch,
+        horizon_days=body.horizon_days,
+        capacity_hours=body.capacity_hours,
+    )
+    n_alerts = session.execute(select(Alert).where(Alert.run_id == run.run_id)).scalars().all()
+    n_cases = session.execute(select(Case).where(Case.run_id == run.run_id)).scalars().all()
+    return run_payload(run, n_alerts=len(n_alerts), n_cases=len(n_cases))
+
+
+@router.get("/runs/current")
+def get_current_run(
+    session: Session = Depends(get_db),
+    _: User = Depends(require("queue:read")),
+) -> dict:
+    run = latest_run(session)
+    if run is None:
+        raise NotFound("no completed run")
+    n_alerts = session.execute(select(Alert).where(Alert.run_id == run.run_id)).scalars().all()
+    n_cases = session.execute(select(Case).where(Case.run_id == run.run_id)).scalars().all()
+    return run_payload(run, n_alerts=len(n_alerts), n_cases=len(n_cases))
 
 
 @router.get("/batches")
@@ -89,7 +146,15 @@ def get_batch(
     batch = session.get(Batch, batch_id)
     if batch is None:
         raise NotFound("batch not found")
-    runs = session.execute(select(PipelineRun).where(PipelineRun.batch_id == batch_id)).scalars().all()
+    runs = (
+        session.execute(
+            select(PipelineRun)
+            .where(PipelineRun.batch_id == batch_id)
+            .order_by(PipelineRun.created_at.desc())
+        )
+        .scalars()
+        .all()
+    )
     return {
         "batch_id": batch.batch_id,
         "adapter": batch.adapter,
@@ -112,14 +177,7 @@ def get_run(
         raise NotFound("run not found")
     n_alerts = session.execute(select(Alert).where(Alert.run_id == run_id)).scalars().all()
     n_cases = session.execute(select(Case).where(Case.run_id == run_id)).scalars().all()
-    return {
-        "run_id": run.run_id,
-        "batch_id": run.batch_id,
-        "status": run.status,
-        "summary": run.summary,
-        "n_alerts": len(n_alerts),
-        "n_cases": len(n_cases),
-    }
+    return run_payload(run, n_alerts=len(n_alerts), n_cases=len(n_cases))
 
 
 @router.get("/runs/{run_id}/queue")
@@ -158,4 +216,8 @@ def _case_brief(case: Case) -> dict:
         "f30": case.f30,
         "f60": case.f60,
         "f90": case.f90,
+        "sla_due": case.sla_due.isoformat() if case.sla_due else None,
+        "screening_days_left": screening_days_left(case),
+        "why_rank": why_rank(case),
+        "suspicion_only": True,
     }

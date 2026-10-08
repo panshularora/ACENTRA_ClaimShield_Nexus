@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     evidence_strength_min: float = 0.4
     harm_capacity_share: float = 0.35
     harm_override_level: int = 4
+    harm_lambda: float = 250.0
+    screening_days: int = 45
     default_recovery_rate: float = 0.5
     batch_reject_stop_pct: float = 5.0
     llm_base_url: str = "https://api.x.ai/v1"

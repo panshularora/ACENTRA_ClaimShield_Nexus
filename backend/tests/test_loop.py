@@ -56,6 +56,40 @@ def test_audit_rbac(client: TestClient) -> None:
     assert verify.json()["intact"] is True
 
 
+def test_recompute_run_endpoint_and_current_run(client: TestClient) -> None:
+    _run_id, rows = _load_tiny(client)
+    members_before = client.get("/api/v1/batches")
+    assert members_before.status_code == 200
+    n_batches = len(members_before.json())
+
+    denied = client.post("/api/v1/auth/logout")
+    assert denied.status_code == 200
+    _login(client, "investigator@demo.claimshield", "demo-investigator")
+    blocked = client.post("/api/v1/runs", json={"horizon_days": 90, "capacity_hours": 20})
+    assert blocked.status_code == 403
+
+    _logout(client)
+    _login(client, "manager@demo.claimshield", "demo-manager")
+    recomputed = client.post("/api/v1/runs", json={"horizon_days": 90, "capacity_hours": 20})
+    assert recomputed.status_code == 200, recomputed.text
+    body = recomputed.json()
+    assert body["run_id"] != _run_id
+    assert body["summary"]["capacity_hours"] == 20
+    assert body["summary"]["recompute"] is True
+    assert len(client.get("/api/v1/batches").json()) == n_batches
+
+    current = client.get("/api/v1/runs/current")
+    assert current.status_code == 200
+    assert current.json()["run_id"] == body["run_id"]
+
+    queue = client.get(f"/api/v1/runs/{body['run_id']}/queue")
+    assert queue.status_code == 200
+    row = queue.json()[0]
+    assert "why_rank" in row
+    assert "screening_days_left" in row
+    assert row["suspicion_only"] is True
+
+
 def test_decision_proposal_approval_and_brief_citation(client: TestClient) -> None:
     _run_id, queue = _load_tiny(client)
     source = queue[0]["case_id"]

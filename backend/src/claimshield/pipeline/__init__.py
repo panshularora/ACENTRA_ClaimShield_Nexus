@@ -1,3 +1,3 @@
-from claimshield.pipeline.service import execute_run, load_synthetic_batch
+from claimshield.pipeline.service import execute_run, load_synthetic_batch, recompute_run
 
-__all__ = ["execute_run", "load_synthetic_batch"]
+__all__ = ["execute_run", "load_synthetic_batch", "recompute_run"]

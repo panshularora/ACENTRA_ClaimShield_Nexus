@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pandas as pd
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from claimshield.anomaly.peer import evaluate_anomalies
@@ -14,8 +15,10 @@ from claimshield.core.ids import new_id
 from claimshield.db.models import Alert, Batch, Case, PipelineRun, User
 from claimshield.graph.build import build_graph, strong_component_map
 from claimshield.graph.detect import evaluate_graph
-from claimshield.ingest.service import persist_dataset
+from claimshield.core.errors import NotFound
+from claimshield.ingest.service import load_tables, persist_dataset
 from claimshield.queue.knapsack import expected_value, knapsack_select
+from claimshield.rules.catalog import stamp_catalog
 from claimshield.rules.engine import AlertDraft, evaluate_rules
 from claimshield.synth.generator import generate
 
@@ -68,7 +71,7 @@ def detect(
 ) -> dict[str, Any]:
     graph = build_graph(tables)
     strong = strong_component_map(graph)
-    alerts = (
+    alerts = stamp_catalog(
         evaluate_rules(tables)
         + evaluate_anomalies(tables)
         + evaluate_graph(tables, graph, strong)
@@ -113,7 +116,7 @@ def persist_detection(
                 status="open",
                 lane=case["lane"],
                 assignee_id=None,
-                sla_due=None,
+                sla_due=case.get("sla_due"),
                 primary_entity_id=case["primary_entity_id"],
                 primary_entity_type=case["primary_entity_type"],
                 entity_ids=case.get("entity_ids") or [case["primary_entity_id"]],
@@ -176,11 +179,14 @@ def execute_run(
         tables,
         horizon_days=horizon_days,
         recovery=settings.default_recovery_rate,
-        harm_lambda=250.0,
+        harm_lambda=settings.harm_lambda,
         capacity_hours=capacity_hours,
         harm_capacity_share=settings.harm_capacity_share,
         evidence_min=settings.evidence_strength_min,
     )
+    sla_due = instant.date() + timedelta(days=int(settings.screening_days))
+    for case in result["cases"]:
+        case["sla_due"] = sla_due
     persist_detection(session, run_id=run.run_id, alerts=result["alerts"], cases=result["cases"])
     summary = {
         "n_alerts": len(result["alerts"]),
@@ -190,6 +196,9 @@ def execute_run(
         "graph_edges": result["graph_edges"],
         "capacity_hours": capacity_hours,
         "horizon_days": horizon_days,
+        "screening_days": int(settings.screening_days),
+        "harm_lambda": settings.harm_lambda,
+        "recompute": False,
         "lanes": _lane_counts(result["cases"]),
     }
     run.status = "completed"
@@ -262,6 +271,68 @@ def load_synthetic_batch(
             now=instant,
         )
     return batch, run
+
+
+def latest_batch(session: Session) -> Batch | None:
+    return session.execute(select(Batch).order_by(Batch.created_at.desc())).scalars().first()
+
+
+def latest_run(session: Session) -> PipelineRun | None:
+    return session.execute(
+        select(PipelineRun).where(PipelineRun.status == "completed").order_by(PipelineRun.created_at.desc())
+    ).scalars().first()
+
+
+def tables_for_batch(session: Session, batch: Batch) -> dict[str, pd.DataFrame]:
+    if batch.adapter == "synthetic" and batch.profile and batch.seed is not None:
+        return generate(profile=batch.profile, seed=batch.seed).tables
+    tables = load_tables(session)
+    if tables.get("claim") is None or tables["claim"].empty:
+        raise NotFound("no persisted extract to re-run")
+    return tables
+
+
+def recompute_run(
+    session: Session,
+    *,
+    user: User,
+    settings: Settings,
+    batch: Batch | None = None,
+    horizon_days: int = 60,
+    capacity_hours: float = 40.0,
+) -> PipelineRun:
+    target = batch or latest_batch(session)
+    if target is None:
+        raise NotFound("no batch loaded")
+    tables = tables_for_batch(session, target)
+    run = execute_run(
+        session,
+        batch=target,
+        user=user,
+        tables=tables,
+        settings=settings,
+        horizon_days=horizon_days,
+        capacity_hours=capacity_hours,
+    )
+    summary = dict(run.summary or {})
+    summary["recompute"] = True
+    summary["source_batch_id"] = target.batch_id
+    run.summary = summary
+    append_event(
+        session,
+        actor_id=user.id,
+        role=user.role,
+        action="run.recompute",
+        object_type="run",
+        object_id=run.run_id,
+        payload={
+            "batch_id": target.batch_id,
+            "capacity_hours": capacity_hours,
+            "horizon_days": horizon_days,
+        },
+    )
+    session.flush()
+    return run
 
 
 def _lane_counts(cases: list[dict[str, Any]]) -> dict[str, int]:

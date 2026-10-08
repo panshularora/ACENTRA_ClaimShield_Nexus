@@ -1,3 +1,3 @@
-from claimshield.ingest.service import persist_dataset
+from claimshield.ingest.service import load_tables, persist_dataset
 
-__all__ = ["persist_dataset"]
+__all__ = ["load_tables", "persist_dataset"]
