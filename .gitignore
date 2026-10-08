@@ -11,8 +11,7 @@ __pycache__/
 *.db
 backend/claimshield.db
 
-# Frontend (not in this repo snapshot)
-frontend/
+# Frontend build artifacts
 node_modules/
 dist/
 
