@@ -1,52 +1,39 @@
-import type { CaseBrief, CaseProvenance, Cite, MatchedPrecedent } from "../../api/types";
-import { CaseLineage } from "./ProvenancePanel";
+import type { CaseBrief, Cite, MatchedPrecedent } from "../../api/types";
+import { ErrorState, LoadingState } from "../../components/ui/States";
 
-function uniqueSentences<T extends { text: string }>(sentences: T[]): T[] {
+function uniqueBy<T>(items: T[], key: (item: T) => string): T[] {
   const seen = new Set<string>();
-  const out: T[] = [];
-  for (const sentence of sentences) {
-    const key = sentence.text.trim();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(sentence);
-  }
-  return out;
+  return items.filter((item) => {
+    const k = key(item);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 }
 
-function uniqueCites<T extends { id: string; label: string }>(cites: T[]): T[] {
-  const seen = new Set<string>();
-  const out: T[] = [];
-  for (const cite of cites) {
-    const key = cite.label || cite.id;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(cite);
-  }
-  return out;
+function CiteButton({ cite, match, onCite }: { cite: Cite; match: boolean; onCite: (cite: Cite) => void }) {
+  return (
+    <button
+      type="button"
+      className={`cite ${match ? "is-match" : ""}`}
+      aria-label={`Open citation ${cite.label}${match ? " (involves the selected entity)" : ""}`}
+      onClick={() => onCite(cite)}
+    >
+      {cite.label}
+    </button>
+  );
 }
 
-function PrecedentList({
-  hits,
-  onCite,
-}: {
-  hits: MatchedPrecedent[];
-  onCite: (cite: Cite) => void;
-}) {
+function PrecedentList({ hits, onCite }: { hits: MatchedPrecedent[]; onCite: (cite: Cite) => void }) {
   if (hits.length === 0) return null;
   return (
-    <article className="brief-section precedent-hits">
+    <article className="brief-section">
       <h3>Approved precedents</h3>
       {hits.map((hit) => (
-        <div key={hit.page_id} className="precedent-hit">
+        <div key={hit.page_id} className="subpanel">
           <p>
             <strong>{hit.title}</strong>{" "}
-            <button
-              type="button"
-              className="cite"
-              onClick={() => onCite({ id: hit.citation, kind: "precedent", label: hit.title })}
-            >
-              {hit.citation}
-            </button>
+            <CiteButton cite={{ id: hit.citation, kind: "precedent", label: hit.citation }} match={false} onCite={onCite} />
           </p>
           <p>{hit.why_it_matches}</p>
           <ul className="compact-list">
@@ -64,62 +51,71 @@ function PrecedentList({
   );
 }
 
-export function BriefPanel({
-  brief,
-  loading,
-  error,
-  onCite,
-  provenance,
-}: {
+interface BriefPanelProps {
   brief: CaseBrief | undefined;
   loading: boolean;
-  error: string | null;
+  error: unknown;
   onCite: (cite: Cite) => void;
-  provenance?: CaseProvenance;
-}) {
+  /** Citation ids that involve the focused network entity, or null for no focus. */
+  highlightCiteIds: Set<string> | null;
+  focusLabel: string | null;
+}
+
+/** Investigation brief where every sentence carries clickable citations to its evidence. */
+export function BriefPanel({ brief, loading, error, onCite, highlightCiteIds, focusLabel }: BriefPanelProps) {
+  if (loading) return <LoadingState label="Assembling the brief from stored evidence…" />;
+  if (error) return <ErrorState title="Brief unavailable" error={error} />;
+  if (!brief) return null;
+  const isMatch = (cite: Cite) => Boolean(highlightCiteIds?.has(cite.id));
+  const matches = brief.sections.reduce(
+    (n, section) => n + section.sentences.filter((sentence) => sentence.cites.some(isMatch)).length,
+    0,
+  );
+
   return (
-    <section className="ws-panel ws-brief" aria-labelledby="brief-title">
-      <header className="ws-panel-head">
-        <p className="kicker">Brief</p>
-        <h2 id="brief-title">Investigation brief</h2>
-        {brief && (
-          <span className="badge">{brief.generator === "template" ? "Template" : "LLM"}</span>
-        )}
-      </header>
-      {loading && <p className="muted">Assembling brief from stored evidence…</p>}
-      {error && <p className="error-text">{error}</p>}
-      {brief && (
-        <div className="brief-body">
-          <p className="brief-action">{brief.action}</p>
-          <PrecedentList hits={brief.precedents ?? []} onCite={onCite} />
-          {brief.sections.map((section) => (
-            <article key={section.title} className="brief-section">
-              <h3>{section.title}</h3>
-              {uniqueSentences(section.sentences).map((sentence, i) => (
-                <p key={i}>
-                  {sentence.text}{" "}
-                  {uniqueCites(sentence.cites).map((cite) => (
-                    <button
-                      key={cite.id}
-                      type="button"
-                      className="cite"
-                      onClick={() => onCite(cite)}
-                    >
-                      {cite.label}
-                    </button>
-                  ))}
-                </p>
-              ))}
-            </article>
-          ))}
-          <p className="muted">
-            Validator: {brief.validator.cited}/{brief.validator.checked} sentences cited,{" "}
-            {brief.validator.dropped} dropped. Each cite opens the claim, rule, or graph
-            evidence that produced the sentence.
-          </p>
-          {provenance ? <CaseLineage provenance={provenance} /> : null}
-        </div>
-      )}
-    </section>
+    <div className="brief">
+      <div className="brief-meta chip-row">
+        <span className="badge">{brief.generator === "template" ? "Template brief" : "LLM brief"}</span>
+        <span className="badge">
+          {brief.validator.cited}/{brief.validator.checked} sentences cited
+        </span>
+        {brief.validator.dropped > 0 ? <span className="badge tone-warning">{brief.validator.dropped} uncited dropped</span> : null}
+      </div>
+      {highlightCiteIds ? (
+        <p className="banner ok focus-banner">
+          {matches > 0
+            ? `${matches} sentence${matches === 1 ? "" : "s"} cite evidence involving ${focusLabel}; highlighted below.`
+            : `No brief citation points at evidence involving ${focusLabel}.`}
+        </p>
+      ) : null}
+      <p className="brief-action">{brief.action}</p>
+      <PrecedentList hits={brief.precedents ?? []} onCite={onCite} />
+      {brief.sections.map((section) => (
+        <article key={section.title} className="brief-section">
+          <h3>{section.title}</h3>
+          {uniqueBy(section.sentences, (s) => s.text.trim()).map((sentence) => {
+            const hit = sentence.cites.some(isMatch);
+            return (
+              <p key={sentence.text} className={hit ? "is-match" : undefined}>
+                {sentence.text}{" "}
+                {uniqueBy(sentence.cites, (c) => c.label || c.id).map((cite) => (
+                  <CiteButton key={cite.id} cite={cite} match={isMatch(cite)} onCite={onCite} />
+                ))}
+              </p>
+            );
+          })}
+        </article>
+      ))}
+      {brief.limitations.length > 0 ? (
+        <article className="brief-section">
+          <h3>Limitations</h3>
+          <ul className="compact-list">
+            {brief.limitations.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </article>
+      ) : null}
+    </div>
   );
 }

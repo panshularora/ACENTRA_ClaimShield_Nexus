@@ -1,19 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { api, can } from "../../api/client";
 import type { CaseDetail, QueueCase } from "../../api/types";
 import { useAuth } from "../../auth/AuthProvider";
-import { EvidenceBar } from "../../components/EvidenceBar";
-import { HarmBadge, LaneBadge, StatusBadge } from "../../components/Badge";
-import { hours, money, pct } from "../../lib/format";
+import { PageHeader } from "../../components/ui/PageHeader";
+import { Panel } from "../../components/ui/Panel";
+import { EmptyState, ErrorState, LoadingState } from "../../components/ui/States";
+import { StatTile } from "../../components/ui/StatTile";
+import { count, hours } from "../../lib/format";
 import { readStoredRun } from "../../lib/runStore";
+import { WorklistTable } from "./WorklistTable";
+import "./cases.css";
 
 type Scope = "desk" | "mine" | "open";
 
+const SCOPE_LABELS: Record<Scope, string> = { desk: "Team desk", mine: "Mine", open: "Unassigned" };
+
 export function InvestigatorCasesPage() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [queryText, setQueryText] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -79,8 +84,8 @@ export function InvestigatorCasesPage() {
   if (!canCases) {
     return (
       <main id="main" className="page">
-        <h1>Investigation worklist</h1>
-        <p className="error-text">Your role cannot read cases.</p>
+        <PageHeader eyebrow="Investigator desk" title="Worklist" />
+        <ErrorState title="Access denied" error="Your role cannot read cases." />
       </main>
     );
   }
@@ -88,190 +93,115 @@ export function InvestigatorCasesPage() {
   const details = detailsQuery.data ?? {};
   const mine = workSeed.filter((row) => details[row.case_id]?.assignee_id === user.id);
   const unassigned = workSeed.filter((row) => !details[row.case_id]?.assignee_id);
+  const byScope: Record<Scope, QueueCase[]> = { desk: workSeed, mine, open: unassigned };
+  const source = byScope[scope];
 
-  const source: QueueCase[] =
-    scope === "mine" ? mine : scope === "open" ? unassigned : workSeed;
-
+  const q = queryText.trim().toLowerCase();
   const visible = source.filter((row) => {
     if (statusFilter !== "all" && row.status !== statusFilter) return false;
-    const q = queryText.trim().toLowerCase();
     if (!q) return true;
     const extra = details[row.case_id];
-    const name = extra?.primary_entity?.name ?? "";
-    return (
-      row.case_id.toLowerCase().includes(q) ||
-      row.primary_entity_id.toLowerCase().includes(q) ||
-      row.status.toLowerCase().includes(q) ||
-      name.toLowerCase().includes(q) ||
-      (extra?.assignee_id ?? "").toLowerCase().includes(q)
-    );
+    return [
+      row.case_id,
+      row.primary_entity_id,
+      row.status,
+      extra?.primary_entity?.name ?? "",
+      extra?.primary_entity?.specialty ?? "",
+      extra?.assignee_id ?? "",
+    ].some((value) => value.toLowerCase().includes(q));
   });
+  const harmCount = workSeed.filter((row) => row.harm >= 4).length;
+  const deskHours = workSeed.reduce((acc, row) => acc + row.estimated_hours, 0);
+  const error = queueQuery.error ?? detailsQuery.error ?? assignMut.error;
 
   return (
     <main id="main" className="page cases-page">
-      <header className="page-head">
-        <div>
-          <p className="kicker">Investigator desk</p>
-          <h1>Worklist</h1>
-        </div>
-        {canQueue && (
-          <button type="button" className="btn ghost" onClick={() => void navigate({ to: "/manager/queue" })}>
-            Team queue
-          </button>
-        )}
-      </header>
+      <PageHeader
+        eyebrow="Investigator desk"
+        title="Worklist"
+        description="Harm-priority and selected cases from the live run. Open a case to review evidence, network, claims and the brief."
+        actions={
+          canQueue ? (
+            <Link to="/manager/queue" className="btn ghost">
+              Team queue
+            </Link>
+          ) : null
+        }
+      />
 
-      {!runId && (
-        <section className="empty">
-          <h2>No active run</h2>
-          <p>
-            A manager loads a batch from the queue page. After that, this desk shows harm-priority
-            and selected cases from the live run.
-          </p>
-        </section>
-      )}
-
-      {runId && (
+      {!runId ? (
+        <EmptyState title="No active run">
+          A manager loads a batch from the queue page. After that, this desk shows harm-priority and selected cases
+          from the live run.
+        </EmptyState>
+      ) : (
         <>
-          <p className="note">
-            {mine.length > 0
-              ? `${mine.length} case${mine.length === 1 ? "" : "s"} on your desk. Unassigned work stays in the team list until someone takes it.`
-              : "Nothing is assigned to you yet. Open a case and take ownership, or claim it from this list."}
-          </p>
+          <dl className="stat-grid">
+            <StatTile label="On the team desk" value={workSeed.length} hint={`${hours(deskHours)} estimated`} />
+            <StatTile label="Assigned to you" value={mine.length} />
+            <StatTile label="Unassigned" value={unassigned.length} />
+            <StatTile label="Harm priority" value={harmCount} tone="harm" />
+          </dl>
 
-          <div className="toolbar">
-            <div className="scope-tabs" role="tablist" aria-label="Worklist scope">
-              <button
-                type="button"
-                className={scope === "desk" ? "on" : ""}
-                onClick={() => setScope("desk")}
-              >
-                Team desk <em>{workSeed.length}</em>
-              </button>
-              <button
-                type="button"
-                className={scope === "mine" ? "on" : ""}
-                onClick={() => setScope("mine")}
-              >
-                Mine <em>{mine.length}</em>
-              </button>
-              <button
-                type="button"
-                className={scope === "open" ? "on" : ""}
-                onClick={() => setScope("open")}
-              >
-                Unassigned <em>{unassigned.length}</em>
-              </button>
-            </div>
-            <label className="grow">
-              <span className="sr">Search</span>
-              <input
-                type="search"
-                placeholder="Search case, provider, or specialty…"
-                value={queryText}
-                onChange={(e) => setQueryText(e.target.value)}
-              />
-            </label>
-            <label>
-              Status
-              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                <option value="all">All</option>
-                {[...new Set(source.map((r) => r.status))].map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
+          {error ? <ErrorState title="Cases could not be loaded" error={error} /> : null}
+
+          <Panel
+            id="worklist"
+            eyebrow="Cases"
+            title={SCOPE_LABELS[scope]}
+            description={
+              mine.length > 0
+                ? `${count(mine.length, "case")} assigned to you. Unassigned work stays in the team list until someone takes it.`
+                : "Nothing is assigned to you yet. Open a case and take ownership, or claim it from this list."
+            }
+            actions={<span className="badge">{visible.length} shown</span>}
+          >
+            <div className="toolbar">
+              <div className="segmented" role="group" aria-label="Worklist scope">
+                {(Object.keys(SCOPE_LABELS) as Scope[]).map((key) => (
+                  <button key={key} type="button" aria-pressed={scope === key} onClick={() => setScope(key)}>
+                    {SCOPE_LABELS[key]} <span className="count">{byScope[key].length}</span>
+                  </button>
                 ))}
-              </select>
-            </label>
-          </div>
-
-          {(queueQuery.isLoading || detailsQuery.isLoading) && <p className="muted">Loading cases…</p>}
-          {queueQuery.error && <p className="error-text">{(queueQuery.error as Error).message}</p>}
-          {!queueQuery.isLoading && visible.length === 0 && (
-            <p className="empty">No cases in this view.</p>
-          )}
-
-          <ul className="case-list">
-            {visible.map((row) => {
-              const extra = details[row.case_id];
-              const name = extra?.primary_entity?.name ?? row.primary_entity_id;
-              const specialty = extra?.primary_entity?.specialty;
-              const mineRow = extra?.assignee_id === user.id;
-              const ownerLabel = mineRow ? "You" : extra?.assignee_id ?? "Unassigned";
-              return (
-                <li key={row.case_id}>
-                  <article className={`case-card lane-${row.lane}`}>
-                    <button
-                      type="button"
-                      className="case-card-main"
-                      onClick={() =>
-                        void navigate({
-                          to: "/investigator/workspace/$caseId",
-                          params: { caseId: row.case_id },
-                        })
-                      }
-                    >
-                      <header>
-                        <LaneBadge lane={row.lane} />
-                        <StatusBadge status={row.status} />
-                        <HarmBadge harm={row.harm} />
-                        <span className="mono case-id">{row.case_id}</span>
-                      </header>
-                      <h2>{name}</h2>
-                      <p className="entity-meta">
-                        <span className="mono">{row.primary_entity_id}</span>
-                        {specialty ? <span>{specialty}</span> : null}
-                        <span>Owner {ownerLabel}</span>
-                      </p>
-                      {row.alert_group && (
-                        <p className="muted" title={row.alert_group.text}>
-                          {row.alert_group.n_alerts
-                            ? `${row.alert_group.n_alerts} grouped alerts`
-                            : extra?.grouping
-                              ? `${extra.grouping.alert_count} grouped alerts`
-                              : "Grouped alerts"}
-                          {row.alert_group.n_entities > 1
-                            ? ` · ${row.alert_group.n_entities} linked NPIs`
-                            : ""}
-                          {row.harm >= 4 ? " · urgent still visible" : ""}
-                        </p>
-                      )}
-                      <dl>
-                        <div>
-                          <dt>Confirm chance</dt>
-                          <dd>{pct(row.p_confirm)}</dd>
-                        </div>
-                        <div>
-                          <dt>Flagged</dt>
-                          <dd>{money(row.flagged_dollars)}</dd>
-                        </div>
-                        <div>
-                          <dt>Hours</dt>
-                          <dd>{hours(row.estimated_hours)}</dd>
-                        </div>
-                        <div>
-                          <dt>Evidence</dt>
-                          <dd>
-                            <EvidenceBar value={row.evidence_strength} />
-                          </dd>
-                        </div>
-                      </dl>
-                    </button>
-                    {canAssign && !mineRow && (
-                      <button
-                        type="button"
-                        className="btn ghost take-btn"
-                        disabled={assignMut.isPending}
-                        onClick={() => assignMut.mutate(row.case_id)}
-                      >
-                        Take ownership
-                      </button>
-                    )}
-                  </article>
-                </li>
-              );
-            })}
-          </ul>
+              </div>
+              <label className="field grow">
+                Search
+                <input
+                  type="search"
+                  placeholder="Case, provider, specialty or owner…"
+                  value={queryText}
+                  onChange={(e) => setQueryText(e.target.value)}
+                />
+              </label>
+              <label className="field">
+                Status
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                  <option value="all">All</option>
+                  {[...new Set(source.map((r) => r.status))].map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            {queueQuery.isLoading || detailsQuery.isLoading ? <LoadingState label="Loading cases…" /> : null}
+            {!queueQuery.isLoading && visible.length === 0 ? (
+              <EmptyState title="No cases in this view" compact>
+                Try another scope or clear the search.
+              </EmptyState>
+            ) : null}
+            {visible.length > 0 ? (
+              <WorklistTable
+                rows={visible}
+                details={details}
+                userId={user.id}
+                canAssign={canAssign}
+                assigning={assignMut.isPending ? assignMut.variables : undefined}
+                onAssign={(caseId) => assignMut.mutate(caseId)}
+              />
+            ) : null}
+          </Panel>
         </>
       )}
     </main>

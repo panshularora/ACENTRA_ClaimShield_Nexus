@@ -2,118 +2,103 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { api } from "../api/client";
 import { hours, money, pct, screeningLabel, signalLabel, whyPriority } from "../lib/format";
+import { HarmFlag, LaneBadge, RiskBadge, StatusBadge } from "./Badge";
 import { EvidenceBar } from "./EvidenceBar";
-import { HarmBadge, LaneBadge, StatusBadge } from "./Badge";
+import { Drawer } from "./ui/Drawer";
+import { SCORE_LABELS } from "../lib/scoreLabels";
+import { ErrorState, LoadingState } from "./ui/States";
 
-export function CaseDrawer({
-  caseId,
-  onClose,
-}: {
-  caseId: string;
-  onClose: () => void;
-  openHref?: string;
-}) {
+/** Quick case summary opened from the manager queue. */
+export function CaseDrawer({ caseId, onClose }: { caseId: string; onClose: () => void }) {
   const query = useQuery({
     queryKey: ["case", caseId],
     queryFn: () => api.getCase(caseId),
   });
+  const detail = query.data;
 
   return (
-    <aside className="drawer" role="dialog" aria-labelledby="case-drawer-title">
-      <header className="drawer-head">
-        <div>
-          <p className="kicker">Case file</p>
-          <h2 id="case-drawer-title">
-            {query.data?.primary_entity?.name ?? caseId}
-          </h2>
-          <p className="mono muted">{caseId}</p>
-        </div>
-        <button type="button" className="btn ghost" onClick={onClose}>
-          Close
-        </button>
-      </header>
-      {query.isLoading && <p className="muted">Loading case…</p>}
-      {query.error && <p className="error-text">{(query.error as Error).message}</p>}
-      {query.data && (
-        <div className="drawer-body">
+    <Drawer
+      titleId="case-drawer-title"
+      eyebrow="Case file"
+      title={detail?.primary_entity?.name ?? caseId}
+      subtitle={caseId}
+      onClose={onClose}
+    >
+      {query.isLoading ? <LoadingState label="Loading case…" /> : null}
+      {query.error ? <ErrorState title="Case unavailable" error={query.error} /> : null}
+      {detail ? (
+        <>
           <div className="chip-row">
-            <LaneBadge lane={query.data.lane} />
-            <StatusBadge status={query.data.status} />
-            <HarmBadge harm={query.data.harm} />
+            <LaneBadge lane={detail.lane} />
+            <StatusBadge status={detail.status} />
+            <RiskBadge severity={detail.severity} />
+            <HarmFlag harm={detail.harm} />
           </div>
+          <p>{whyPriority(detail)}</p>
           <dl className="facts">
             <div>
               <dt>Primary entity</dt>
-              <dd className="mono">{query.data.primary_entity_id}</dd>
+              <dd className="mono">{detail.primary_entity_id}</dd>
             </div>
             <div>
               <dt>Type</dt>
-              <dd>{query.data.primary_entity_type}</dd>
+              <dd>{detail.primary_entity_type}</dd>
             </div>
             <div>
               <dt>Flagged</dt>
-              <dd className="mono">{money(query.data.flagged_dollars)}</dd>
+              <dd className="num">{money(detail.flagged_dollars)}</dd>
             </div>
             <div>
               <dt>Members</dt>
-              <dd className="mono">{query.data.members_affected}</dd>
+              <dd className="num">{detail.members_affected}</dd>
             </div>
             <div>
-              <dt>P(confirm)</dt>
-              <dd className="mono">{pct(query.data.p_confirm)}</dd>
+              <dt>{SCORE_LABELS.pConfirm.label}</dt>
+              <dd className="num">{pct(detail.p_confirm)}</dd>
             </div>
             <div>
               <dt>Hours</dt>
-              <dd className="mono">{hours(query.data.estimated_hours)}</dd>
+              <dd className="num">{hours(detail.estimated_hours)}</dd>
             </div>
             <div>
-              <dt>F30 / F60 / F90</dt>
-              <dd className="mono">
-                {pct(query.data.f30)} · {pct(query.data.f60)} · {pct(query.data.f90)}
+              <dt>{SCORE_LABELS.horizon.shortSet}</dt>
+              <dd className="num">
+                {pct(detail.f30)} · {pct(detail.f60)} · {pct(detail.f90)}
               </dd>
             </div>
             <div>
               <dt>Assignee</dt>
-              <dd className="mono">{query.data.assignee_id ?? "Unassigned"}</dd>
+              <dd className="mono">{detail.assignee_id ?? "Unassigned"}</dd>
             </div>
             <div>
               <dt>45-day screen</dt>
-              <dd>{screeningLabel(query.data.screening_days_left)}</dd>
-            </div>
-            <div>
-              <dt>Why this rank</dt>
-              <dd>{whyPriority(query.data)}</dd>
+              <dd>{screeningLabel(detail.screening_days_left)}</dd>
             </div>
           </dl>
           <div>
             <p className="kicker">Evidence strength</p>
-            <EvidenceBar value={query.data.evidence_strength} />
+            <EvidenceBar value={detail.evidence_strength} />
           </div>
           <div>
             <p className="kicker">Signals on this case</p>
-            {query.data.alerts.length === 0 ? (
+            {detail.alerts.length === 0 ? (
               <p className="muted">No alerts attached.</p>
             ) : (
-              <ul className="signal-list">
-                {query.data.alerts.map((alert) => (
+              <ul className="compact-list signal-list">
+                {detail.alerts.map((alert) => (
                   <li key={alert.alert_id}>
-                    <span className="mono">{alert.rule_id ?? alert.detector}</span>
-                    <span>{signalLabel(alert.evidence)}</span>
-                    <span className="muted">{alert.line_ids.length} lines</span>
+                    <span className="mono">{alert.rule_id ?? alert.detector}</span> {signalLabel(alert.evidence)}{" "}
+                    <span className="muted">· {alert.line_ids.length} lines</span>
                   </li>
                 ))}
               </ul>
             )}
           </div>
-          <Link
-            to="/investigator/workspace/$caseId"
-            params={{ caseId }}
-            className="btn solid"
-          >
+          <Link to="/investigator/workspace/$caseId" params={{ caseId }} className="btn solid">
             Open investigation workspace
           </Link>
-        </div>
-      )}
-    </aside>
+        </>
+      ) : null}
+    </Drawer>
   );
 }

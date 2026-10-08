@@ -1,0 +1,171 @@
+/* Reset, typography and accessibility primitives shared by every route. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Legacy family for the landing and login pages only (landing.css and login.css read it). */
+:root {
+  --sans: "Outfit", "IBM Plex Sans", "Segoe UI", sans-serif;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+/*
+ * The body keeps the landing/login typography; the signed-in app sets its own
+ * on .app so the public pages render exactly as before.
+ */
+body {
+  margin: 0;
+  color: var(--color-text);
+  background: var(--color-bg);
+  font-family: var(--sans);
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+
+.app {
+  color: var(--color-text);
+  font: var(--type-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv11" 1;
+}
+
+.app :is(table, .badge, dd, .num, .stat) {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+.app :is(h1, h2, h3, h4) {
+  margin: 0;
+  color: var(--color-text);
+}
+
+.app h1 {
+  font: var(--type-h1);
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+.app h2 {
+  font: var(--type-h3);
+}
+
+.app h3 {
+  font: var(--type-h4);
+}
+
+.app h4 {
+  font: var(--type-label);
+  font-size: var(--font-size-14);
+}
+
+.app p {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
+
+.app a {
+  color: var(--color-link);
+  text-underline-offset: 2px;
+}
+
+.app a:hover {
+  color: var(--color-link-hover);
+}
+
+img,
+svg,
+canvas {
+  max-width: 100%;
+}
+
+.app :focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.93em;
+}
+
+.num {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+/* Overline (card and page kicker). Green text only on the page header, per the design system. */
+.app .kicker {
+  color: var(--color-text-muted);
+  font: var(--type-overline);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+}
+
+.app .page-head .kicker {
+  color: var(--color-brand-text);
+}
+
+.app .lede {
+  color: var(--color-text-muted);
+  max-width: 44rem;
+}
+
+.sr,
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip {
+  position: absolute;
+  left: var(--space-2);
+  top: var(--space-2);
+  z-index: var(--z-toast);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  transform: translateY(-200%);
+}
+
+.skip:focus {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

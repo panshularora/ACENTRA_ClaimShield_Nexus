@@ -1,0 +1,86 @@
+/*
+ * Primitives for the public landing and login pages.
+ *
+ * Those pages are intentionally unchanged by the app redesign. Their own
+ * stylesheets build on these base rules, so they are kept here verbatim and
+ * scoped with :where() (zero added specificity) so they never reach the app.
+ */
+:where(.landing, .login-screen) h1,
+:where(.landing, .login-screen) h2,
+:where(.landing, .login-screen) h3 {
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+:where(.landing, .login-screen) h1 {
+  font-size: 1.7rem;
+  margin: 0.1rem 0 0.35rem;
+}
+
+:where(.landing, .login-screen) h2 {
+  font-size: 1.05rem;
+  margin: 0 0 0.6rem;
+}
+
+:where(.landing, .login-screen) .kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #4a6670;
+  margin: 0 0 0.25rem;
+}
+
+:where(.landing, .login-screen) .lede {
+  color: #4a6670;
+  max-width: 32rem;
+}
+
+:where(.landing, .login-screen) .btn {
+  border: 1px solid #d5e4da;
+  background: #ffffff;
+  padding: 0.45rem 0.85rem;
+  cursor: pointer;
+  border-radius: 10px;
+}
+
+:where(.landing, .login-screen) .btn:hover {
+  background: #ffffff;
+  border-color: #b7cfc0;
+}
+
+:where(.landing, .login-screen) .btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+:where(.landing, .login-screen) .btn.solid {
+  background: #06141b;
+  color: #e8f4ec;
+  border-color: #06141b;
+}
+
+:where(.landing, .login-screen) .btn.solid:hover {
+  filter: brightness(1.08);
+}
+
+:where(.landing, .login-screen) .btn.ghost {
+  background: transparent;
+}
+
+:where(.landing, .login-screen) :is(.btn, input, select):focus-visible {
+  outline: 2px solid #1aa24c;
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+:where(.landing, .login-screen) :is(input, select, textarea) {
+  border: 1px solid #d5e4da;
+  background: #ffffff;
+  padding: 0.48rem 0.6rem;
+  border-radius: 10px;
+}
+
+:where(.landing, .login-screen) .error-text {
+  color: #8f1d1d;
+}

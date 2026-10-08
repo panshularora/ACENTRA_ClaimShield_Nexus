@@ -6,6 +6,7 @@ import type {
   CaseBrief,
   CaseDetail,
   ClaimsPack,
+  DecisionAction,
   DecisionResult,
   EvidenceItem,
   Lane,
@@ -160,7 +161,7 @@ export const api = {
   decide: (
     caseId: string,
     body: {
-      action: "escalate" | "monitor" | "dismiss" | "needs_evidence";
+      action: DecisionAction;
       reason: string;
       ladder_step?: string | null;
       evidence_refs?: string[];

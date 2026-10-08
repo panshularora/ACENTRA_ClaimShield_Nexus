@@ -1,0 +1,73 @@
+/* Investigator worklist. */
+.worklist .subject-cell {
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+  min-width: 16rem;
+  font-size: var(--font-size-13);
+  font-weight: 400;
+  text-align: left;
+}
+
+.worklist .row-title {
+  font-size: var(--font-size-14);
+}
+
+
+
+@media (max-width: 720px) {
+  .worklist-wrap {
+    overflow: visible;
+    border: 0;
+  }
+
+  .worklist thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .worklist,
+  .worklist tbody {
+    display: block;
+  }
+
+  .worklist tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-3);
+    padding: var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+  }
+
+  .worklist tr > * {
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  .worklist .subject-cell,
+  .worklist .action-cell {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .worklist td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-12);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .worklist td.num {
+    text-align: left;
+  }
+}

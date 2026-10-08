@@ -5,16 +5,16 @@ import "./landing.css";
 
 const CHAPTERS = [
   {
-    kicker: "Acentra Health · Problem 3",
+    kicker: "Acentra Health code-a-thon · Problem 3",
     title: "ClaimShield Nexus",
-    body: "Post-adjudication program integrity for Medicaid-like claims. Built to sit downstream of eCAMS and feed an SIU — not to label anyone as fraud.",
+    body: "Post-adjudication program integrity for Medicaid-like claims. Designed to sit downstream of a claims system such as eCAMS and feed an SIU — not to label anyone as fraud. No eCAMS integration exists in this prototype.",
     points: [
       "Lives after adjudication. It does not recode or deny a claim.",
       "Ranks suspicion for scarce investigator hours. A flag is a queue position.",
       "Due process stays with the state: humans decide, models cite.",
     ],
     facts: [
-      { value: "eCAMS", label: "Sits downstream of the claims engine" },
+      { value: "Downstream", label: "Designed to sit after a claims engine such as eCAMS" },
       { value: "SIU", label: "Built for special investigations, not pay-and-chase noise" },
       { value: "Recommend", label: "Never prints fraud on a provider" },
     ],
@@ -52,7 +52,7 @@ const CHAPTERS = [
   {
     kicker: "CMS harm first",
     title: "Beneficiary harm never waits in line.",
-    body: "A thousand cases do not become a dollar sort. ClaimShield combines scheme severity, financial exposure, member impact, evidence strength, and urgency, then packs the result into investigator hours and a top-N desk. AI recommends today's 20. Investigators decide. The rest stay open on a tracked backlog.",
+    body: "A thousand cases do not become a dollar sort. ClaimShield combines scheme severity, financial exposure, member impact, evidence strength, and urgency, then packs the result into investigator hours and a top-N desk. The ranking proposes today's 20. Investigators decide. The rest stay open on a tracked backlog.",
     points: [
       "Harm-priority cases jump the dollar queue. Vulnerable members come first.",
       "Today's queue is multi-factor inside capacity. Dollars or evidence alone never pick the set.",
@@ -67,16 +67,16 @@ const CHAPTERS = [
   {
     kicker: "30 / 60 / 90",
     title: "Risk is a clock, not a scoreboard.",
-    body: "Each case carries a discrete-time hazard: probability the pattern is still burning at 30, 60, and 90 days. The queue sorts by expected value inside the hours you actually have.",
+    body: "Each case carries a cumulative probability by each horizon: the chance the escalation event has already happened by day 30, 60, and 90. The queue sorts by expected value inside the hours you actually have.",
     points: [
-      "F30 / F60 / F90 are survival of the pattern, not a guilt score.",
+      "F30 / F60 / F90 are cumulative probabilities by the horizon, not a guilt score.",
       "Managers set horizon and capacity. The queue recomputes lanes.",
       "A longer horizon raises expected value. It does not invent new evidence.",
     ],
     facts: [
-      { value: "F30", label: "Still-burning chance at one month" },
-      { value: "F60", label: "Two-month discrete hazard" },
-      { value: "F90", label: "Three-month clock the manager can select" },
+      { value: "F30", label: "Cumulative probability by day 30" },
+      { value: "F60", label: "Cumulative probability by day 60" },
+      { value: "F90", label: "Cumulative probability by day 90" },
     ],
   },
   {
@@ -113,7 +113,7 @@ export function LandingPage() {
           <span className="brand-mark" aria-hidden="true" />
           <div>
             <strong>ClaimShield Nexus</strong>
-            <em>for Acentra Health</em>
+            <em>Acentra Health code-a-thon prototype</em>
           </div>
         </div>
         <nav>
@@ -124,7 +124,7 @@ export function LandingPage() {
       </header>
 
       <section className="landing-hero" id="story">
-        <p className="kicker">Accelerating better outcomes · program integrity</p>
+        <p className="kicker">Program integrity · post-adjudication</p>
         <h1>Turn a flood of claim alerts into a few cases an SIU can actually work.</h1>
         <p className="lede">
           Rules, peer anomalies, and identity graphs collapse into capacity-ranked cases.

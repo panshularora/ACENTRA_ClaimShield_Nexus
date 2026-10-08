@@ -336,20 +336,53 @@ export interface TimelineEvent {
   entity_id: string;
 }
 
+/**
+ * Network node from GET /cases/{id}/network. Fields marked "newer API" are being added on the
+ * backend branch fix/backend-p0; they are optional so the UI works with both shapes
+ * (components/network/graphModel.ts normalises them).
+ */
 export interface NetworkNode {
   id: string;
   type: string;
   label: string;
   primary?: boolean;
   masked?: boolean;
+  /** Case p_confirm, on the primary node only. */
   risk?: number;
   specialty?: string;
+  facility_type?: string;
+  owner_kind?: string;
+  /** Newer API: true for the case subject. */
+  is_subject?: boolean;
+  /** Newer API: true when the entity belongs to the case (vs surrounding context). */
+  in_case?: boolean;
+  /** Newer API: alerts on this case that involve the entity. */
+  alert_ids?: string[];
+  /** Newer API: flagged paid dollars on this case attributable to the entity. */
+  flagged_dollars?: number;
+  flagged_paid?: number;
+  /** Newer API: flagged claim lines on this case attributable to the entity. */
+  n_flagged_lines?: number;
+  /** Newer API: hop distance from the subject (capped at 2). */
+  hop?: number;
+  /** Newer API: patient-harm level for the entity. */
+  harm?: number;
 }
 
 export interface NetworkEdge {
   source: string;
   target: string;
   kind: string;
+  /** Newer API: stable edge id. */
+  id?: string;
+  /** Newer API: "out" (source → target), "in", or "none". */
+  direction?: "out" | "in" | "none";
+  /** Newer API: number of underlying records (referrals, shared claims). */
+  count?: number;
+  /** Newer API: evidence ids (alerts, contact hashes, ownership links) behind the edge. */
+  evidence_ids?: string[];
+  /** Newer API: inferred / weak link. */
+  inferred?: boolean;
 }
 
 export interface NetworkPack {
@@ -442,6 +475,9 @@ export interface LabelRecord {
   approved_by: string | null;
   approved_at: string | null;
 }
+
+/** Actions POST /cases/{id}/decisions accepts today (being revised on the backend). */
+export type DecisionAction = "escalate" | "monitor" | "dismiss" | "needs_evidence";
 
 export interface DecisionResult {
   decision_id: string;

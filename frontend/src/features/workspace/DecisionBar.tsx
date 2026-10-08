@@ -1,12 +1,21 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { CaseAlert, DecisionResult, WikiProposal } from "../../api/types";
+import { alertLabel } from "../../lib/format";
 import { ProposalCard } from "../wiki/ProposalCard";
+import {
+  DECISION_ACTIONS,
+  DEFAULT_DECISION,
+  LADDER_LABELS,
+  REASON_MIN_LENGTH,
+  type DecisionAction,
+  type DecisionActionConfig,
+} from "./decisionConfig";
 
 function groupAlerts(alerts: CaseAlert[]): { key: string; rule: string; label: string; refs: string[] }[] {
   const map = new Map<string, { key: string; rule: string; label: string; refs: string[] }>();
   for (const alert of alerts) {
     const rule = alert.rule_id ?? alert.detector;
-    const label = alert.label ?? alert.rule_title ?? alert.detector;
+    const label = alertLabel(alert);
     const key = `${rule}|${label}`;
     const prev = map.get(key);
     const ref = `alert:${alert.alert_id}`;
@@ -19,52 +28,9 @@ function groupAlerts(alerts: CaseAlert[]): { key: string; rule: string; label: s
   return [...map.values()];
 }
 
-const ACTIONS = [
-  {
-    id: "needs_evidence" as const,
-    label: "Request more information",
-    hint: "Hold the case until records, EVV, or interviews arrive.",
-  },
-  {
-    id: "escalate" as const,
-    label: "Refer for deeper review",
-    hint: "Send to a fuller investigation or MFCU screening path.",
-  },
-  {
-    id: "monitor" as const,
-    label: "Keep under watch",
-    hint: "Suspicion remains; do not close and do not treat as fraud.",
-  },
-  {
-    id: "dismiss" as const,
-    label: "Dismiss with reason",
-    hint: "Evidence does not support concern. Document why.",
-  },
-];
-
-const LADDER_LABELS: Record<string, string> = {
-  education_letter: "Provider education letter",
-  medical_records_request: "Medical records request",
-  prepayment_review: "Prepayment review",
-  mfcu_referral: "Referral to state MFCU",
-  payment_suspension_recommend: "Recommend 42 CFR 455.23 payment suspension (state decides)",
-};
-
-const LADDER_BY_ACTION: Record<(typeof ACTIONS)[number]["id"], string[]> = {
-  needs_evidence: ["medical_records_request", "prepayment_review"],
-  escalate: ["mfcu_referral", "prepayment_review", "payment_suspension_recommend"],
-  monitor: ["education_letter", "prepayment_review"],
-  dismiss: [],
-};
-
-const DEFAULT_LADDER: Record<(typeof ACTIONS)[number]["id"], string | null> = {
-  needs_evidence: "medical_records_request",
-  escalate: "mfcu_referral",
-  monitor: "education_letter",
-  dismiss: null,
-};
-
 export function DecisionBar({
+  actions = DECISION_ACTIONS,
+  defaultAction = DEFAULT_DECISION,
   disabled,
   gaps,
   pending,
@@ -74,6 +40,9 @@ export function DecisionBar({
   alerts,
   onSubmit,
 }: {
+  /** Actions to offer; defaults to decisionConfig so the API's new set can be swapped in. */
+  actions?: readonly DecisionActionConfig[];
+  defaultAction?: DecisionAction;
   disabled: boolean;
   gaps: string[];
   pending: boolean;
@@ -82,23 +51,26 @@ export function DecisionBar({
   existingProposal?: WikiProposal | null;
   alerts: CaseAlert[];
   onSubmit: (
-    action: (typeof ACTIONS)[number]["id"],
+    action: DecisionAction,
     reason: string,
     evidenceRefs: string[],
     ladderStep: string | null,
   ) => void;
 }) {
-  const [action, setAction] = useState<(typeof ACTIONS)[number]["id"]>("monitor");
-  const [ladder, setLadder] = useState<string | null>(DEFAULT_LADDER.monitor);
+  const configFor = (id: DecisionAction) => actions.find((item) => item.id === id) ?? actions[0];
+  const [action, setAction] = useState<DecisionAction>(configFor(defaultAction).id);
+  const [ladder, setLadder] = useState<string | null>(configFor(defaultAction).defaultLadder);
   const [reason, setReason] = useState("");
   const [refs, setRefs] = useState<string[]>([]);
-  const ready = reason.trim().length >= 20 && !disabled && !pending;
+  const ready = reason.trim().length >= REASON_MIN_LENGTH && !disabled && !pending;
   const proposal = result?.proposal ?? existingProposal ?? null;
-  const ladderOptions = LADDER_BY_ACTION[action];
+  const current = configFor(action);
+  const ladderOptions = current.ladder;
 
-  useEffect(() => {
-    setLadder(DEFAULT_LADDER[action]);
-  }, [action]);
+  function chooseAction(next: DecisionAction) {
+    setAction(next);
+    setLadder(configFor(next).defaultLadder);
+  }
 
   function toggleGroup(groupRefs: string[]) {
     setRefs((prev) => {
@@ -109,21 +81,11 @@ export function DecisionBar({
   }
 
   return (
-    <section className="ws-panel ws-decide" aria-labelledby="decide-title">
-      <header className="ws-panel-head">
-        <div>
-          <p className="kicker">Disposition · human only</p>
-          <h2 id="decide-title">Record the next step</h2>
-        </div>
-        <p className="muted">
-          An alert is suspicion, not a confirmed finding of fraud. Cite the evidence you inspected
-          and write a reason another reviewer can follow.
-        </p>
-      </header>
+    <div className="decision">
       <div className="decide-grid">
         <fieldset className="decide-actions">
-          <legend className="sr">Action</legend>
-          {ACTIONS.map((item) => (
+          <legend className="field">Action</legend>
+          {actions.map((item) => (
             <label key={item.id} className={action === item.id ? "on" : ""}>
               <input
                 type="radio"
@@ -131,15 +93,17 @@ export function DecisionBar({
                 value={item.id}
                 checked={action === item.id}
                 disabled={disabled || pending}
-                onChange={() => setAction(item.id)}
+                onChange={() => chooseAction(item.id)}
               />
-              <strong>{item.label}</strong>
-              <span>{item.hint}</span>
+              <span className="decide-option">
+                <strong>{item.label}</strong>
+                <span>{item.hint}</span>
+              </span>
             </label>
           ))}
         </fieldset>
-        <div>
-          <p className="kicker">Supporting evidence reviewed</p>
+        <div className="decide-evidence">
+          <p className="field">Supporting evidence reviewed</p>
           {alerts.length === 0 ? (
             <p className="muted">No findings to attach.</p>
           ) : (
@@ -162,8 +126,8 @@ export function DecisionBar({
               })}
             </ul>
           )}
-          <label className="decide-reason">
-            Notes and override rationale
+          <label className="field decide-reason">
+            Notes and rationale (at least {REASON_MIN_LENGTH} characters)
             <textarea
               rows={3}
               value={reason}
@@ -171,13 +135,15 @@ export function DecisionBar({
               onChange={(e) => setReason(e.target.value)}
               placeholder="What you verified, what remains uncertain, and why this next step…"
             />
-            <span className="muted mono">{reason.trim().length}/20</span>
+            <span className="field-hint">
+              {reason.trim().length}/{REASON_MIN_LENGTH} characters
+            </span>
           </label>
         </div>
         <div className="decide-side">
-          {action === "needs_evidence" && gaps.length > 0 && (
+          {current.showsGaps && gaps.length > 0 && (
             <div>
-              <p className="kicker">Evidence still needed</p>
+              <p className="field">Evidence still needed</p>
               <ul className="gap-list">
                 {gaps.map((g) => (
                   <li key={g}>{g}</li>
@@ -186,7 +152,7 @@ export function DecisionBar({
             </div>
           )}
           {ladderOptions.length > 0 && (
-            <label className="ladder-select">
+            <label className="field ladder-select">
               Program-integrity next step
               <select
                 value={ladder ?? ""}
@@ -195,11 +161,11 @@ export function DecisionBar({
               >
                 {ladderOptions.map((step) => (
                   <option key={step} value={step}>
-                    {LADDER_LABELS[step]}
+                    {LADDER_LABELS[step] ?? step}
                   </option>
                 ))}
               </select>
-              <span className="muted">
+              <span className="field-hint">
                 42 CFR 455.23 payment suspension is a recommendation. The state decides.
               </span>
             </label>
@@ -214,10 +180,16 @@ export function DecisionBar({
           </button>
         </div>
       </div>
-      {error && <p className="error-text">{error}</p>}
+      {error && (
+        <p className="error-text" role="alert">
+          {error}
+        </p>
+      )}
       {result && (
         <div className="banner ok decide-receipt" role="status">
-          <p className="kicker">Audit confirmation</p>
+          <p>
+            <strong>Audit confirmation</strong>
+          </p>
           <p>
             {result.action} recorded
             {result.ladder_label ? ` · ${result.ladder_label}` : ""}. {result.note}
@@ -232,6 +204,6 @@ export function DecisionBar({
           <ProposalCard proposal={proposal} compact={proposal.status !== "pending"} />
         </div>
       )}
-    </section>
+    </div>
   );
 }

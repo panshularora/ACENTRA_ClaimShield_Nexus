@@ -1,13 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { api, can } from "../../api/client";
 import { useAuth } from "../../auth/AuthProvider";
+import { PageHeader } from "../../components/ui/PageHeader";
+import { Panel } from "../../components/ui/Panel";
+import { EmptyState, ErrorState, LoadingState } from "../../components/ui/States";
+import { dateTime, humanize } from "../../lib/format";
+
+const STATUSES = ["pending", "approved", "rejected", "all"] as const;
+type StatusFilter = (typeof STATUSES)[number];
 
 export function WikiProposalsPage() {
   const { user } = useAuth();
-  const navigate = useNavigate();
-  const [status, setStatus] = useState("pending");
+  const [status, setStatus] = useState<StatusFilter>("pending");
   const allowed = can(user, "wiki:read");
   const query = useQuery({
     queryKey: ["wiki-proposals", status],
@@ -19,8 +25,8 @@ export function WikiProposalsPage() {
   if (!allowed) {
     return (
       <main id="main" className="page">
-        <h1>Precedent proposals</h1>
-        <p className="error-text">Your role cannot read wiki proposals.</p>
+        <PageHeader eyebrow="Knowledge loop" title="Precedent proposals" />
+        <ErrorState title="Access denied" error="Your role cannot read wiki proposals." />
       </main>
     );
   }
@@ -29,71 +35,79 @@ export function WikiProposalsPage() {
 
   return (
     <main id="main" className="page">
-      <header className="page-head">
-        <div>
-          <p className="kicker">Knowledge loop</p>
-          <h1>Precedent proposals</h1>
-          <p className="lede">
-            A human decision drafts a pending precedent. Manager or analyst approval publishes it
-            so later briefs can cite it. The model never writes policy by itself.
-          </p>
-        </div>
-        <label>
-          Status
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-            <option value="all">All</option>
-          </select>
-        </label>
-      </header>
-      {query.isLoading && <p className="muted">Loading proposals…</p>}
-      {query.error && <p className="error-text">{(query.error as Error).message}</p>}
-      <div className="table-wrap">
-        <table className="grid">
-          <thead>
-            <tr>
-              <th>Proposal</th>
-              <th>Source case</th>
-              <th>Decision</th>
-              <th>Status</th>
-              <th>Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={5} className="muted">
-                  No proposals in this filter.
-                </td>
-              </tr>
-            )}
-            {rows.map((row) => (
-              <tr
-                key={row.proposal_id}
-                onClick={() =>
-                  void navigate({
-                    to: "/wiki/proposals/$proposalId",
-                    params: { proposalId: row.proposal_id },
-                  })
-                }
-              >
-                <td>
-                  <strong>{row.title}</strong>
-                  <div className="mono muted">{row.proposal_id}</div>
-                </td>
-                <td className="mono">{row.source_case_id}</td>
-                <td>{row.body.decision ?? "—"}</td>
-                <td>
-                  <span className="badge">{row.status}</span>
-                </td>
-                <td className="mono">{row.created_at ?? "—"}</td>
-              </tr>
+      <PageHeader
+        eyebrow="Knowledge loop"
+        title="Precedent proposals"
+        description="A human decision drafts a pending precedent. Manager or analyst approval publishes it so later briefs can cite it. The model never writes policy by itself."
+      />
+      <Panel
+        id="proposals"
+        eyebrow="Review queue"
+        title={`${humanize(status)} proposals`}
+        actions={
+          <div className="segmented" role="group" aria-label="Filter by status">
+            {STATUSES.map((value) => (
+              <button key={value} type="button" aria-pressed={status === value} onClick={() => setStatus(value)}>
+                {humanize(value)}
+              </button>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </div>
+        }
+      >
+        {query.isLoading ? <LoadingState label="Loading proposals…" /> : null}
+        {query.error ? <ErrorState title="Proposals unavailable" error={query.error} /> : null}
+        {query.data && rows.length === 0 ? (
+          <EmptyState title="No proposals in this filter" compact>
+            Decisions recorded in a case workspace draft new proposals here.
+          </EmptyState>
+        ) : null}
+        {rows.length > 0 ? (
+          <div className="table-wrap">
+            <table className="grid">
+              <caption className="sr-only">Precedent proposals</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Proposal</th>
+                  <th scope="col">Source case</th>
+                  <th scope="col">Decision</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.proposal_id}>
+                    <th scope="row">
+                      <Link
+                        to="/wiki/proposals/$proposalId"
+                        params={{ proposalId: row.proposal_id }}
+                        className="row-title"
+                      >
+                        {row.title}
+                      </Link>
+                      <span className="mono muted"> {row.proposal_id}</span>
+                    </th>
+                    <td>
+                      <Link
+                        to="/investigator/workspace/$caseId"
+                        params={{ caseId: row.source_case_id }}
+                        className="mono"
+                      >
+                        {row.source_case_id}
+                      </Link>
+                    </td>
+                    <td>{row.body.decision ? humanize(row.body.decision) : "—"}</td>
+                    <td>
+                      <span className="badge">{humanize(row.status)}</span>
+                    </td>
+                    <td>{dateTime(row.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </Panel>
     </main>
   );
 }

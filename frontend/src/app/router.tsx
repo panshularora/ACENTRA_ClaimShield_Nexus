@@ -1,72 +1,67 @@
-import { Outlet, createRootRoute, createRoute, createRouter, useRouterState } from "@tanstack/react-router";
-import { Shell } from "../components/Shell";
-import { InvestigatorCasesPage } from "../features/cases/InvestigatorCasesPage";
-import { LoginPage } from "../features/auth/LoginPage";
-import { LandingPage } from "../features/landing/LandingPage";
-import { ManagerQueuePage } from "../features/queue/ManagerQueuePage";
-import { WorkspacePage } from "../features/workspace/WorkspacePage";
-import { AuditPage } from "../features/audit/AuditPage";
-import { WikiProposalDetailPage } from "../features/wiki/WikiProposalDetailPage";
-import { WikiProposalsPage } from "../features/wiki/WikiProposalsPage";
+import {
+  createRootRoute,
+  createRoute,
+  createRouter,
+  lazyRouteComponent,
+} from "@tanstack/react-router";
+import { Root, RouteError, RouteNotFound, RoutePending } from "./RouteShells";
 
-function Root() {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  if (pathname === "/" || pathname === "/login") {
-    return <Outlet />;
-  }
-  return <Shell />;
-}
+const rootRoute = createRootRoute({ component: Root });
 
-const rootRoute = createRootRoute({
-  component: Root,
-});
-
+// Every page is code-split so the three.js landing scene, the chart library and
+// the network graph only download on the routes that use them.
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  component: LandingPage,
+  component: lazyRouteComponent(() => import("../features/landing/LandingPage"), "LandingPage"),
 });
 
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",
-  component: LoginPage,
+  component: lazyRouteComponent(() => import("../features/auth/LoginPage"), "LoginPage"),
 });
 
 const queueRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/manager/queue",
-  component: ManagerQueuePage,
+  component: lazyRouteComponent(() => import("../features/queue/ManagerQueuePage"), "ManagerQueuePage"),
 });
 
 const casesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/investigator/cases",
-  component: InvestigatorCasesPage,
+  component: lazyRouteComponent(
+    () => import("../features/cases/InvestigatorCasesPage"),
+    "InvestigatorCasesPage",
+  ),
 });
 
 const workspaceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/investigator/workspace/$caseId",
-  component: WorkspacePage,
+  component: lazyRouteComponent(() => import("../features/workspace/WorkspacePage"), "WorkspacePage"),
 });
 
 const proposalsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/wiki/proposals",
-  component: WikiProposalsPage,
+  component: lazyRouteComponent(() => import("../features/wiki/WikiProposalsPage"), "WikiProposalsPage"),
 });
 
 const proposalDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/wiki/proposals/$proposalId",
-  component: WikiProposalDetailPage,
+  component: lazyRouteComponent(
+    () => import("../features/wiki/WikiProposalDetailPage"),
+    "WikiProposalDetailPage",
+  ),
 });
 
 const auditRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/audit",
-  component: AuditPage,
+  component: lazyRouteComponent(() => import("../features/audit/AuditPage"), "AuditPage"),
 });
 
 const routeTree = rootRoute.addChildren([
@@ -80,7 +75,12 @@ const routeTree = rootRoute.addChildren([
   auditRoute,
 ]);
 
-export const router = createRouter({ routeTree });
+export const router = createRouter({
+  routeTree,
+  defaultPendingComponent: RoutePending,
+  defaultErrorComponent: RouteError,
+  defaultNotFoundComponent: RouteNotFound,
+});
 
 declare module "@tanstack/react-router" {
   interface Register {
