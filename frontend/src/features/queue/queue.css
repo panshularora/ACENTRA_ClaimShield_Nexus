@@ -1,0 +1,53 @@
+.queue-page .queue-stage {
+  height: 320px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  margin-bottom: 1rem;
+  background: #06141b;
+}
+
+.q3-label {
+  color: #e8f4ec;
+  font-family: Outfit, sans-serif;
+  font-size: 11px;
+  text-align: center;
+  background: rgba(6, 20, 27, 0.72);
+  border: 1px solid rgba(158, 230, 184, 0.25);
+  border-radius: 8px;
+  padding: 4px 8px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.q3-label strong {
+  display: block;
+}
+
+.q3-label.on {
+  border-color: #1fbf5a;
+}
+
+.queue-page .funnel {
+  font-family: "Fraunces", Georgia, serif;
+}
+
+.queue-page .control-board {
+  border-radius: 14px;
+  background: #fff;
+}
+
+.queue-page .lanes {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 900px) {
+  .queue-page .lanes,
+  .queue-page .control-board {
+    grid-template-columns: 1fr;
+  }
+  .queue-page .queue-stage {
+    height: 240px;
+  }
+}

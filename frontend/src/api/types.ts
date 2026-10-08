@@ -95,6 +95,7 @@ export interface QueueCase {
   lane: Lane;
   status: string;
   primary_entity_id: string;
+  entity_ids?: string[];
   harm: number;
   severity: number;
   members_affected: number;
@@ -102,6 +103,7 @@ export interface QueueCase {
   evidence_strength: number;
   estimated_hours: number;
   p_confirm: number;
+  expected_value?: number;
   f30: number | null;
   f60: number | null;
   f90: number | null;
@@ -387,6 +389,7 @@ export interface CaseDetail {
   assignee_id: string | null;
   primary_entity_id: string;
   primary_entity_type: string;
+  entity_ids?: string[];
   primary_entity?: ProviderCard;
   harm: number;
   severity: number;
@@ -395,6 +398,7 @@ export interface CaseDetail {
   evidence_strength: number;
   estimated_hours: number;
   p_confirm: number;
+  expected_value?: number;
   f30: number | null;
   f60: number | null;
   f90: number | null;

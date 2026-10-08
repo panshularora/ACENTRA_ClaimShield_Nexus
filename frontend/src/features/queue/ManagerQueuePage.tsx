@@ -9,8 +9,11 @@ import { EvidenceBar } from "../../components/EvidenceBar";
 import { HarmBadge, LaneBadge, StatusBadge } from "../../components/Badge";
 import { hours, horizonRisk, money, pct, whyPriority } from "../../lib/format";
 import { readStoredRun, writeStoredRun } from "../../lib/runStore";
+import { QueueScene } from "../../three/QueueScene";
+import { usePrefersReducedMotion } from "../../three/useScrollProgress";
+import "./queue.css";
 
-type SortKey = "rank" | "dollars" | "harm" | "hours" | "evidence" | "p";
+type SortKey = "rank" | "ev" | "dollars" | "harm" | "hours" | "evidence" | "p";
 
 const LANE_ORDER: Lane[] = ["harm_priority", "selected", "needs_evidence", "overflow"];
 
@@ -25,7 +28,8 @@ export function ManagerQueuePage() {
   const [queryText, setQueryText] = useState("");
   const [laneFilter, setLaneFilter] = useState<"all" | Lane>("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [sortKey, setSortKey] = useState<SortKey>("rank");
+  const [sortKey, setSortKey] = useState<SortKey>("ev");
+  const reduced = usePrefersReducedMotion();
   const [openId, setOpenId] = useState<string | null>(null);
   const [capacityDraft, setCapacityDraft] = useState(40);
   const [horizonDraft, setHorizonDraft] = useState(60);
@@ -132,6 +136,7 @@ export function ManagerQueuePage() {
     });
     const ranked = [...list];
     ranked.sort((a, b) => {
+      if (sortKey === "ev") return (b.expected_value ?? 0) - (a.expected_value ?? 0);
       if (sortKey === "dollars") return b.flagged_dollars - a.flagged_dollars;
       if (sortKey === "harm") return b.harm - a.harm;
       if (sortKey === "hours") return b.estimated_hours - a.estimated_hours;
@@ -140,7 +145,7 @@ export function ManagerQueuePage() {
       const ia = LANE_ORDER.indexOf(a.lane);
       const ib = LANE_ORDER.indexOf(b.lane);
       if (ia !== ib) return ia - ib;
-      return b.flagged_dollars - a.flagged_dollars;
+      return (b.expected_value ?? 0) - (a.expected_value ?? 0);
     });
     return ranked;
   }, [rows, queryText, laneFilter, statusFilter, sortKey]);
@@ -169,8 +174,8 @@ export function ManagerQueuePage() {
     <main id="main" className="page queue-page">
       <header className="page-head">
         <div>
-          <p className="kicker">Manager command center</p>
-          <h1>Investigation queue</h1>
+          <p className="kicker">Manager command center · live API</p>
+          <h1>Capacity-ranked SIU queue</h1>
         </div>
         <p className="funnel" aria-live="polite">
           <strong className="mono">{nAlerts}</strong> alerts
@@ -267,6 +272,19 @@ export function ManagerQueuePage() {
 
       {runId && (
         <>
+          <section className="queue-stage" aria-label="Lane hours in 3D">
+            <QueueScene
+              hoursByLane={{
+                harm_priority: harmHours,
+                selected: selectedHours,
+                needs_evidence: evidenceHours,
+                overflow: monitorHours,
+              }}
+              selected={laneFilter}
+              onSelect={(lane) => setLaneFilter(laneFilter === lane ? "all" : lane)}
+              reduced={reduced}
+            />
+          </section>
           <section className="lanes" aria-label="Queue lanes">
             <LaneStat
               lane="harm_priority"
@@ -319,8 +337,8 @@ export function ManagerQueuePage() {
               </li>
             </ol>
             <p className="muted">
-              Expected-value internals are not returned by GET /queue. This board explains the
-              persisted lanes and hours from the run.
+              Harm takes a reserved slice of hours, then knapsack fills the rest by expected value
+              (recovery × dollars + harm term). Click a tower to filter that lane.
             </p>
           </section>
 
@@ -349,6 +367,7 @@ export function ManagerQueuePage() {
               Sort
               <select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)}>
                 <option value="rank">Lane rank</option>
+                <option value="ev">Expected value</option>
                 <option value="dollars">Flagged $</option>
                 <option value="harm">Harm</option>
                 <option value="p">P(confirm)</option>
@@ -373,6 +392,7 @@ export function ManagerQueuePage() {
                   <th>Status</th>
                   <th>P(confirm)</th>
                   <th>Horizon risk</th>
+                  <th>EV</th>
                   <th>Flagged</th>
                   <th>Members</th>
                   <th>Sev</th>
@@ -479,6 +499,7 @@ function QueueRow({
       </td>
       <td className="mono">{pct(row.p_confirm)}</td>
       <td className="mono">{pct(risk)}</td>
+      <td className="mono">{money(row.expected_value ?? 0)}</td>
       <td className="mono dollars">{money(row.flagged_dollars)}</td>
       <td className="mono">{row.members_affected}</td>
       <td>
