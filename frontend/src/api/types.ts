@@ -476,6 +476,9 @@ export interface LabelRecord {
   approved_at: string | null;
 }
 
+/** Actions POST /cases/{id}/decisions accepts today (being revised on the backend). */
+export type DecisionAction = "escalate" | "monitor" | "dismiss" | "needs_evidence";
+
 export interface DecisionResult {
   decision_id: string;
   case_id: string;

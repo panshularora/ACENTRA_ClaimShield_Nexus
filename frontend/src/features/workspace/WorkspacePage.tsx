@@ -15,6 +15,7 @@ import { BriefPanel } from "./BriefPanel";
 import { CaseHeader } from "./CaseHeader";
 import { ClaimsTable } from "./ClaimsTable";
 import { DecisionBar } from "./DecisionBar";
+import type { DecisionAction } from "./decisionConfig";
 import { EvidenceDrawer } from "./EvidenceDrawer";
 import { FindingsPanel } from "./FindingsPanel";
 import { focusMatches, type EntityFocus } from "./focus";
@@ -34,8 +35,6 @@ const SECTIONS = [
 
 /** Hashes from the earlier tabbed workspace still land on the right section. */
 const LEGACY_HASH: Record<string, string> = { overview: "evidence", findings: "evidence", timeline: "claims" };
-
-type Decision = "escalate" | "monitor" | "dismiss" | "needs_evidence";
 
 export function WorkspacePage() {
   const { caseId } = useParams({ from: "/investigator/workspace/$caseId" });
@@ -78,7 +77,7 @@ export function WorkspacePage() {
   });
 
   const decideMut = useMutation({
-    mutationFn: (vars: { action: Decision; reason: string; ladder_step?: string | null; evidence_refs?: string[] }) =>
+    mutationFn: (vars: { action: DecisionAction; reason: string; ladder_step?: string | null; evidence_refs?: string[] }) =>
       api.decide(caseId, vars),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["case", caseId] });
