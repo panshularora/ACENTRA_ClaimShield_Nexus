@@ -31,6 +31,8 @@ def test_workspace_pack_and_decision(client: TestClient) -> None:
     assert "alerts" in case
     assert case["status"] == "open"
     assert case["primary_entity"]["provider_id"] == case["primary_entity_id"]
+    assert case.get("screening_days_left") is not None
+    assert case.get("why_rank", {}).get("text")
 
     brief = client.get(f"/api/v1/cases/{case_id}/brief")
     assert brief.status_code == 200
@@ -104,6 +106,7 @@ def test_workspace_pack_and_decision(client: TestClient) -> None:
     assert decided.status_code == 200, decided.text
     payload = decided.json()
     assert payload["status"] == "needs_evidence"
+    assert payload["ladder_step"] == "medical_records_request"
     assert payload["audit"]["seq"] >= 1
     assert payload["audit"]["hash"]
     assert "not an automatic fraud label" in payload["note"].lower()
@@ -111,6 +114,28 @@ def test_workspace_pack_and_decision(client: TestClient) -> None:
     after = client.get(f"/api/v1/cases/{case_id}")
     assert after.json()["status"] == "needs_evidence"
     assert after.json()["latest_decision"]["decision_id"] == payload["decision_id"]
+
+
+def test_unmask_writes_member_audit(client: TestClient) -> None:
+    _run_id, case_id = _load_tiny(client)
+    client.post("/api/v1/auth/logout")
+    _login(client, "investigator@demo.claimshield", "demo-investigator")
+    hidden = client.get(f"/api/v1/cases/{case_id}/claims")
+    assert hidden.status_code == 200
+    assert hidden.json()["masked"] is True
+    shown = client.get(f"/api/v1/cases/{case_id}/claims", params={"unmask": True})
+    assert shown.status_code == 200
+    assert shown.json()["masked"] is False
+    client.post("/api/v1/auth/logout")
+    _login(client, "auditor@demo.claimshield", "demo-auditor")
+    log = client.get("/api/v1/audit")
+    assert log.status_code == 200
+    events = log.json()["events"]
+    unmask_events = [e for e in events if e["action"] == "member.unmask"]
+    assert unmask_events
+    assert unmask_events[-1]["object_id"] == case_id
+    assert unmask_events[-1]["payload"]["surface"] == "claims"
+    assert unmask_events[-1]["payload"]["minimum_necessary"] is True
 
 
 def test_investigator_can_take_ownership(client: TestClient) -> None:

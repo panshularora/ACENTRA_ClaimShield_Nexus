@@ -13,6 +13,8 @@ from claimshield.auth.rbac import has_permission
 from claimshield.core.clock import canonical_iso
 from claimshield.core.errors import Forbidden, NotFound, ValidationFailed
 from claimshield.core.ids import new_id
+from claimshield.queue.explain import screening_days_left, why_rank
+from claimshield.rules.catalog import rule_title as catalog_title
 from claimshield.db.models import (
     Alert,
     Case,
@@ -33,6 +35,26 @@ from claimshield.db.models import (
 )
 
 ACTIONS = ("escalate", "monitor", "dismiss", "needs_evidence")
+LADDER_STEPS = (
+    "education_letter",
+    "medical_records_request",
+    "prepayment_review",
+    "mfcu_referral",
+    "payment_suspension_recommend",
+)
+DEFAULT_LADDER = {
+    "needs_evidence": "medical_records_request",
+    "escalate": "mfcu_referral",
+    "monitor": "education_letter",
+    "dismiss": None,
+}
+LADDER_LABELS = {
+    "education_letter": "Provider education letter",
+    "medical_records_request": "Medical records request",
+    "prepayment_review": "Prepayment review",
+    "mfcu_referral": "Referral to state MFCU",
+    "payment_suspension_recommend": "Recommend 42 CFR 455.23 payment suspension (state decides)",
+}
 ACTION_STATUS = {
     "escalate": "escalated",
     "monitor": "monitor",
@@ -162,7 +184,8 @@ def serialize_alert(alert: Alert) -> dict[str, Any]:
         "approach": approach,
         "rule_id": alert.rule_id,
         "rule_version": alert.rule_version,
-        "rule_title": RULE_TITLES.get(alert.rule_id or "", alert.rule_id),
+        "rule_title": catalog_title(alert.rule_id, RULE_TITLES.get(alert.rule_id or "", alert.rule_id)),
+        "policy_ref": evidence.get("policy_ref"),
         "entity_id": alert.entity_id,
         "entity_type": alert.entity_type,
         "score": alert.score,
@@ -171,7 +194,7 @@ def serialize_alert(alert: Alert) -> dict[str, Any]:
         "kind": kind,
         "label": KIND_LABELS.get(kind, kind.replace("_", " ") if kind else "Signal"),
         "review_reason": evidence.get("review_reason")
-        or RULE_TITLES.get(alert.rule_id or "", "Review the supporting claims and fields."),
+        or catalog_title(alert.rule_id, RULE_TITLES.get(alert.rule_id or "", "Review the supporting claims and fields.")),
     }
 
 
@@ -223,6 +246,9 @@ def serialize_case(session: Session, case: Case, user: User) -> dict[str, Any]:
         "f30": case.f30,
         "f60": case.f60,
         "f90": case.f90,
+        "sla_due": iso(case.sla_due),
+        "screening_days_left": screening_days_left(case),
+        "why_rank": why_rank(case),
         "alerts": [serialize_alert(a) for a in alerts],
         "evidence_gaps": evidence_gaps(alerts, case),
         "latest_decision": serialize_decision(latest) if latest else None,
@@ -277,6 +303,7 @@ def serialize_decision(row: Decision) -> dict[str, Any]:
         "actor_id": row.actor_id,
         "action": row.action,
         "ladder_step": row.ladder_step,
+        "ladder_label": LADDER_LABELS.get(row.ladder_step) if row.ladder_step else None,
         "reason": row.reason,
         "evidence_refs": row.evidence_refs or [],
         "approved_by": row.approved_by,
@@ -284,10 +311,41 @@ def serialize_decision(row: Decision) -> dict[str, Any]:
     }
 
 
-def claims_pack(session: Session, case: Case, user: User, *, unmask: bool) -> dict[str, Any]:
+def _audit_unmask(
+    session: Session,
+    *,
+    user: User,
+    case: Case,
+    surface: str,
+    unmask: bool,
+) -> bool:
+    reveal = unmask and can_unmask(user)
+    if reveal:
+        append_event(
+            session,
+            actor_id=user.id,
+            role=user.role,
+            action="member.unmask",
+            object_type="case",
+            object_id=case.case_id,
+            payload={"surface": surface, "minimum_necessary": True},
+        )
+    return reveal
+
+
+def claims_pack(
+    session: Session,
+    case: Case,
+    user: User,
+    *,
+    unmask: bool,
+    audit: bool = True,
+) -> dict[str, Any]:
     alerts = alerts_for(session, case.case_id)
     lids = line_ids_for(alerts)
-    reveal = unmask and can_unmask(user)
+    reveal = _audit_unmask(session, user=user, case=case, surface="claims", unmask=unmask) if audit else (
+        unmask and can_unmask(user)
+    )
     if not lids:
         return {"case_id": case.case_id, "masked": not reveal, "rows": []}
 
@@ -357,13 +415,13 @@ def evidence_item(session: Session, case: Case, item_id: str, user: User) -> dic
             raise NotFound("evidence item not found")
         return {"item_id": item_id, "kind": "alert", "payload": serialize_alert(alert)}
     if kind == "line":
-        pack = claims_pack(session, case, user, unmask=reveal)
+        pack = claims_pack(session, case, user, unmask=reveal, audit=False)
         row = next((r for r in pack["rows"] if r["line_id"] == rest), None)
         if row is None:
             raise NotFound("evidence item not found")
         return {"item_id": item_id, "kind": "line", "payload": row}
     if kind == "claim":
-        pack = claims_pack(session, case, user, unmask=reveal)
+        pack = claims_pack(session, case, user, unmask=reveal, audit=False)
         rows = [r for r in pack["rows"] if r["claim_id"] == rest]
         if not rows:
             raise NotFound("evidence item not found")
@@ -440,9 +498,14 @@ def template_brief(session: Session, case: Case, user: User) -> dict[str, Any]:
     key_sentences = []
     for a in serialized[:8]:
         n = len(a["line_ids"])
+        policy = a.get("policy_ref")
+        policy_bit = f" Policy {policy}." if policy else ""
         key_sentences.append(
             {
-                "text": f"{a['label']} ({a['rule_id'] or a['detector']}) on {n} claim line(s) for entity {a['entity_id']}.",
+                "text": (
+                    f"{a['label']} ({a['rule_id'] or a['detector']}) on {n} claim line(s) "
+                    f"for entity {a['entity_id']}.{policy_bit}"
+                ),
                 "cites": [_cite(f"alert:{a['alert_id']}", "alert", a["rule_id"] or a["detector"])],
             }
         )
@@ -526,7 +589,17 @@ def template_brief(session: Session, case: Case, user: User) -> dict[str, Any]:
         },
         {
             "title": "Recommended human-review action",
-            "sentences": [{"text": action, "cites": metric_cite}],
+            "sentences": [
+                {"text": action, "cites": metric_cite},
+                {
+                    "text": (
+                        "Action ladder is education letter, records request, prepayment review, "
+                        "MFCU referral, then a 42 CFR 455.23 payment-suspension recommendation. "
+                        "The state decides suspension. ClaimShield does not."
+                    ),
+                    "cites": metric_cite,
+                },
+            ],
         },
     ]
     from claimshield.wiki.service import match_precedents
@@ -571,7 +644,7 @@ def template_brief(session: Session, case: Case, user: User) -> dict[str, Any]:
 def timeline_pack(session: Session, case: Case, user: User, *, unmask: bool) -> dict[str, Any]:
     alerts = alerts_for(session, case.case_id)
     lids = line_ids_for(alerts)
-    reveal = unmask and can_unmask(user)
+    reveal = _audit_unmask(session, user=user, case=case, surface="timeline", unmask=unmask)
     events: list[dict[str, Any]] = []
 
     lines = list(session.execute(select(ClaimLine).where(ClaimLine.line_id.in_(lids))).scalars().all()) if lids else []
@@ -699,7 +772,7 @@ def network_pack(session: Session, case: Case, user: User, *, hops: int = 2, unm
     hops = max(1, min(int(hops), 2))
     alerts = alerts_for(session, case.case_id)
     lids = line_ids_for(alerts)
-    reveal = unmask and can_unmask(user)
+    reveal = _audit_unmask(session, user=user, case=case, surface="network", unmask=unmask)
     nodes: dict[str, dict[str, Any]] = {}
     edges: list[dict[str, Any]] = []
     edge_keys: set[tuple[str, str, str]] = set()
@@ -869,13 +942,16 @@ def record_decision(
     text = (reason or "").strip()
     if len(text) < 20:
         raise ValidationFailed("reason must be at least 20 characters")
+    step = ladder_step or DEFAULT_LADDER.get(action)
+    if step and step not in LADDER_STEPS:
+        raise ValidationFailed("ladder_step is not a program-integrity action")
     case.status = ACTION_STATUS[action]
     row = Decision(
         decision_id=new_id("DEC"),
         case_id=case.case_id,
         actor_id=user.id,
         action=action,
-        ladder_step=ladder_step,
+        ladder_step=step,
         reason=text,
         evidence_refs=evidence_refs,
         approved_by=None,
@@ -893,7 +969,8 @@ def record_decision(
             "decision_id": row.decision_id,
             "action": action,
             "status": case.status,
-            "ladder_step": ladder_step,
+            "ladder_step": step,
+            "ladder_label": LADDER_LABELS.get(step) if step else None,
         },
         ts=now,
     )
@@ -908,7 +985,8 @@ def record_decision(
         "action": action,
         "status": case.status,
         "reason": text,
-        "ladder_step": ladder_step,
+        "ladder_step": step,
+        "ladder_label": LADDER_LABELS.get(step) if step else None,
         "evidence_refs": evidence_refs,
         "created_at": iso(row.created_at),
         "audit": {
