@@ -1,0 +1,4 @@
+column1,column2,indicator,policy_ref,notes
+LAB-PNL-01,LAB-CMP-03,0,NCCI-SYN-001,component with panel is unbundling
+LAB-PNL-01,LAB-CMP-05,1,NCCI-SYN-002,indicator 1 allowed together (hard negative)
+EM-EST-5,EM-EST-3,0,NCCI-SYN-003,two established E/M levels same member-day

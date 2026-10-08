@@ -1,0 +1,66 @@
+rules:
+  - rule_id: R-DUP-001
+    kind: duplicate
+    title: Same member, provider, code, date of service
+    severity: 3
+    policy_ref: NCCI-SYN-DUP
+  - rule_id: R-PTP-001
+    kind: ptp_pair
+    title: Procedure-to-procedure unbundling (indicator 0)
+    severity: 3
+    policy_ref: NCCI-SYN-001
+  - rule_id: R-UNIT-001
+    kind: unit_cap
+    title: Units above synthetic MUE cap
+    severity: 3
+    policy_ref: MUE-SYN
+  - rule_id: R-DEATH-001
+    kind: after_death
+    title: Date of service after date of death
+    severity: 4
+    policy_ref: OIG-DOD
+  - rule_id: R-BH-001
+    kind: daily_minutes_cap
+    title: More than 960 billed minutes on one clinician-day
+    severity: 4
+    policy_ref: KRIZEK
+  - rule_id: R-IP-001
+    kind: inpatient_overlap
+    title: Outpatient/ABA service during an inpatient stay
+    severity: 3
+    policy_ref: OIG-ABA
+  - rule_id: R-EVV-001
+    kind: evv_missing
+    title: Home-health visit with no EVV row
+    severity: 3
+    policy_ref: CURES-EVV
+  - rule_id: R-LEIE-001
+    kind: excluded_party
+    title: Billing NPI matches synthetic LEIE
+    severity: 4
+    policy_ref: LEIE
+  - rule_id: R-RX-001
+    kind: doctor_shopping
+    title: High-MME opioids across 4+ prescribers and pharmacies
+    severity: 3
+    policy_ref: OEI-02-17-00250
+  - rule_id: R-SEX-001
+    kind: sex_implausible
+    title: Sex-incompatible synthetic procedure
+    severity: 3
+    policy_ref: NCCI-DEM
+  - rule_id: R-POS-001
+    kind: pos_mismatch
+    title: Office E/M billed at inpatient or ambulance POS
+    severity: 2
+    policy_ref: CMS-POS
+  - rule_id: R-AMB-001
+    kind: ambulance_overlap
+    title: Overlapping ambulance trips same vehicle-day
+    severity: 3
+    policy_ref: OEI-09-12-00351
+  - rule_id: R-CLONE-001
+    kind: clone_billing
+    title: Identical paid amount cloned across many members same day
+    severity: 3
+    policy_ref: SIU-CLONE

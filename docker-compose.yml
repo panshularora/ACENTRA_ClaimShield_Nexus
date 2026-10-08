@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: claimshield
+      POSTGRES_PASSWORD: claimshield
+      POSTGRES_DB: claimshield
+    ports:
+      - "5432:5432"
+    volumes:
+      - claimshield_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U claimshield"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      CLAIMSHIELD_DATABASE_URL: postgresql+psycopg://claimshield:claimshield@db:5432/claimshield
+      CLAIMSHIELD_JWT_SIGNING_KEY: change-me-in-compose
+      CLAIMSHIELD_COOKIE_SECURE: "false"
+      CLAIMSHIELD_DEMO_MODE: "true"
+      CLAIMSHIELD_DATA_PROFILE: tiny
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  claimshield_pg:
