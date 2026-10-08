@@ -1,40 +1,97 @@
-.queue-page .queue-stage {
-  height: 320px;
-  border-radius: 16px;
-  overflow: hidden;
-  border: 1px solid var(--rule);
-  margin-bottom: 1rem;
-  background: #06141b;
-}
-
-.q3-label {
-  color: #e8f4ec;
-  font-family: Outfit, sans-serif;
-  font-size: 11px;
-  text-align: center;
-  background: rgba(6, 20, 27, 0.72);
-  border: 1px solid rgba(158, 230, 184, 0.25);
-  border-radius: 8px;
-  padding: 4px 8px;
-  white-space: nowrap;
-  pointer-events: none;
-}
-
-.q3-label strong {
-  display: block;
-}
-
-.q3-label.on {
-  border-color: #1fbf5a;
+.queue-page .page-head h1 {
+  letter-spacing: -0.03em;
 }
 
 .queue-page .funnel {
-  font-family: "Fraunces", Georgia, serif;
+  display: flex;
+  gap: 0.55rem;
+  margin: 0;
+  font-family: inherit;
+}
+
+.stat-chip {
+  min-width: 5.5rem;
+  background: #fff;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  padding: 0.45rem 0.7rem 0.5rem;
+  box-shadow: var(--shadow);
+}
+
+.stat-chip span {
+  display: block;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.stat-chip strong {
+  font-size: 1.35rem;
+  font-weight: 650;
+  letter-spacing: -0.03em;
 }
 
 .queue-page .control-board {
   border-radius: 14px;
   background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.queue-chart {
+  margin: 0 0 1rem;
+  background: #fff;
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  padding: 0.9rem 1rem 0.55rem;
+  box-shadow: var(--shadow);
+}
+
+.queue-chart figcaption {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-end;
+  margin-bottom: 0.35rem;
+}
+
+.queue-chart h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.queue-chart svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.qc-row {
+  cursor: pointer;
+}
+.qc-row:focus { outline: none; }
+.qc-row:focus-visible rect:nth-of-type(1) {
+  stroke: #1aa24c;
+  stroke-width: 2;
+}
+
+.qc-label,
+.qc-value,
+.qc-tick {
+  font-family: Outfit, "IBM Plex Sans", sans-serif;
+  font-size: 12px;
+  fill: #3d5a63;
+}
+
+.qc-value {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  fill: #12262c;
+}
+
+.qc-tick {
+  font-size: 10px;
+  fill: #7a939b;
 }
 
 .queue-page .lanes {
@@ -42,12 +99,99 @@
   grid-template-columns: repeat(4, 1fr);
 }
 
+.lane-stat {
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.waterfall {
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.waterfall ol {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.queue-page .table-wrap {
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.case-cell {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.case-cell strong {
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.sla-chip {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: #eef4f1;
+  color: #1f3a40;
+}
+.sla-chip.sla-ok { background: #e3f6ea; color: #0d7a38; }
+.sla-chip.sla-warn { background: #f4ead3; color: #6d5a32; }
+.sla-chip.sla-hot { background: #f8e2df; color: #8a2f28; }
+
+.compare-strip {
+  margin: 0 0 1rem;
+  padding: 0.9rem 1rem;
+  background: #fff;
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+.compare-strip header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.6rem;
+}
+.compare-strip h2 { margin: 0; font-size: 1.05rem; }
+.compare-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+.compare-grid.n-1,
+.compare-grid.n-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.compare-grid article {
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  padding: 0.7rem 0.8rem;
+  background: #f7fbf8;
+}
+.compare-grid dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem 0.7rem;
+  margin: 0.45rem 0;
+}
+.compare-grid dt {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-2);
+}
+.compare-grid dd { margin: 0; }
+
 @media (max-width: 900px) {
   .queue-page .lanes,
-  .queue-page .control-board {
+  .queue-page .control-board,
+  .queue-page .funnel,
+  .compare-grid.n-1,
+  .compare-grid.n-2 {
     grid-template-columns: 1fr;
-  }
-  .queue-page .queue-stage {
-    height: 240px;
+    flex-wrap: wrap;
   }
 }

@@ -88,6 +88,9 @@ export interface PipelineRun {
   summary: RunSummary["summary"];
   n_alerts: number;
   n_cases: number;
+  horizon_days?: number;
+  capacity_hours?: number;
+  screening_days?: number;
 }
 
 export interface QueueCase {
@@ -107,6 +110,10 @@ export interface QueueCase {
   f30: number | null;
   f60: number | null;
   f90: number | null;
+  sla_due?: string | null;
+  screening_days_left?: number | null;
+  why_rank?: { code: string; text: string };
+  suspicion_only?: boolean;
 }
 
 export interface PeerGroup {
@@ -131,6 +138,7 @@ export interface CaseAlert {
   rule_id: string | null;
   rule_version?: number | null;
   rule_title?: string | null;
+  policy_ref?: string | null;
   entity_id: string;
   entity_type?: string;
   score: number;
@@ -275,6 +283,7 @@ export interface DecisionRecord {
   actor_id: string;
   action: string;
   ladder_step: string | null;
+  ladder_label?: string | null;
   reason: string;
   evidence_refs: string[];
   approved_by?: string | null;
@@ -358,6 +367,7 @@ export interface DecisionResult {
   status: string;
   reason: string;
   ladder_step: string | null;
+  ladder_label?: string | null;
   evidence_refs: string[];
   created_at: string | null;
   audit: AuditReceipt;
@@ -418,6 +428,9 @@ export interface CaseDetail {
   f30: number | null;
   f60: number | null;
   f90: number | null;
+  sla_due?: string | null;
+  screening_days_left?: number | null;
+  why_rank?: { code: string; text: string };
   alerts: CaseAlert[];
   evidence_gaps?: string[];
   latest_decision?: DecisionRecord | null;

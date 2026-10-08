@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CaseAlert, DecisionResult, WikiProposal } from "../../api/types";
 import { ProposalCard } from "../wiki/ProposalCard";
 
@@ -25,6 +25,28 @@ const ACTIONS = [
   },
 ];
 
+const LADDER_LABELS: Record<string, string> = {
+  education_letter: "Provider education letter",
+  medical_records_request: "Medical records request",
+  prepayment_review: "Prepayment review",
+  mfcu_referral: "Referral to state MFCU",
+  payment_suspension_recommend: "Recommend 42 CFR 455.23 payment suspension (state decides)",
+};
+
+const LADDER_BY_ACTION: Record<(typeof ACTIONS)[number]["id"], string[]> = {
+  needs_evidence: ["medical_records_request", "prepayment_review"],
+  escalate: ["mfcu_referral", "prepayment_review", "payment_suspension_recommend"],
+  monitor: ["education_letter", "prepayment_review"],
+  dismiss: [],
+};
+
+const DEFAULT_LADDER: Record<(typeof ACTIONS)[number]["id"], string | null> = {
+  needs_evidence: "medical_records_request",
+  escalate: "mfcu_referral",
+  monitor: "education_letter",
+  dismiss: null,
+};
+
 export function DecisionBar({
   disabled,
   gaps,
@@ -46,13 +68,20 @@ export function DecisionBar({
     action: (typeof ACTIONS)[number]["id"],
     reason: string,
     evidenceRefs: string[],
+    ladderStep: string | null,
   ) => void;
 }) {
   const [action, setAction] = useState<(typeof ACTIONS)[number]["id"]>("monitor");
+  const [ladder, setLadder] = useState<string | null>(DEFAULT_LADDER.monitor);
   const [reason, setReason] = useState("");
   const [refs, setRefs] = useState<string[]>([]);
   const ready = reason.trim().length >= 20 && !disabled && !pending;
   const proposal = result?.proposal ?? existingProposal ?? null;
+  const ladderOptions = LADDER_BY_ACTION[action];
+
+  useEffect(() => {
+    setLadder(DEFAULT_LADDER[action]);
+  }, [action]);
 
   function toggle(ref: string) {
     setRefs((prev) => (prev.includes(ref) ? prev.filter((x) => x !== ref) : [...prev, ref]));
@@ -135,11 +164,30 @@ export function DecisionBar({
               </ul>
             </div>
           )}
+          {ladderOptions.length > 0 && (
+            <label className="ladder-select">
+              Program-integrity next step
+              <select
+                value={ladder ?? ""}
+                disabled={disabled || pending}
+                onChange={(e) => setLadder(e.target.value || null)}
+              >
+                {ladderOptions.map((step) => (
+                  <option key={step} value={step}>
+                    {LADDER_LABELS[step]}
+                  </option>
+                ))}
+              </select>
+              <span className="muted">
+                42 CFR 455.23 payment suspension is a recommendation. The state decides.
+              </span>
+            </label>
+          )}
           <button
             type="button"
             className="btn solid"
             disabled={!ready}
-            onClick={() => onSubmit(action, reason.trim(), refs)}
+            onClick={() => onSubmit(action, reason.trim(), refs, ladder)}
           >
             {pending ? "Recording…" : "Record disposition"}
           </button>
@@ -150,7 +198,8 @@ export function DecisionBar({
         <div className="banner ok decide-receipt" role="status">
           <p className="kicker">Audit confirmation</p>
           <p>
-            {result.action} recorded. {result.note}
+            {result.action} recorded
+            {result.ladder_label ? ` · ${result.ladder_label}` : ""}. {result.note}
           </p>
           <p className="mono muted">
             seq {result.audit.seq} · chain {result.audit.chain_intact ? "intact" : "broken"}

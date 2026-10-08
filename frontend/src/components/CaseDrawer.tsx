@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { api } from "../api/client";
-import { hours, money, pct, signalLabel, whyPriority } from "../lib/format";
+import { hours, money, pct, screeningLabel, signalLabel, whyPriority } from "../lib/format";
 import { EvidenceBar } from "./EvidenceBar";
 import { HarmBadge, LaneBadge, StatusBadge } from "./Badge";
 
@@ -23,9 +23,10 @@ export function CaseDrawer({
       <header className="drawer-head">
         <div>
           <p className="kicker">Case file</p>
-          <h2 id="case-drawer-title" className="mono">
-            {caseId}
+          <h2 id="case-drawer-title">
+            {query.data?.primary_entity?.name ?? caseId}
           </h2>
+          <p className="mono muted">{caseId}</p>
         </div>
         <button type="button" className="btn ghost" onClick={onClose}>
           Close
@@ -76,7 +77,11 @@ export function CaseDrawer({
               <dd className="mono">{query.data.assignee_id ?? "Unassigned"}</dd>
             </div>
             <div>
-              <dt>Why this lane</dt>
+              <dt>45-day screen</dt>
+              <dd>{screeningLabel(query.data.screening_days_left)}</dd>
+            </div>
+            <div>
+              <dt>Why this rank</dt>
               <dd>{whyPriority(query.data)}</dd>
             </div>
           </dl>

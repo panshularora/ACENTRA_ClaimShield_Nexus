@@ -6,7 +6,7 @@ import type { Cite } from "../../api/types";
 import { useAuth } from "../../auth/AuthProvider";
 import { EvidenceBar } from "../../components/EvidenceBar";
 import { HarmBadge, LaneBadge, StatusBadge } from "../../components/Badge";
-import { hours, money, pct } from "../../lib/format";
+import { hours, money, pct, screeningLabel, screeningTone } from "../../lib/format";
 import { BriefPanel } from "./BriefPanel";
 import { ClaimsTable } from "./ClaimsTable";
 import { DecisionBar } from "./DecisionBar";
@@ -65,6 +65,7 @@ export function WorkspacePage() {
     mutationFn: (vars: {
       action: "escalate" | "monitor" | "dismiss" | "needs_evidence";
       reason: string;
+      ladder_step?: string | null;
       evidence_refs?: string[];
     }) => api.decide(caseId, vars),
     onSuccess: () => {
@@ -105,10 +106,11 @@ export function WorkspacePage() {
       <section className="ws-panel ws-summary" aria-labelledby="sum-title">
         <header className="ws-panel-head">
           <div>
-            <p className="kicker">Triage · suspicion only</p>
-            <h1 id="sum-title" className="mono">
-              {caseId}
+            <p className="kicker">Investigation · suspicion only</p>
+            <h1 id="sum-title">
+              {data?.primary_entity?.name ?? caseId}
             </h1>
+            <p className="mono muted">{caseId}</p>
           </div>
           <Link to="/investigator/cases" className="btn ghost">
             Worklist
@@ -122,13 +124,18 @@ export function WorkspacePage() {
               <LaneBadge lane={data.lane} />
               <StatusBadge status={data.status} />
               <HarmBadge harm={data.harm} />
+              <span className={`sla-chip sla-${screeningTone(data.screening_days_left)}`}>
+                {screeningLabel(data.screening_days_left)}
+              </span>
             </div>
+            {data.why_rank?.text && <p className="why-rank">{data.why_rank.text}</p>}
             <p className="entity-line">
-              <span className="kicker">Primary entity</span>
-              <strong>{data.primary_entity?.name ?? data.primary_entity_id}</strong>
               <span className="mono">{data.primary_entity_id}</span>
               {data.primary_entity?.specialty && (
                 <span className="muted">{data.primary_entity.specialty}</span>
+              )}
+              {data.primary_entity?.kind && (
+                <span className="muted">{data.primary_entity.kind}</span>
               )}
             </p>
             {data.entity_ids && data.entity_ids.length > 1 && (
@@ -194,6 +201,7 @@ export function WorkspacePage() {
                       >
                         <span className="mono">{alert.rule_id ?? alert.detector}</span>
                         <span>{alert.label ?? alert.detector}</span>
+                        {alert.policy_ref && <span className="muted">Policy {alert.policy_ref}</span>}
                         <span className="muted">{alert.line_ids.length} lines</span>
                       </button>
                     </li>
@@ -201,23 +209,20 @@ export function WorkspacePage() {
                 </ul>
               )}
             </div>
-            <p className="banner">
-              This is a ranked suspicion for human review. It is not a confirmed finding of fraud.
+            <p className="note">
+              Ranked suspicion for human review. The model does not print fraud on a provider.
             </p>
-            <p className="muted">
-              Owner: <span className="mono">{data.assignee_id ?? "unassigned"}</span>
+            <p className="owner-line">
+              <span>Owner {data.assignee_id === user.id ? "you" : data.assignee_id ?? "unassigned"}</span>
               {canAssign && data.assignee_id !== user.id && (
-                <>
-                  {" "}
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    disabled={assignMut.isPending}
-                    onClick={() => assignMut.mutate()}
-                  >
-                    {assignMut.isPending ? "Taking…" : "Take ownership"}
-                  </button>
-                </>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  disabled={assignMut.isPending}
+                  onClick={() => assignMut.mutate()}
+                >
+                  {assignMut.isPending ? "Taking…" : "Take ownership"}
+                </button>
               )}
             </p>
             <FindingsPanel alerts={data.alerts} onOpen={(id) => setItemId(`alert:${id}`)} />
@@ -228,7 +233,7 @@ export function WorkspacePage() {
                   checked={unmask}
                   onChange={(e) => setUnmask(e.target.checked)}
                 />
-                Reveal member names (member:unmask)
+                Reveal member names. Writes a member.unmask audit event (HIPAA minimum necessary).
               </label>
             )}
           </>
@@ -277,8 +282,13 @@ export function WorkspacePage() {
         result={decideMut.data ?? null}
         existingProposal={data?.latest_proposal ?? null}
         alerts={data?.alerts ?? []}
-        onSubmit={(action, reason, evidenceRefs) =>
-          decideMut.mutate({ action, reason, evidence_refs: evidenceRefs })
+        onSubmit={(action, reason, evidenceRefs, ladderStep) =>
+          decideMut.mutate({
+            action,
+            reason,
+            evidence_refs: evidenceRefs,
+            ladder_step: ladderStep,
+          })
         }
       />
 

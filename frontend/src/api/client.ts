@@ -110,6 +110,12 @@ export const api = {
       body: JSON.stringify(body),
     }),
   getRun: (runId: string) => request<PipelineRun>(`/api/v1/runs/${runId}`),
+  getCurrentRun: () => request<PipelineRun>("/api/v1/runs/current"),
+  startRun: (body: { batch_id?: string; horizon_days: number; capacity_hours: number }) =>
+    request<PipelineRun>("/api/v1/runs", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   getQueue: (runId: string) => request<QueueCase[]>(`/api/v1/runs/${runId}/queue`),
   getCase: (caseId: string) => request<CaseDetail>(`/api/v1/cases/${caseId}`),
   getBrief: (caseId: string) => request<CaseBrief>(`/api/v1/cases/${caseId}/brief`),

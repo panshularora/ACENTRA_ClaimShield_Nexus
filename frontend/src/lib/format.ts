@@ -70,7 +70,9 @@ export function whyPriority(row: {
   p_confirm: number;
   flagged_dollars: number;
   evidence_strength: number;
+  why_rank?: { code: string; text: string };
 }): string {
+  if (row.why_rank?.text) return row.why_rank.text;
   if (row.lane === "harm_priority") {
     return `Harm ${row.harm} overrides capacity — always queued.`;
   }
@@ -81,4 +83,17 @@ export function whyPriority(row: {
     return "Outside remaining investigator hours after knapsack fill.";
   }
   return `Selected: P(confirm) ${pct(row.p_confirm)} on ${money(row.flagged_dollars)} flagged.`;
+}
+
+export function screeningLabel(days: number | null | undefined): string {
+  if (days === null || days === undefined) return "No screening clock";
+  if (days < 0) return `${Math.abs(days)}d past 45-day screen`;
+  return `${days}d left on 45-day screen`;
+}
+
+export function screeningTone(days: number | null | undefined): "ok" | "warn" | "hot" | "none" {
+  if (days === null || days === undefined) return "none";
+  if (days <= 7) return "hot";
+  if (days <= 15) return "warn";
+  return "ok";
 }

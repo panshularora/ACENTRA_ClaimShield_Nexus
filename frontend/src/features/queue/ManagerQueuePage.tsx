@@ -7,10 +7,9 @@ import { useAuth } from "../../auth/AuthProvider";
 import { CaseDrawer } from "../../components/CaseDrawer";
 import { EvidenceBar } from "../../components/EvidenceBar";
 import { HarmBadge, LaneBadge, StatusBadge } from "../../components/Badge";
-import { hours, horizonRisk, money, pct, whyPriority } from "../../lib/format";
+import { hours, horizonRisk, money, pct, screeningLabel, screeningTone, whyPriority } from "../../lib/format";
 import { readStoredRun, writeStoredRun } from "../../lib/runStore";
 import { QueueScene } from "../../three/QueueScene";
-import { usePrefersReducedMotion } from "../../three/useScrollProgress";
 import "./queue.css";
 
 type SortKey = "rank" | "ev" | "dollars" | "harm" | "hours" | "evidence" | "p";
@@ -23,14 +22,15 @@ export function ManagerQueuePage() {
   const queryClient = useQueryClient();
   const canQueue = can(user, "queue:read");
   const canLoad = can(user, "batch:load");
+  const canStart = can(user, "run:start");
   const canReadBatches = can(user, "batch:read");
 
   const [queryText, setQueryText] = useState("");
   const [laneFilter, setLaneFilter] = useState<"all" | Lane>("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("ev");
-  const reduced = usePrefersReducedMotion();
   const [openId, setOpenId] = useState<string | null>(null);
+  const [compareIds, setCompareIds] = useState<string[]>([]);
   const [capacityDraft, setCapacityDraft] = useState(40);
   const [horizonDraft, setHorizonDraft] = useState(60);
   const [notice, setNotice] = useState<string | null>(null);
@@ -51,8 +51,15 @@ export function ManagerQueuePage() {
     enabled: Boolean(batchId),
   });
 
+  const currentRunQuery = useQuery({
+    queryKey: ["run", "current"],
+    queryFn: api.getCurrentRun,
+    enabled: canQueue,
+    retry: false,
+  });
+
   const runId =
-    batchQuery.data?.runs[0]?.run_id ?? stored?.runId ?? null;
+    batchQuery.data?.runs[0]?.run_id ?? stored?.runId ?? currentRunQuery.data?.run_id ?? null;
 
   const runQuery = useQuery({
     queryKey: ["run", runId],
@@ -74,34 +81,65 @@ export function ManagerQueuePage() {
     setHorizonDraft(appliedHorizon);
   }, [appliedCapacity, appliedHorizon]);
 
+  const hasExtract = Boolean(runId || batchId);
+  const canRunDesk = hasExtract ? canStart : canLoad;
+
   const loadMut = useMutation({
-    mutationFn: (vars: { capacity: number; horizon: number }) =>
-      api.loadBatch({
+    mutationFn: async (vars: { capacity: number; horizon: number }) => {
+      if (hasExtract) {
+        const run = await api.startRun({
+          batch_id: batchId,
+          horizon_days: vars.horizon,
+          capacity_hours: vars.capacity,
+        });
+        return { kind: "run" as const, run };
+      }
+      const data = await api.loadBatch({
         adapter: "synthetic",
         profile: batchQuery.data?.profile ?? stored?.profile ?? "tiny",
         seed: batchQuery.data?.seed ?? stored?.seed ?? 7,
         horizon_days: vars.horizon,
         capacity_hours: vars.capacity,
         run_now: true,
-      }),
-    onSuccess: (data) => {
-      if (data.run) {
+      });
+      return { kind: "batch" as const, data };
+    },
+    onSuccess: (payload) => {
+      if (payload.kind === "run") {
         writeStoredRun({
-          runId: data.run.run_id,
-          batchId: data.batch_id,
-          profile: data.profile ?? "tiny",
-          seed: data.seed ?? 7,
-          capacityHours: data.run.capacity_hours ?? capacityDraft,
-          horizonDays: data.run.horizon_days ?? horizonDraft,
+          runId: payload.run.run_id,
+          batchId: payload.run.batch_id,
+          profile: batchQuery.data?.profile ?? stored?.profile ?? "tiny",
+          seed: batchQuery.data?.seed ?? stored?.seed ?? 7,
+          capacityHours: payload.run.capacity_hours ?? payload.run.summary.capacity_hours ?? capacityDraft,
+          horizonDays: payload.run.horizon_days ?? payload.run.summary.horizon_days ?? horizonDraft,
         });
+        setNotice("Queue re-laned on the existing extract. No new members were generated.");
+      } else if (payload.data.run) {
+        writeStoredRun({
+          runId: payload.data.run.run_id,
+          batchId: payload.data.batch_id,
+          profile: payload.data.profile ?? "tiny",
+          seed: payload.data.seed ?? 7,
+          capacityHours: payload.data.run.capacity_hours ?? capacityDraft,
+          horizonDays: payload.data.run.horizon_days ?? horizonDraft,
+        });
+        setNotice("Detection run completed. Queue reflects the new capacity and horizon.");
       }
-      setNotice("Detection run completed. Queue reflects the new capacity and horizon.");
       void queryClient.invalidateQueries({ queryKey: ["batches"] });
       void queryClient.invalidateQueries({ queryKey: ["run"] });
       void queryClient.invalidateQueries({ queryKey: ["queue"] });
       void queryClient.invalidateQueries({ queryKey: ["batch"] });
     },
   });
+
+  function toggleCompare(caseId: string) {
+    setCompareIds((prev) => {
+      if (prev.includes(caseId)) return prev.filter((id) => id !== caseId);
+      if (prev.length >= 2) return [prev[1], caseId];
+      return [...prev, caseId];
+    });
+  }
 
   if (!user) return null;
   if (!canQueue) {
@@ -164,30 +202,43 @@ export function ManagerQueuePage() {
   const monitorHours = sumHours(rows, "overflow");
   const evidenceHours = sumHours(rows, "needs_evidence");
 
+  const currentErr = currentRunQuery.error as ApiError | undefined;
   const error =
     (batchesQuery.error as ApiError | undefined) ||
     (runQuery.error as ApiError | undefined) ||
     (queueQuery.error as ApiError | undefined) ||
-    (loadMut.error as ApiError | undefined);
+    (loadMut.error as ApiError | undefined) ||
+    (currentErr && currentErr.status !== 404 ? currentErr : undefined);
+
+  const compared = rows.filter((row) => compareIds.includes(row.case_id));
 
   return (
     <main id="main" className="page queue-page">
       <header className="page-head">
         <div>
-          <p className="kicker">Manager command center · live API</p>
-          <h1>Capacity-ranked SIU queue</h1>
+          <p className="kicker">Manager desk</p>
+          <h1>SIU queue</h1>
         </div>
         <p className="funnel" aria-live="polite">
-          <strong className="mono">{nAlerts}</strong> alerts
-          <span aria-hidden="true"> → </span>
-          <strong className="mono">{nCases}</strong> cases
-          <span aria-hidden="true"> → </span>
-          <strong className="mono">{nSelected}</strong> selected
+          <span className="stat-chip">
+            <span>Alerts</span>
+            <strong>{nAlerts}</strong>
+          </span>
+          <span className="stat-chip">
+            <span>Cases</span>
+            <strong>{nCases}</strong>
+          </span>
+          <span className="stat-chip">
+            <span>Queued</span>
+            <strong>{nSelected}</strong>
+          </span>
         </p>
       </header>
 
-      {!canLoad && (
-        <p className="banner">Read-only. Capacity recompute requires manager `batch:load`.</p>
+      {!canRunDesk && (
+        <p className="banner">
+          Read-only. {hasExtract ? "Recompute requires `run:start`." : "First load requires `batch:load`."}
+        </p>
       )}
 
       <section className="control-board" aria-label="Capacity and horizon">
@@ -203,7 +254,7 @@ export function ManagerQueuePage() {
             max={80}
             step={1}
             value={capacityDraft}
-            disabled={!canLoad || loadMut.isPending}
+            disabled={!canRunDesk || loadMut.isPending}
             onChange={(e) => setCapacityDraft(Number(e.target.value))}
           />
           <p className="muted">
@@ -225,7 +276,7 @@ export function ManagerQueuePage() {
                 name="horizon"
                 value={h}
                 checked={horizonDraft === h}
-                disabled={!canLoad || loadMut.isPending}
+                disabled={!canRunDesk || loadMut.isPending}
                 onChange={() => setHorizonDraft(h)}
               />
               {h}d
@@ -235,7 +286,7 @@ export function ManagerQueuePage() {
             Applied: <span className="mono">{appliedHorizon}d</span>. Risk column uses F{appliedHorizon}.
           </p>
         </fieldset>
-        {canLoad && (
+        {canRunDesk && (
           <button
             type="button"
             className="btn solid"
@@ -243,8 +294,10 @@ export function ManagerQueuePage() {
             onClick={() => loadMut.mutate({ capacity: capacityDraft, horizon: horizonDraft })}
           >
             {loadMut.isPending
-              ? "Running detection…"
-              : runId
+              ? hasExtract
+                ? "Re-laning…"
+                : "Running detection…"
+              : hasExtract
                 ? "Recompute queue"
                 : "Load tiny run"}
           </button>
@@ -253,7 +306,9 @@ export function ManagerQueuePage() {
 
       {loadMut.isPending && (
         <p className="banner" aria-live="polite">
-          Generating extract, scoring rules/anomaly/graph, packing hours. This uses POST /api/v1/batches.
+          {hasExtract
+            ? "Re-laning the existing extract via POST /api/v1/runs. Members are not regenerated."
+            : "Generating extract, scoring rules/anomaly/graph, packing hours. This uses POST /api/v1/batches."}
         </p>
       )}
       {notice && <p className="banner ok">{notice}</p>}
@@ -265,26 +320,23 @@ export function ManagerQueuePage() {
           <p>
             {canLoad
               ? "Load the tiny synthetic batch to fill this queue from the live API."
-              : "A manager must load a batch first. Run id is stored locally after that load."}
+              : "A manager must load a batch first. Later recomputes use POST /api/v1/runs on that extract."}
           </p>
         </section>
       )}
 
       {runId && (
         <>
-          <section className="queue-stage" aria-label="Lane hours in 3D">
-            <QueueScene
-              hoursByLane={{
-                harm_priority: harmHours,
-                selected: selectedHours,
-                needs_evidence: evidenceHours,
-                overflow: monitorHours,
-              }}
-              selected={laneFilter}
-              onSelect={(lane) => setLaneFilter(laneFilter === lane ? "all" : lane)}
-              reduced={reduced}
-            />
-          </section>
+          <QueueScene
+            hoursByLane={{
+              harm_priority: harmHours,
+              selected: selectedHours,
+              needs_evidence: evidenceHours,
+              overflow: monitorHours,
+            }}
+            selected={laneFilter}
+            onSelect={(lane) => setLaneFilter(laneFilter === lane ? "all" : lane)}
+          />
           <section className="lanes" aria-label="Queue lanes">
             <LaneStat
               lane="harm_priority"
@@ -337,10 +389,50 @@ export function ManagerQueuePage() {
               </li>
             </ol>
             <p className="muted">
-              Harm takes a reserved slice of hours, then knapsack fills the rest by expected value
-              (recovery × dollars + harm term). Click a tower to filter that lane.
+              Harm ≥ 4 takes a reserved slice of hours. Remaining capacity is packed by expected
+              value (recovery × dollars + harm term). The 45-day column is the CMS-style lead
+              screening clock. Click a bar or lane chip to filter the table. Check two cases to compare.
             </p>
           </section>
+
+          {compared.length > 0 && (
+            <section className="compare-strip" aria-label="Side-by-side case compare">
+              <header>
+                <h2>Compare</h2>
+                <button type="button" className="btn ghost" onClick={() => setCompareIds([])}>
+                  Clear
+                </button>
+              </header>
+              <div className={`compare-grid n-${compared.length}`}>
+                {compared.map((row) => (
+                  <article key={row.case_id}>
+                    <p className="mono">{row.case_id}</p>
+                    <p className="mono">{row.primary_entity_id}</p>
+                    <LaneBadge lane={row.lane} />
+                    <dl>
+                      <div>
+                        <dt>EV</dt>
+                        <dd className="mono">{money(row.expected_value ?? 0)}</dd>
+                      </div>
+                      <div>
+                        <dt>Harm</dt>
+                        <dd className="mono">{row.harm}</dd>
+                      </div>
+                      <div>
+                        <dt>Hours</dt>
+                        <dd className="mono">{hours(row.estimated_hours)}</dd>
+                      </div>
+                      <div>
+                        <dt>45-day</dt>
+                        <dd className="mono">{screeningLabel(row.screening_days_left)}</dd>
+                      </div>
+                    </dl>
+                    <p className="why">{whyPriority(row)}</p>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
 
           <div className="toolbar">
             <label className="grow">
@@ -386,10 +478,12 @@ export function ManagerQueuePage() {
             <table className="grid">
               <thead>
                 <tr>
+                  <th>Compare</th>
                   <th>Case</th>
-                  <th>Provider</th>
+                  <th>Entity</th>
                   <th>Lane</th>
                   <th>Status</th>
+                  <th>45-day</th>
                   <th>P(confirm)</th>
                   <th>Horizon risk</th>
                   <th>EV</th>
@@ -398,7 +492,7 @@ export function ManagerQueuePage() {
                   <th>Sev</th>
                   <th>Evidence</th>
                   <th>Hours</th>
-                  <th>Why queued</th>
+                  <th>Why this rank</th>
                 </tr>
               </thead>
               <tbody>
@@ -408,7 +502,9 @@ export function ManagerQueuePage() {
                     row={row}
                     horizon={appliedHorizon}
                     selected={openId === row.case_id}
+                    compared={compareIds.includes(row.case_id)}
                     onOpen={() => setOpenId(row.case_id)}
+                    onCompare={() => toggleCompare(row.case_id)}
                   />
                 ))}
               </tbody>
@@ -469,14 +565,19 @@ function QueueRow({
   row,
   horizon,
   selected,
+  compared,
   onOpen,
+  onCompare,
 }: {
   row: QueueCase;
   horizon: number;
   selected: boolean;
+  compared: boolean;
   onOpen: () => void;
+  onCompare: () => void;
 }) {
   const risk = horizonRisk(row, horizon);
+  const sla = screeningTone(row.screening_days_left);
   return (
     <tr
       className={`lane-${row.lane} ${row.harm >= 4 ? "is-harm" : ""} ${selected ? "is-open" : ""}`}
@@ -489,13 +590,29 @@ function QueueRow({
         }
       }}
     >
-      <td className="mono">{row.case_id}</td>
+      <td>
+        <input
+          type="checkbox"
+          aria-label={`Compare ${row.case_id}`}
+          checked={compared}
+          onClick={(e) => e.stopPropagation()}
+          onChange={onCompare}
+        />
+      </td>
+      <td>
+        <div className="case-cell">
+          <strong className="mono">{row.case_id}</strong>
+        </div>
+      </td>
       <td className="mono">{row.primary_entity_id}</td>
       <td>
         <LaneBadge lane={row.lane} />
       </td>
       <td>
         <StatusBadge status={row.status} />
+      </td>
+      <td>
+        <span className={`sla-chip sla-${sla}`}>{screeningLabel(row.screening_days_left)}</span>
       </td>
       <td className="mono">{pct(row.p_confirm)}</td>
       <td className="mono">{pct(risk)}</td>

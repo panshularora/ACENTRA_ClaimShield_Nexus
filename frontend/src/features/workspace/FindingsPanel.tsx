@@ -36,6 +36,7 @@ export function FindingsPanel({
                   <span className={`badge approach-${alert.approach ?? alert.detector}`}>{approach}</span>
                   <strong>{alert.label ?? alert.rule_title ?? alert.rule_id}</strong>
                   <span className="mono">{alert.rule_id ?? alert.detector}</span>
+                  {alert.policy_ref && <span className="muted">Policy {alert.policy_ref}</span>}
                   <span className="muted">{alert.line_ids.length} supporting claim line(s)</span>
                   <p>{alert.review_reason}</p>
                 </button>
