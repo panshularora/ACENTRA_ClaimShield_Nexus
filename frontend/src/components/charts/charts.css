@@ -1,0 +1,175 @@
+/* Shared chart chrome: frame, legend, tooltip, data-table disclosure. */
+.chart {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  min-width: 0;
+}
+
+.chart-head {
+  display: grid;
+  gap: 2px;
+}
+
+.chart-title {
+  color: var(--color-text);
+  font: var(--type-h4);
+}
+
+.chart-summary {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+}
+
+.chart-plot {
+  min-width: 0;
+}
+
+.chart-plot :is(.recharts-text, .recharts-label, .recharts-label-list text) {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: var(--font-features-data);
+}
+
+.chart-plot
+  :is(
+    .recharts-cartesian-grid line,
+    .recharts-cartesian-axis-line,
+    .recharts-cartesian-axis-tick-line,
+    .recharts-reference-line line
+  ) {
+  shape-rendering: crispEdges;
+}
+
+/* Mouse focus stays quiet; keyboard focus on the plot (accessibility layer) shows the ring. */
+.chart-plot .recharts-surface:focus {
+  outline: none;
+}
+
+.chart-plot .recharts-wrapper:has(.recharts-surface:focus-visible) {
+  border-radius: var(--radius-sm);
+  box-shadow: var(--focus-ring);
+}
+
+.chart-plot .recharts-tooltip-wrapper {
+  z-index: var(--z-tooltip);
+}
+
+.chart-footnote {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-text-muted);
+  font: var(--type-caption);
+}
+
+.chart-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.chart-swatch {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  background: currentColor;
+}
+
+.chart-swatch.shape-line,
+.chart-swatch.shape-dashed {
+  height: 0;
+  width: 12px;
+  border-radius: 0;
+  background: none;
+  border-top: 2px solid currentColor;
+}
+
+.chart-swatch.shape-dashed {
+  border-top-style: dashed;
+}
+
+.chart-swatch.shape-dot {
+  border-radius: var(--radius-full);
+}
+
+.chart-table summary {
+  width: fit-content;
+  color: var(--color-link);
+  font: var(--type-label);
+  font-size: var(--font-size-12);
+  cursor: pointer;
+}
+
+.chart-table[open] summary {
+  margin-bottom: var(--space-2);
+}
+
+.chart-table .grid th[scope="row"] {
+  position: static;
+  background: none;
+  color: var(--color-text);
+  font: var(--type-body-sm);
+}
+
+.chart-tooltip {
+  min-width: 10rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-overlay);
+  color: var(--color-text);
+  font: var(--type-caption);
+  pointer-events: none;
+  animation: chart-tooltip-in var(--duration-fast) var(--ease-standard);
+}
+
+@keyframes chart-tooltip-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.chart-tooltip-title {
+  margin-bottom: var(--space-1);
+  font: var(--type-label);
+}
+
+.chart-tooltip dl {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+
+.chart-tooltip dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.chart-tooltip dt {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+}
+
+.chart-tooltip dd {
+  margin: 0;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-medium);
+}
+
+.chart.is-compact {
+  gap: var(--space-2);
+}
