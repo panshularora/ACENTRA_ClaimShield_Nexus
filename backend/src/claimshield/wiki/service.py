@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from claimshield.audit.service import append_event
-from claimshield.cases.workspace import KIND_LABELS, RULE_TITLES, alerts_for, iso, serialize_alert
+from claimshield.cases.common import KIND_LABELS, RULE_TITLES, alerts_for, iso, serialize_alert
 from claimshield.core.errors import Conflict, NotFound, ValidationFailed
 from claimshield.core.ids import new_id
 from claimshield.db.models import Case, Decision, Label, Provider, User, WikiPage, WikiProposal
