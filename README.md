@@ -60,6 +60,8 @@ Demo users (demo mode):
 
 Manager loads data: `POST /api/v1/batches` `{"profile":"tiny","seed":7}`. Queue: `GET /api/v1/runs/{run_id}/queue`.
 
+S3 ingest (optional, not required for local demo): Lambda `claimshield-s3-processor` calls `POST /api/v1/aws/ingest` with `X-ClaimShield-Internal-Token`. See [docs/AWS_INGEST.md](docs/AWS_INGEST.md). Local synthetic load does not need AWS.
+
 Investigation workspace: `/investigator/workspace/:caseId`. APIs: `GET /api/v1/cases/{id}` plus `/brief`, `/claims`, `/timeline`, `/network`, `/evidence/{item_id}`; `POST /api/v1/cases/{id}/decisions`.
 
 ## Dataset notes
