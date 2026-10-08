@@ -90,9 +90,9 @@ strict = true
 mypy_path = "src"
 packages = ["claimshield"]
 
-# pandas, networkx and boto3 ship without type information. pandas-stubs and
+# pandas, networkx, scikit-learn and boto3 ship without type information. pandas-stubs and
 # types-networkx report thousands of false positives on DataFrame indexing, so
 # these modules are treated as Any at the boundary and typed on our side.
 [[tool.mypy.overrides]]
-module = ["pandas.*", "networkx.*", "boto3.*", "botocore.*"]
+module = ["pandas.*", "networkx.*", "sklearn.*", "boto3.*", "botocore.*"]
 ignore_missing_imports = true

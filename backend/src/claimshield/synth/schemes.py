@@ -166,7 +166,7 @@ def _schedule(
     return [start + timedelta(days=min(span - 1, int(onset + i * step))) for i in range(n)]
 
 
-def _providers_by_line(ds: "Dataset", line: str) -> pd.DataFrame:
+def _providers_by_line(ds: Dataset, line: str) -> pd.DataFrame:
     frame = ds.tables["provider"]
     subset = frame[frame.service_line == line]
     return subset if not subset.empty else frame
@@ -547,7 +547,7 @@ def fac_ok(ds: Dataset) -> bool:
 
 
 def _plant_ring(
-    ds: "Dataset",
+    ds: Dataset,
     rng: np.random.Generator,
     fake: Faker,
     start: date,
@@ -567,7 +567,7 @@ def _plant_ring(
     line = "dme" if kind == "telefraud" else "behavioral_health"
     enrolled = dates[0] - timedelta(days=30) if spread else start + timedelta(days=10)
     linked = enrolled if spread else start
-    for i in range(n):
+    for _ in range(n):
         pid = _rid(rng, "PRV")
         new_provs.append(
             {
@@ -674,7 +674,7 @@ def _leie_name(name: str) -> list[str]:
 
 
 def _plant_shell(
-    ds: "Dataset",
+    ds: Dataset,
     rng: np.random.Generator,
     fake: Faker,
     start: date,
