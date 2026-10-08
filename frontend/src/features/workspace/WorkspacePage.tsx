@@ -7,6 +7,7 @@ import { useAuth } from "../../auth/AuthProvider";
 import { EvidenceBar } from "../../components/EvidenceBar";
 import { HarmBadge, LaneBadge, StatusBadge } from "../../components/Badge";
 import { hours, money, pct, screeningLabel, screeningTone } from "../../lib/format";
+import { FactorBars } from "../queue/FactorBars";
 import { BriefPanel } from "./BriefPanel";
 import { ClaimsTable } from "./ClaimsTable";
 import { DecisionBar } from "./DecisionBar";
@@ -129,6 +130,10 @@ export function WorkspacePage() {
               </span>
             </div>
             {data.why_rank?.text && <p className="why-rank">{data.why_rank.text}</p>}
+            {data.recommendation === "tracked_backlog" && (
+              <p className="muted">Outside today&apos;s recommended desk. Still open for reassessment.</p>
+            )}
+            <FactorBars factors={data.rank_factors} />
             <p className="entity-line">
               <span className="mono">{data.primary_entity_id}</span>
               {data.primary_entity?.specialty && (

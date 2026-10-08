@@ -52,6 +52,9 @@ export interface RunSummary {
     graph_edges?: number;
     capacity_hours?: number;
     horizon_days?: number;
+    max_slots?: number;
+    member_weight?: number;
+    ranking_policy?: RankingPolicy;
     lanes?: Partial<Record<Lane, number>>;
   };
 }
@@ -81,6 +84,35 @@ export interface LoadBatchResponse {
   run: (RunSummary["summary"] & { run_id: string; status: string }) | null;
 }
 
+export interface RankFactors {
+  severity: number;
+  exposure: number;
+  member: number;
+  evidence: number;
+  urgency: number;
+  composite: number;
+  weights?: Record<string, number>;
+  member_weight?: number;
+}
+
+export interface RankingPolicy {
+  method: string;
+  factors: { key: string; label: string; weight: number }[];
+  max_slots: number;
+  member_weight: number;
+  capacity_hours: number;
+  human_in_the_loop: boolean;
+  overflow_is_dismissal: boolean;
+  note: string;
+}
+
+export interface QueueOverride {
+  action: "promote" | "defer" | "release" | string;
+  reason: string;
+  actor_id: string;
+  prior_lane?: string;
+}
+
 export interface PipelineRun {
   run_id: string;
   batch_id: string;
@@ -91,6 +123,9 @@ export interface PipelineRun {
   horizon_days?: number;
   capacity_hours?: number;
   screening_days?: number;
+  max_slots?: number;
+  member_weight?: number;
+  ranking_policy?: RankingPolicy;
 }
 
 export interface QueueCase {
@@ -112,7 +147,11 @@ export interface QueueCase {
   f90: number | null;
   sla_due?: string | null;
   screening_days_left?: number | null;
-  why_rank?: { code: string; text: string };
+  why_rank?: { code: string; text: string; recommendation?: string };
+  rank_factors?: RankFactors;
+  queue_rank?: number | null;
+  recommendation?: "today_queue" | "gather_evidence" | "tracked_backlog" | string;
+  override?: QueueOverride | null;
   suspicion_only?: boolean;
 }
 
@@ -430,7 +469,10 @@ export interface CaseDetail {
   f90: number | null;
   sla_due?: string | null;
   screening_days_left?: number | null;
-  why_rank?: { code: string; text: string };
+  why_rank?: { code: string; text: string; recommendation?: string };
+  rank_factors?: RankFactors;
+  recommendation?: string;
+  override?: QueueOverride | null;
   alerts: CaseAlert[];
   evidence_gaps?: string[];
   latest_decision?: DecisionRecord | null;

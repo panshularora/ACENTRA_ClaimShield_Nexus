@@ -77,6 +77,34 @@
   border-color: #d4b46a;
 }
 
+.factor-bars {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+.factor-bars li {
+  display: grid;
+  grid-template-columns: 5rem 1fr 2.6rem;
+  gap: 0.4rem;
+  align-items: center;
+  font-size: 0.72rem;
+  color: var(--ink-2);
+}
+.factor-track {
+  display: block;
+  height: 7px;
+  background: #e6eeea;
+  border-radius: 99px;
+  overflow: hidden;
+}
+.factor-track i {
+  display: block;
+  height: 100%;
+  background: #1fbf5a;
+}
+
 .why-rank {
   margin: 0.45rem 0 0;
   font-size: 0.86rem;

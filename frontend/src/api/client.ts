@@ -8,6 +8,7 @@ import type {
   ClaimsPack,
   DecisionResult,
   EvidenceItem,
+  Lane,
   LoadBatchResponse,
   MetaResponse,
   NetworkPack,
@@ -103,6 +104,8 @@ export const api = {
     seed: number;
     horizon_days: number;
     capacity_hours: number;
+    max_slots?: number;
+    member_weight?: number;
     run_now: boolean;
   }) =>
     request<LoadBatchResponse>("/api/v1/batches", {
@@ -111,8 +114,26 @@ export const api = {
     }),
   getRun: (runId: string) => request<PipelineRun>(`/api/v1/runs/${runId}`),
   getCurrentRun: () => request<PipelineRun>("/api/v1/runs/current"),
-  startRun: (body: { batch_id?: string; horizon_days: number; capacity_hours: number }) =>
+  startRun: (body: {
+    batch_id?: string;
+    horizon_days: number;
+    capacity_hours: number;
+    max_slots?: number;
+    member_weight?: number;
+  }) =>
     request<PipelineRun>("/api/v1/runs", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  overrideRank: (caseId: string, body: { action: "promote" | "defer" | "release"; reason: string }) =>
+    request<{
+      case_id: string;
+      lane: Lane;
+      status: string;
+      recommendation: string;
+      override: { action: string; reason: string; actor_id: string; prior_lane: string };
+      note: string;
+    }>(`/api/v1/cases/${caseId}/rank`, {
       method: "POST",
       body: JSON.stringify(body),
     }),

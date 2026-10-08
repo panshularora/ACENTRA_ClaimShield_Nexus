@@ -145,7 +145,7 @@ a { color: inherit; }
 
 .control-board {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: repeat(2, minmax(11rem, 1fr)) auto;
   gap: 1.2rem;
   align-items: end;
   background: var(--paper-2);

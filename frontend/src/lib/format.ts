@@ -26,7 +26,7 @@ export function laneLabel(lane: Lane): string {
     case "needs_evidence":
       return "Needs evidence";
     case "overflow":
-      return "Monitor";
+      return "Tracked backlog";
     default:
       return lane;
   }

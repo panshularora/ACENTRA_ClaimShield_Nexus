@@ -10,6 +10,7 @@ import { HarmBadge, LaneBadge, StatusBadge } from "../../components/Badge";
 import { hours, horizonRisk, money, pct, screeningLabel, screeningTone, whyPriority } from "../../lib/format";
 import { readStoredRun, writeStoredRun } from "../../lib/runStore";
 import { QueueScene } from "../../three/QueueScene";
+import { FactorBars } from "./FactorBars";
 import "./queue.css";
 
 type SortKey = "rank" | "ev" | "dollars" | "harm" | "hours" | "evidence" | "p";
@@ -24,15 +25,20 @@ export function ManagerQueuePage() {
   const canLoad = can(user, "batch:load");
   const canStart = can(user, "run:start");
   const canReadBatches = can(user, "batch:read");
+  const canOverride = can(user, "queue:configure") || can(user, "case:decide");
 
   const [queryText, setQueryText] = useState("");
   const [laneFilter, setLaneFilter] = useState<"all" | Lane>("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [sortKey, setSortKey] = useState<SortKey>("ev");
+  const [sortKey, setSortKey] = useState<SortKey>("rank");
   const [openId, setOpenId] = useState<string | null>(null);
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [capacityDraft, setCapacityDraft] = useState(40);
   const [horizonDraft, setHorizonDraft] = useState(60);
+  const [slotsDraft, setSlotsDraft] = useState(20);
+  const [memberDraft, setMemberDraft] = useState(1);
+  const [overrideCase, setOverrideCase] = useState<{ caseId: string; action: "promote" | "defer" } | null>(null);
+  const [overrideReason, setOverrideReason] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
 
   const stored = readStoredRun();
@@ -75,22 +81,29 @@ export function ManagerQueuePage() {
 
   const appliedCapacity = runQuery.data?.summary.capacity_hours ?? stored?.capacityHours ?? 40;
   const appliedHorizon = runQuery.data?.summary.horizon_days ?? stored?.horizonDays ?? 60;
+  const appliedSlots = runQuery.data?.summary.max_slots ?? runQuery.data?.max_slots ?? 20;
+  const appliedMember = runQuery.data?.summary.member_weight ?? runQuery.data?.member_weight ?? 1;
+  const rankingPolicy = runQuery.data?.summary.ranking_policy ?? runQuery.data?.ranking_policy;
 
   useEffect(() => {
     setCapacityDraft(appliedCapacity);
     setHorizonDraft(appliedHorizon);
-  }, [appliedCapacity, appliedHorizon]);
+    setSlotsDraft(appliedSlots);
+    setMemberDraft(appliedMember);
+  }, [appliedCapacity, appliedHorizon, appliedSlots, appliedMember]);
 
   const hasExtract = Boolean(runId || batchId);
   const canRunDesk = hasExtract ? canStart : canLoad;
 
   const loadMut = useMutation({
-    mutationFn: async (vars: { capacity: number; horizon: number }) => {
+    mutationFn: async (vars: { capacity: number; horizon: number; slots: number; member: number }) => {
       if (hasExtract) {
         const run = await api.startRun({
           batch_id: batchId,
           horizon_days: vars.horizon,
           capacity_hours: vars.capacity,
+          max_slots: vars.slots,
+          member_weight: vars.member,
         });
         return { kind: "run" as const, run };
       }
@@ -100,6 +113,8 @@ export function ManagerQueuePage() {
         seed: batchQuery.data?.seed ?? stored?.seed ?? 7,
         horizon_days: vars.horizon,
         capacity_hours: vars.capacity,
+        max_slots: vars.slots,
+        member_weight: vars.member,
         run_now: true,
       });
       return { kind: "batch" as const, data };
@@ -114,7 +129,7 @@ export function ManagerQueuePage() {
           capacityHours: payload.run.capacity_hours ?? payload.run.summary.capacity_hours ?? capacityDraft,
           horizonDays: payload.run.horizon_days ?? payload.run.summary.horizon_days ?? horizonDraft,
         });
-        setNotice("Queue re-laned on the existing extract. No new members were generated.");
+        setNotice("Queue re-laned with the current hours, member-impact weight, and top-N cap. Backlog stays open.");
       } else if (payload.data.run) {
         writeStoredRun({
           runId: payload.data.run.run_id,
@@ -130,6 +145,18 @@ export function ManagerQueuePage() {
       void queryClient.invalidateQueries({ queryKey: ["run"] });
       void queryClient.invalidateQueries({ queryKey: ["queue"] });
       void queryClient.invalidateQueries({ queryKey: ["batch"] });
+    },
+  });
+
+  const overrideMut = useMutation({
+    mutationFn: (vars: { caseId: string; action: "promote" | "defer"; reason: string }) =>
+      api.overrideRank(vars.caseId, { action: vars.action, reason: vars.reason }),
+    onSuccess: (data) => {
+      setNotice(data.note);
+      setOverrideCase(null);
+      setOverrideReason("");
+      void queryClient.invalidateQueries({ queryKey: ["queue"] });
+      void queryClient.invalidateQueries({ queryKey: ["case"] });
     },
   });
 
@@ -174,6 +201,14 @@ export function ManagerQueuePage() {
     });
     const ranked = [...list];
     ranked.sort((a, b) => {
+      if (sortKey === "rank") {
+        const ca = a.rank_factors?.composite ?? 0;
+        const cb = b.rank_factors?.composite ?? 0;
+        const ia = LANE_ORDER.indexOf(a.lane);
+        const ib = LANE_ORDER.indexOf(b.lane);
+        if (ia !== ib) return ia - ib;
+        return cb - ca;
+      }
       if (sortKey === "ev") return (b.expected_value ?? 0) - (a.expected_value ?? 0);
       if (sortKey === "dollars") return b.flagged_dollars - a.flagged_dollars;
       if (sortKey === "harm") return b.harm - a.harm;
@@ -208,6 +243,7 @@ export function ManagerQueuePage() {
     (runQuery.error as ApiError | undefined) ||
     (queueQuery.error as ApiError | undefined) ||
     (loadMut.error as ApiError | undefined) ||
+    (overrideMut.error as ApiError | undefined) ||
     (currentErr && currentErr.status !== 404 ? currentErr : undefined);
 
   const compared = rows.filter((row) => compareIds.includes(row.case_id));
@@ -229,8 +265,12 @@ export function ManagerQueuePage() {
             <strong>{nCases}</strong>
           </span>
           <span className="stat-chip">
-            <span>Queued</span>
+            <span>Today</span>
             <strong>{nSelected}</strong>
+          </span>
+          <span className="stat-chip">
+            <span>Backlog</span>
+            <strong>{counts.overflow}</strong>
           </span>
         </p>
       </header>
@@ -286,12 +326,55 @@ export function ManagerQueuePage() {
             Applied: <span className="mono">{appliedHorizon}d</span>. Risk column uses F{appliedHorizon}.
           </p>
         </fieldset>
+        <div className="capacity-block">
+          <label htmlFor="member-weight">
+            Member impact weight
+            <strong className="mono">{memberDraft.toFixed(1)}×</strong>
+          </label>
+          <input
+            id="member-weight"
+            type="range"
+            min={0.3}
+            max={2.5}
+            step={0.1}
+            value={memberDraft}
+            disabled={!canRunDesk || loadMut.isPending}
+            onChange={(e) => setMemberDraft(Number(e.target.value))}
+          />
+          <p className="muted">Raises beneficiary harm versus dollars. Recompute to see the desk change.</p>
+        </div>
+        <div className="capacity-block">
+          <label htmlFor="max-slots">
+            Today&apos;s recommended slots
+            <strong className="mono">{slotsDraft}</strong>
+          </label>
+          <input
+            id="max-slots"
+            type="range"
+            min={3}
+            max={20}
+            step={1}
+            value={slotsDraft}
+            disabled={!canRunDesk || loadMut.isPending}
+            onChange={(e) => setSlotsDraft(Number(e.target.value))}
+          />
+          <p className="muted">
+            Applied cap: <span className="mono">{appliedSlots}</span>. Extra cases stay on the tracked backlog.
+          </p>
+        </div>
         {canRunDesk && (
           <button
             type="button"
             className="btn solid"
             disabled={loadMut.isPending}
-            onClick={() => loadMut.mutate({ capacity: capacityDraft, horizon: horizonDraft })}
+            onClick={() =>
+              loadMut.mutate({
+                capacity: capacityDraft,
+                horizon: horizonDraft,
+                slots: slotsDraft,
+                member: memberDraft,
+              })
+            }
           >
             {loadMut.isPending
               ? hasExtract
@@ -313,6 +396,46 @@ export function ManagerQueuePage() {
       )}
       {notice && <p className="banner ok">{notice}</p>}
       {error && <p className="error-text">{error.message}</p>}
+      {overrideCase && (
+        <section className="override-form" aria-label="Human queue override">
+          <p className="kicker">Human in the loop</p>
+          <h2>{overrideCase.action === "promote" ? "Promote onto today's desk" : "Defer to tracked backlog"}</h2>
+          <p className="muted">
+            {overrideCase.action === "promote"
+              ? "This does not label fraud. It only asks SIU to work the case now."
+              : "Defer keeps the case open. It is not a dismissal."}
+          </p>
+          <label>
+            Reason (required)
+            <textarea
+              rows={3}
+              value={overrideReason}
+              onChange={(e) => setOverrideReason(e.target.value)}
+              placeholder="Why this override, in language another reviewer can follow…"
+            />
+            <span className="muted mono">{overrideReason.trim().length}/20</span>
+          </label>
+          <div className="override-actions">
+            <button
+              type="button"
+              className="btn solid"
+              disabled={overrideReason.trim().length < 20 || overrideMut.isPending}
+              onClick={() =>
+                overrideMut.mutate({
+                  caseId: overrideCase.caseId,
+                  action: overrideCase.action,
+                  reason: overrideReason.trim(),
+                })
+              }
+            >
+              {overrideMut.isPending ? "Recording…" : "Record override"}
+            </button>
+            <button type="button" className="btn ghost" onClick={() => setOverrideCase(null)}>
+              Cancel
+            </button>
+          </div>
+        </section>
+      )}
 
       {!runId && !loadMut.isPending && (
         <section className="empty">
@@ -364,15 +487,19 @@ export function ManagerQueuePage() {
             />
           </section>
 
-          <section className="waterfall" aria-label="Capacity selection explanation">
-            <h2>Why these cases were selected</h2>
+          <section className="waterfall ranking-policy" aria-label="Ranking policy">
+            <h2>How today&apos;s queue is recommended</h2>
+            <p>
+              {rankingPolicy?.note ??
+                "AI recommends a top-N desk from combined factors inside investigator capacity. Investigators decide. Cases outside today's slots stay open."}
+            </p>
             <ol>
               <li>
-                Harm ≥ 4 is taken first
+                Harm ≥ 4 is taken first (member safety)
                 <span className="mono">{hours(harmHours)}</span>
               </li>
               <li>
-                Remaining hours packed by knapsack (selected lane)
+                Remaining hours packed on combined rank (severity, exposure, members, evidence, urgency)
                 <span className="mono">{hours(selectedHours)}</span>
               </li>
               <li>
@@ -380,18 +507,18 @@ export function ManagerQueuePage() {
                 <span className="mono">{hours(unused)}</span>
               </li>
               <li>
-                Monitor (overflow) excluded — would exceed hours
+                Tracked backlog — outside hours or the {appliedSlots}-slot cap. Still open.
                 <span className="mono">{hours(monitorHours)}</span>
               </li>
               <li>
-                Needs evidence — evidence strength below 0.40
+                Gather evidence — strength below 0.40, including high-impact incomplete files
                 <span className="mono">{hours(evidenceHours)}</span>
               </li>
             </ol>
             <p className="muted">
-              Harm ≥ 4 takes a reserved slice of hours. Remaining capacity is packed by expected
-              value (recovery × dollars + harm term). The 45-day column is the CMS-style lead
-              screening clock. Click a bar or lane chip to filter the table. Check two cases to compare.
+              Dollars estimate impact. Evidence strength tells you how well the concern is supported.
+              Neither one picks the queue alone. Promote or defer a case with a reason; that is the
+              human loop. Check two cases to compare factors.
             </p>
           </section>
 
@@ -427,6 +554,7 @@ export function ManagerQueuePage() {
                         <dd className="mono">{screeningLabel(row.screening_days_left)}</dd>
                       </div>
                     </dl>
+                    <FactorBars factors={row.rank_factors} />
                     <p className="why">{whyPriority(row)}</p>
                   </article>
                 ))}
@@ -492,7 +620,9 @@ export function ManagerQueuePage() {
                   <th>Sev</th>
                   <th>Evidence</th>
                   <th>Hours</th>
+                  <th>Factors</th>
                   <th>Why this rank</th>
+                  <th>Override</th>
                 </tr>
               </thead>
               <tbody>
@@ -503,8 +633,13 @@ export function ManagerQueuePage() {
                     horizon={appliedHorizon}
                     selected={openId === row.case_id}
                     compared={compareIds.includes(row.case_id)}
+                    canOverride={canOverride}
                     onOpen={() => setOpenId(row.case_id)}
                     onCompare={() => toggleCompare(row.case_id)}
+                    onOverride={(action) => {
+                      setOverrideCase({ caseId: row.case_id, action });
+                      setOverrideReason("");
+                    }}
                   />
                 ))}
               </tbody>
@@ -551,7 +686,7 @@ function LaneStat({
     harm_priority: "Harm priority",
     selected: "Selected",
     needs_evidence: "Needs evidence",
-    overflow: "Monitor",
+    overflow: "Tracked backlog",
   };
   return (
     <button type="button" className={`lane-stat lane-${lane} ${active ? "on" : ""}`} onClick={onClick}>
@@ -566,18 +701,23 @@ function QueueRow({
   horizon,
   selected,
   compared,
+  canOverride,
   onOpen,
   onCompare,
+  onOverride,
 }: {
   row: QueueCase;
   horizon: number;
   selected: boolean;
   compared: boolean;
+  canOverride: boolean;
   onOpen: () => void;
   onCompare: () => void;
+  onOverride: (action: "promote" | "defer") => void;
 }) {
   const risk = horizonRisk(row, horizon);
   const sla = screeningTone(row.screening_days_left);
+  const today = row.lane === "harm_priority" || row.lane === "selected";
   return (
     <tr
       className={`lane-${row.lane} ${row.harm >= 4 ? "is-harm" : ""} ${selected ? "is-open" : ""}`}
@@ -627,7 +767,30 @@ function QueueRow({
         <EvidenceBar value={row.evidence_strength} />
       </td>
       <td className="mono">{hours(row.estimated_hours)}</td>
-      <td className="why">{whyPriority(row)}</td>
+      <td>
+        <FactorBars factors={row.rank_factors} compact />
+        {row.queue_rank ? <p className="muted mono">Today #{row.queue_rank}</p> : null}
+      </td>
+      <td className="why">
+        {whyPriority(row)}
+        {row.override && <p className="muted">Human {row.override.action}: {row.override.reason}</p>}
+      </td>
+      <td>
+        {canOverride && (
+          <div className="override-actions" onClick={(e) => e.stopPropagation()}>
+            {!today && (
+              <button type="button" className="btn ghost" onClick={() => onOverride("promote")}>
+                Promote
+              </button>
+            )}
+            {today && (
+              <button type="button" className="btn ghost" onClick={() => onOverride("defer")}>
+                Defer
+              </button>
+            )}
+          </div>
+        )}
+      </td>
     </tr>
   );
 }

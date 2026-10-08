@@ -52,16 +52,16 @@ const CHAPTERS = [
   {
     kicker: "CMS harm first",
     title: "Beneficiary harm never waits in line.",
-    body: "Services after death and excluded parties take a reserved slice of capacity. Remaining hours fill a knapsack of expected recovery plus a harm term. Weak evidence goes to needs-evidence, not the investigator’s day.",
+    body: "A thousand cases do not become a dollar sort. ClaimShield combines scheme severity, financial exposure, member impact, evidence strength, and urgency, then packs the result into investigator hours and a top-N desk. AI recommends today's 20. Investigators decide. The rest stay open on a tracked backlog.",
     points: [
       "Harm-priority cases jump the dollar queue. Vulnerable members come first.",
-      "Selected work is a knapsack: expected value inside the hours you have.",
-      "Needs-evidence is a holding lane. Overflow waits. Nothing auto-labels fraud.",
+      "Today's queue is multi-factor inside capacity. Dollars or evidence alone never pick the set.",
+      "Needs-evidence gathers records. Overflow stays tracked. Nothing auto-labels fraud.",
     ],
     facts: [
-      { value: "Harm lane", label: "Reserved share of investigator hours" },
-      { value: "Knapsack", label: "EV packs the rest of the day" },
-      { value: "Evidence", label: "Weak packs sit out of today’s work" },
+      { value: "Five factors", label: "Severity, exposure, members, evidence, urgency" },
+      { value: "Top N + hours", label: "Capacity knapsack, then a 20-case desk cap" },
+      { value: "Human loop", label: "Promote or defer with a reason. Backlog is not a close." },
     ],
   },
   {
@@ -149,7 +149,7 @@ export function LandingPage() {
           </div>
           <div>
             <dt>Queue math</dt>
-            <dd>Harm override + knapsack</dd>
+            <dd>Five factors + capacity + human override</dd>
           </div>
         </dl>
       </section>
@@ -206,7 +206,7 @@ export function LandingPage() {
               </li>
               <li>
                 <strong>Queue</strong>
-                <span>Harm lane, selected knapsack, needs-evidence, overflow.</span>
+                <span>Change hours or member impact. Watch today's 20 move. Overflow stays open.</span>
               </li>
               <li>
                 <strong>Investigator</strong>
