@@ -56,6 +56,7 @@ export interface RunSummary {
     member_weight?: number;
     ranking_policy?: RankingPolicy;
     lanes?: Partial<Record<Lane, number>>;
+    risk_model?: RiskModelInfo;
   };
 }
 
@@ -128,7 +129,48 @@ export interface PipelineRun {
   ranking_policy?: RankingPolicy;
 }
 
-export interface QueueCase {
+/** Which scorer produced p_confirm and f30/f60/f90 for a run. */
+export interface RiskModelInfo {
+  score_kind: ScoreKind;
+  model_version: string;
+  calibrated: boolean;
+  as_of?: string;
+  note?: string;
+  [key: string]: unknown;
+}
+
+export type ScoreKind = "trained_model" | "uncalibrated_heuristic";
+
+/** One per-case driver of a model score (contribution to the logit). */
+export interface RiskFactor {
+  feature: string;
+  label: string;
+  value: number;
+  contribution: number;
+  direction: "raises" | "lowers";
+}
+
+/**
+ * Risk-model fields on queue rows and case detail. p_confirm and f30/f60/f90 stay as before;
+ * risk_30/60/90 are aliases of f30/f60/f90. See docs/MODEL_CARD.md.
+ */
+export interface RiskScoreFields {
+  risk_30?: number | null;
+  risk_60?: number | null;
+  risk_90?: number | null;
+  score_kind?: ScoreKind;
+  model_version?: string;
+  calibrated?: boolean;
+  risk_as_of?: string | null;
+  /** Provider whose 30/60/90 curve the case shows (riskiest subject). */
+  risk_subject?: string | null;
+  /** Monthly hazards h1..h3 behind the cumulative curve. */
+  monthly_hazards?: number[] | null;
+  risk_factors?: RiskFactor[];
+  p_confirm_factors?: RiskFactor[];
+}
+
+export interface QueueCase extends RiskScoreFields {
   case_id: string;
   lane: Lane;
   status: string;
@@ -526,7 +568,7 @@ export interface EvidenceItem {
   payload: Record<string, unknown>;
 }
 
-export interface CaseDetail {
+export interface CaseDetail extends RiskScoreFields {
   case_id: string;
   run_id: string;
   status: string;

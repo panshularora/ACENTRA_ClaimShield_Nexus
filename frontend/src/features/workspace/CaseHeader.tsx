@@ -72,7 +72,7 @@ export function CaseHeader({ data, user, canAssign, assigning, onAssign, unmask,
       </div>
       <div className="case-header-metrics">
         <dl className="stat-grid">
-          <StatTile label={SCORE_LABELS.pConfirm.label} value={pct(data.p_confirm)} hint={SCORE_LABELS.pConfirm.hint} />
+          <StatTile label={SCORE_LABELS.pConfirm.label} value={pct(data.p_confirm)} hint={SCORE_LABELS.pConfirm.hintFor(data)} />
           <StatTile label="Flagged paid" value={money(data.flagged_dollars)} />
           <StatTile
             label={SCORE_LABELS.expectedValue.label}

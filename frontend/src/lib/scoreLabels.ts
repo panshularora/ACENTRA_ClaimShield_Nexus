@@ -1,14 +1,22 @@
 /**
  * Display copy for the API's risk numbers (p_confirm, f30/f60/f90, expected_value).
  *
- * The backend definitions of these scores are being revised on a separate branch, so every
- * label, hint and chart sentence that names them lives here. Change the wording in one place
- * when the API changes.
+ * Every label, hint and chart sentence that names these scores lives here, so the wording
+ * changes in one place. Definitions and backtest numbers: docs/MODEL_CARD.md.
  */
 export const SCORE_LABELS = {
   pConfirm: {
     label: "P(confirm)",
     hint: "Score from the API, not a finding",
+    /** Hint that says which scorer produced the number (`score_kind` / `calibrated`). */
+    hintFor: (row: { score_kind?: string; calibrated?: boolean }) =>
+      row.score_kind === "trained_model"
+        ? row.calibrated
+          ? "Calibrated model, trained on synthetic data; not a finding"
+          : "Uncalibrated model score; not a finding"
+        : row.score_kind === "uncalibrated_heuristic"
+          ? "Uncalibrated heuristic, not a probability"
+          : "Score from the API, not a finding",
   },
   expectedValue: {
     label: "Expected value",
@@ -20,7 +28,8 @@ export const SCORE_LABELS = {
     shortSet: "F30 / F60 / F90",
     chartTitle: "Cumulative risk by horizon",
     /** Lead-in for the chart's text summary. */
-    meaning: "Chance the escalation event has already happened by each horizon (cumulative)",
+    meaning:
+      "Chance the case's riskiest provider bills a fraudulent claim line within each horizon (cumulative)",
     tooltip: "Cumulative risk",
   },
 } as const;
