@@ -53,13 +53,13 @@ export function ClaimsTable({
     <section className="ws-panel ws-claims" aria-labelledby="claims-title">
       <header className="ws-panel-head">
         <div>
-          <p className="kicker">Panel 3</p>
-          <h2 id="claims-title">Claim / evidence table</h2>
+          <p className="kicker">Claims</p>
+          <h2 id="claims-title">Claim lines</h2>
         </div>
         <span className="muted mono">{visible.length} lines</span>
       </header>
       {pack?.masked && (
-        <p className="banner">Member names are masked. IDs only, per RBAC.</p>
+        <p className="note">Member names are masked. IDs only, per RBAC.</p>
       )}
       <div className="toolbar tight">
         <label className="grow">

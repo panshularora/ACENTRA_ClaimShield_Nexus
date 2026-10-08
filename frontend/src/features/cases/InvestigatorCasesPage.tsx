@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { api, can } from "../../api/client";
@@ -9,16 +9,21 @@ import { HarmBadge, LaneBadge, StatusBadge } from "../../components/Badge";
 import { hours, money, pct } from "../../lib/format";
 import { readStoredRun } from "../../lib/runStore";
 
+type Scope = "desk" | "mine" | "open";
+
 export function InvestigatorCasesPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [queryText, setQueryText] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [scope, setScope] = useState<Scope>("desk");
 
   const stored = readStoredRun();
   const canCases = can(user, "case:read");
   const canQueue = can(user, "queue:read");
   const canReadBatches = can(user, "batch:read");
+  const canAssign = can(user, "case:assign");
 
   const batchesQuery = useQuery({
     queryKey: ["batches"],
@@ -54,6 +59,15 @@ export function InvestigatorCasesPage() {
     enabled: workSeed.length > 0 && canCases,
   });
 
+  const assignMut = useMutation({
+    mutationFn: (caseId: string) => api.assignCase(caseId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["work-details"] });
+      void queryClient.invalidateQueries({ queryKey: ["case"] });
+      void queryClient.invalidateQueries({ queryKey: ["queue"] });
+    },
+  });
+
   if (!user) return null;
   if (!canCases) {
     return (
@@ -65,19 +79,23 @@ export function InvestigatorCasesPage() {
   }
 
   const details = detailsQuery.data ?? {};
-  const assigned = workSeed.filter((row) => details[row.case_id]?.assignee_id === user.id);
-  const usingAssigned = assigned.length > 0;
-  const source: QueueCase[] = usingAssigned ? assigned : workSeed;
+  const mine = workSeed.filter((row) => details[row.case_id]?.assignee_id === user.id);
+  const unassigned = workSeed.filter((row) => !details[row.case_id]?.assignee_id);
+
+  const source: QueueCase[] =
+    scope === "mine" ? mine : scope === "open" ? unassigned : workSeed;
 
   const visible = source.filter((row) => {
     if (statusFilter !== "all" && row.status !== statusFilter) return false;
     const q = queryText.trim().toLowerCase();
     if (!q) return true;
     const extra = details[row.case_id];
+    const name = extra?.primary_entity?.name ?? "";
     return (
       row.case_id.toLowerCase().includes(q) ||
       row.primary_entity_id.toLowerCase().includes(q) ||
       row.status.toLowerCase().includes(q) ||
+      name.toLowerCase().includes(q) ||
       (extra?.assignee_id ?? "").toLowerCase().includes(q)
     );
   });
@@ -86,7 +104,7 @@ export function InvestigatorCasesPage() {
     <main id="main" className="page cases-page">
       <header className="page-head">
         <div>
-          <p className="kicker">Investigator desk · recommend only</p>
+          <p className="kicker">Investigator desk</p>
           <h1>Worklist</h1>
         </div>
         {canQueue && (
@@ -100,29 +118,49 @@ export function InvestigatorCasesPage() {
         <section className="empty">
           <h2>No active run</h2>
           <p>
-            There is no detection run in this browser yet. A manager loads a batch from the queue
-            page; the run id is then stored locally so investigators can open work.
+            A manager loads a batch from the queue page. After that, this desk shows harm-priority
+            and selected cases from the live run.
           </p>
         </section>
       )}
 
       {runId && (
         <>
-          {usingAssigned ? (
-            <p className="banner ok">Showing cases assigned to {user.display_name}.</p>
-          ) : (
-            <p className="banner">
-              No cases have `assignee_id` on this run (assignment is not exposed by the current
-              API). Showing harm-priority and selected work from GET /runs/{"{id}"}/queue.
-            </p>
-          )}
+          <p className="note">
+            {mine.length > 0
+              ? `${mine.length} case${mine.length === 1 ? "" : "s"} on your desk. Unassigned work stays in the team list until someone takes it.`
+              : "Nothing is assigned to you yet. Open a case and take ownership, or claim it from this list."}
+          </p>
 
           <div className="toolbar">
+            <div className="scope-tabs" role="tablist" aria-label="Worklist scope">
+              <button
+                type="button"
+                className={scope === "desk" ? "on" : ""}
+                onClick={() => setScope("desk")}
+              >
+                Team desk <em>{workSeed.length}</em>
+              </button>
+              <button
+                type="button"
+                className={scope === "mine" ? "on" : ""}
+                onClick={() => setScope("mine")}
+              >
+                Mine <em>{mine.length}</em>
+              </button>
+              <button
+                type="button"
+                className={scope === "open" ? "on" : ""}
+                onClick={() => setScope("open")}
+              >
+                Unassigned <em>{unassigned.length}</em>
+              </button>
+            </div>
             <label className="grow">
               <span className="sr">Search</span>
               <input
                 type="search"
-                placeholder="Search case or provider…"
+                placeholder="Search case, provider, or specialty…"
                 value={queryText}
                 onChange={(e) => setQueryText(e.target.value)}
               />
@@ -143,59 +181,73 @@ export function InvestigatorCasesPage() {
           {(queueQuery.isLoading || detailsQuery.isLoading) && <p className="muted">Loading cases…</p>}
           {queueQuery.error && <p className="error-text">{(queueQuery.error as Error).message}</p>}
           {!queueQuery.isLoading && visible.length === 0 && (
-            <p className="empty">No cases on the investigator worklist.</p>
+            <p className="empty">No cases in this view.</p>
           )}
 
           <ul className="case-list">
             {visible.map((row) => {
               const extra = details[row.case_id];
+              const name = extra?.primary_entity?.name ?? row.primary_entity_id;
+              const specialty = extra?.primary_entity?.specialty;
+              const mineRow = extra?.assignee_id === user.id;
+              const ownerLabel = mineRow ? "You" : extra?.assignee_id ?? "Unassigned";
               return (
                 <li key={row.case_id}>
-                  <button
-                    type="button"
-                    className={`case-card lane-${row.lane} ${row.harm >= 4 ? "is-harm" : ""}`}
-                    onClick={() =>
-                      void navigate({
-                        to: "/investigator/workspace/$caseId",
-                        params: { caseId: row.case_id },
-                      })
-                    }
-                  >
-                    <header>
-                      <span className="mono">{row.case_id}</span>
-                      <LaneBadge lane={row.lane} />
-                      <StatusBadge status={row.status} />
-                    </header>
-                    <p className="entity mono">{row.primary_entity_id}</p>
-                    <dl>
-                      <div>
-                        <dt>Priority</dt>
-                        <dd>
-                          <HarmBadge harm={row.harm} />
-                          <span className="mono"> P {pct(row.p_confirm)}</span>
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Flagged</dt>
-                        <dd className="mono">{money(row.flagged_dollars)}</dd>
-                      </div>
-                      <div>
-                        <dt>Hours</dt>
-                        <dd className="mono">{hours(row.estimated_hours)}</dd>
-                      </div>
-                      <div>
-                        <dt>Evidence</dt>
-                        <dd>
-                          <EvidenceBar value={row.evidence_strength} />
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Assignee</dt>
-                        <dd className="mono">{extra?.assignee_id ?? "Unassigned"}</dd>
-                      </div>
-                    </dl>
-                    <span className="open-hint">Open investigation workspace</span>
-                  </button>
+                  <article className={`case-card lane-${row.lane}`}>
+                    <button
+                      type="button"
+                      className="case-card-main"
+                      onClick={() =>
+                        void navigate({
+                          to: "/investigator/workspace/$caseId",
+                          params: { caseId: row.case_id },
+                        })
+                      }
+                    >
+                      <header>
+                        <LaneBadge lane={row.lane} />
+                        <StatusBadge status={row.status} />
+                        <HarmBadge harm={row.harm} />
+                        <span className="mono case-id">{row.case_id}</span>
+                      </header>
+                      <h2>{name}</h2>
+                      <p className="entity-meta">
+                        <span className="mono">{row.primary_entity_id}</span>
+                        {specialty ? <span>{specialty}</span> : null}
+                        <span>Owner {ownerLabel}</span>
+                      </p>
+                      <dl>
+                        <div>
+                          <dt>Confirm chance</dt>
+                          <dd>{pct(row.p_confirm)}</dd>
+                        </div>
+                        <div>
+                          <dt>Flagged</dt>
+                          <dd>{money(row.flagged_dollars)}</dd>
+                        </div>
+                        <div>
+                          <dt>Hours</dt>
+                          <dd>{hours(row.estimated_hours)}</dd>
+                        </div>
+                        <div>
+                          <dt>Evidence</dt>
+                          <dd>
+                            <EvidenceBar value={row.evidence_strength} />
+                          </dd>
+                        </div>
+                      </dl>
+                    </button>
+                    {canAssign && !mineRow && (
+                      <button
+                        type="button"
+                        className="btn ghost take-btn"
+                        disabled={assignMut.isPending}
+                        onClick={() => assignMut.mutate(row.case_id)}
+                      >
+                        Take ownership
+                      </button>
+                    )}
+                  </article>
                 </li>
               );
             })}

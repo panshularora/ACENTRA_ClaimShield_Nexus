@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import type { NetworkNode, NetworkPack } from "../../api/types";
 import { NetworkGraph } from "../../three/NetworkGraph";
-import { usePrefersReducedMotion } from "../../three/useScrollProgress";
 import "./network.css";
 
 const EDGE_KINDS = [
@@ -27,7 +26,6 @@ export function NetworkPanel({
   error: string | null;
   onSelect: (id: string, type: string) => void;
 }) {
-  const reduced = usePrefersReducedMotion();
   const [enabled, setEnabled] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(EDGE_KINDS.map((k) => [k, true])),
   );
@@ -44,8 +42,8 @@ export function NetworkPanel({
     <section className="ws-panel ws-network" aria-labelledby="net-title">
       <header className="ws-panel-head">
         <div>
-          <p className="kicker">Panel 5 · a case is a network</p>
-          <h2 id="net-title">2-hop neighbourhood</h2>
+          <p className="kicker">Relationships</p>
+          <h2 id="net-title">Two-hop neighbourhood</h2>
         </div>
         {pack && (
           <span className="muted mono">
@@ -72,18 +70,25 @@ export function NetworkPanel({
         </fieldset>
       )}
       {pack && pack.nodes.length > 0 && (
-        <div className="n3-host" role="img" aria-label="Case relationship graph">
-          <NetworkGraph
-            pack={pack}
-            enabled={enabled}
-            reduced={reduced}
-            onSelect={(id, type) => {
-              const node = pack.nodes.find((n) => n.id === id) ?? null;
-              setPicked(node);
-              onSelect(id, type);
-            }}
-          />
-        </div>
+        <>
+          <div className="n3-host">
+            <NetworkGraph
+              pack={pack}
+              enabled={enabled}
+              onSelect={(id, type) => {
+                const node = pack.nodes.find((n) => n.id === id) ?? null;
+                setPicked(node);
+                onSelect(id, type);
+              }}
+            />
+          </div>
+          <ul className="net-legend">
+            <li><i className="t-provider" /> Provider</li>
+            <li><i className="t-member" /> Member</li>
+            <li><i className="t-facility" /> Facility</li>
+            <li><i className="t-owner" /> Owner</li>
+          </ul>
+        </>
       )}
       {picked && (
         <p className="net-pick">

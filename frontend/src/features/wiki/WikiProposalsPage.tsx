@@ -31,7 +31,7 @@ export function WikiProposalsPage() {
     <main id="main" className="page">
       <header className="page-head">
         <div>
-          <p className="kicker">Navigator-style knowledge loop</p>
+          <p className="kicker">Knowledge loop</p>
           <h1>Precedent proposals</h1>
           <p className="lede">
             A human decision drafts a pending precedent. Manager or analyst approval publishes it

@@ -53,7 +53,7 @@ export function BriefPanel({
   return (
     <section className="ws-panel ws-brief" aria-labelledby="brief-title">
       <header className="ws-panel-head">
-        <p className="kicker">Panel 2</p>
+        <p className="kicker">Brief</p>
         <h2 id="brief-title">Investigation brief</h2>
         {brief && (
           <span className="badge">{brief.generator === "template" ? "Template" : "LLM"}</span>

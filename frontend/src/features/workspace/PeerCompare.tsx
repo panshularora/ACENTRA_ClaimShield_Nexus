@@ -5,13 +5,24 @@ function num(value: unknown): string {
   return "—";
 }
 
+function asNum(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
 export function PeerCompare({ evidence }: { evidence: Record<string, unknown> }) {
   const group = (evidence.peer_group ?? null) as PeerGroup | null;
   if (!group) return null;
   const limited = group.confidence === "limited" || group.confidence === "insufficient";
+  const provider = asNum(evidence.provider_value);
+  const q1 = asNum(evidence.peer_q1);
+  const median = asNum(evidence.peer_median);
+  const q3 = asNum(evidence.peer_q3);
   return (
     <div className={`peer-compare ${limited ? "is-limited" : ""}`}>
       <p className="kicker">Peer comparison · like with like</p>
+      {provider != null && q1 != null && q3 != null && median != null && (
+        <PeerRange provider={provider} q1={q1} median={median} q3={q3} />
+      )}
       <dl>
         <div>
           <dt>This provider</dt>
@@ -37,7 +48,33 @@ export function PeerCompare({ evidence }: { evidence: Record<string, unknown> })
         {(group.dimensions_used ?? []).join(", ") || "none"}. Geography {group.geography ?? "—"}.
       </p>
       {group.limitation ? <p className="muted">{group.limitation}</p> : null}
-      <p className="muted">A difference from peers is a reason to examine the evidence, not a finding of fraud.</p>
+      <p className="muted">
+        A difference from peers is a reason to examine the evidence.
+      </p>
+    </div>
+  );
+}
+
+function PeerRange({
+  provider,
+  q1,
+  median,
+  q3,
+}: {
+  provider: number;
+  q1: number;
+  median: number;
+  q3: number;
+}) {
+  const lo = Math.min(q1, provider, median);
+  const hi = Math.max(q3, provider, median);
+  const span = hi - lo || 1;
+  const pct = (v: number) => `${((v - lo) / span) * 100}%`;
+  return (
+    <div className="peer-range" aria-hidden="true">
+      <span className="peer-iqr" style={{ left: pct(q1), width: `calc(${pct(q3)} - ${pct(q1)})` }} />
+      <span className="peer-median" style={{ left: pct(median) }} />
+      <span className="peer-dot" style={{ left: pct(provider) }} />
     </div>
   );
 }

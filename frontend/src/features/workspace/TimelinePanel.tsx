@@ -15,7 +15,7 @@ export function TimelinePanel({
   return (
     <section className="ws-panel ws-timeline" aria-labelledby="tl-title">
       <header className="ws-panel-head">
-        <p className="kicker">Panel 4</p>
+        <p className="kicker">Chronology</p>
         <h2 id="tl-title">Timeline</h2>
       </header>
       {loading && <p className="muted">Loading chronology…</p>}
