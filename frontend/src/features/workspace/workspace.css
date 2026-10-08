@@ -67,6 +67,47 @@
   align-items: start;
 }
 
+.case-model-factors {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--space-4);
+}
+
+.factor-contrib {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--font-size-13);
+}
+
+.factor-contrib li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.factor-contrib .up {
+  color: var(--color-text);
+}
+
+.factor-contrib .down {
+  color: var(--color-text-muted);
+}
+
+.decide-review {
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.decide-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .case-header-metrics .stat-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }

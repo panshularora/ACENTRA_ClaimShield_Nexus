@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { api } from "../api/client";
 import { hours, money, pct, screeningLabel, signalLabel, whyPriority } from "../lib/format";
-import { HarmFlag, LaneBadge, RiskBadge, StatusBadge } from "./Badge";
+import { ConfirmBandBadge, HarmFlag, LaneBadge, RiskBadge, StatusBadge } from "./Badge";
 import { EvidenceBar } from "./EvidenceBar";
 import { Drawer } from "./ui/Drawer";
 import { SCORE_LABELS } from "../lib/scoreLabels";
@@ -33,7 +33,14 @@ export function CaseDrawer({ caseId, onClose }: { caseId: string; onClose: () =>
             <StatusBadge status={detail.status} />
             <RiskBadge severity={detail.severity} />
             <HarmFlag harm={detail.harm} />
+            <ConfirmBandBadge p={detail.p_confirm} />
           </div>
+          {detail.model_version ? (
+            <p className="muted">
+              {SCORE_LABELS.pConfirm.hintFor(detail)}
+              {detail.model_version ? ` · ${detail.model_version}` : ""}
+            </p>
+          ) : null}
           <p>{whyPriority(detail)}</p>
           <dl className="facts">
             <div>

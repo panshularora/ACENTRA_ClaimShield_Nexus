@@ -194,8 +194,13 @@ export function ManagerQueuePage() {
   const casesByLane = Object.fromEntries(
     LANE_ORDER.map((lane) => [lane, rows.filter((r) => r.lane === lane).length]),
   ) as Record<Lane, number>;
-  const deskHours = hoursByLane.harm_priority + hoursByLane.selected;
-  const overCapacity = Math.max(0, deskHours - applied.capacity);
+  const capacityPack = runQuery.data?.summary.capacity ?? runQuery.data?.capacity;
+  const capacityHours = capacityPack?.capacity_hours ?? applied.capacity;
+  const overrideHours = capacityPack?.priority_override_hours ?? hoursByLane.harm_priority;
+  const selectedHours = capacityPack?.selected_hours ?? hoursByLane.selected;
+  const deskHours = capacityPack?.capacity_used_hours ?? overrideHours + selectedHours;
+  const overCapacity = capacityPack?.over_capacity_hours ?? Math.max(0, deskHours - capacityHours);
+  const overrideWarn = capacityPack?.override_share_warning ?? false;
   const nAlerts = runQuery.data?.n_alerts ?? runQuery.data?.summary.n_alerts ?? 0;
   const nCases = rows.length || runQuery.data?.n_cases || 0;
   const nToday = casesByLane.harm_priority + casesByLane.selected || runQuery.data?.summary.n_selected || 0;
@@ -245,7 +250,7 @@ export function ManagerQueuePage() {
           <StatTile
             label="Today's desk"
             value={nToday}
-            hint={`${hours(deskHours)} queued · ${hours(applied.capacity)} capacity`}
+            hint={`${hours(deskHours)} used · ${hours(capacityHours)} capacity`}
           />
           <StatTile label="Harm priority" value={casesByLane.harm_priority} tone="harm" />
           <StatTile label="Tracked backlog" value={casesByLane.overflow} hint="Still open, not dismissed" />
@@ -257,8 +262,19 @@ export function ManagerQueuePage() {
           <Panel id="capacity" eyebrow="Capacity" title="Hours by lane">
             {overCapacity > 0 ? (
               <p className="banner warn">
-                Today&apos;s desk fills {hours(deskHours)} against {hours(applied.capacity)} of capacity, {hours(overCapacity)}{" "}
-                over. Harm-priority cases are always queued and only part of their hours count against capacity.
+                Today&apos;s desk uses {hours(deskHours)} against {hours(capacityHours)} of capacity, {hours(overCapacity)}{" "}
+                over. Priority-override hours ({hours(overrideHours)}) count against capacity.
+              </p>
+            ) : (
+              <p className="muted">
+                Priority-override hours {hours(overrideHours)} plus selected {hours(selectedHours)} use {hours(deskHours)} of{" "}
+                {hours(capacityHours)} capacity.
+              </p>
+            )}
+            {overrideWarn ? (
+              <p className="banner warn">
+                Priority-override hours are more than 35% of capacity. The desk is spending most of its budget on harm
+                overrides.
               </p>
             ) : null}
             {queueQuery.isLoading ? (
@@ -267,7 +283,7 @@ export function ManagerQueuePage() {
               <LaneHoursChart
                 hoursByLane={hoursByLane}
                 casesByLane={casesByLane}
-                capacityHours={applied.capacity}
+                capacityHours={capacityHours}
                 selected={laneFilter}
                 onSelect={toggleLane}
               />

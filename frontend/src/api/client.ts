@@ -1,18 +1,23 @@
 import type {
   AuditEvent,
   AuditLog,
+  AuthSession,
   BatchDetail,
   BatchSummary,
   CaseBrief,
   CaseDetail,
   ClaimsPack,
   DecisionAction,
+  DecisionOptions,
   DecisionResult,
+  DecisionReviewResult,
+  EntitySummary,
   EvidenceItem,
   Lane,
   LoadBatchResponse,
   MetaResponse,
   NetworkPack,
+  NodeDetail,
   PipelineRun,
   QueueCase,
   SessionUser,
@@ -62,11 +67,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     res.status === 401 &&
     path !== "/api/v1/auth/login" &&
     path !== "/api/v1/auth/refresh" &&
-    path !== "/api/v1/auth/me"
+    path !== "/api/v1/auth/session"
   ) {
+    const refreshHeaders = new Headers();
+    if (csrf) refreshHeaders.set("X-CSRF-Token", csrf);
     const refresh = await fetch("/api/v1/auth/refresh", {
       method: "POST",
       credentials: "include",
+      headers: refreshHeaders,
     });
     if (refresh.ok) {
       res = await send();
@@ -90,6 +98,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const api = {
   meta: () => request<MetaResponse>("/api/v1/meta"),
   me: () => request<SessionUser>("/api/v1/auth/me"),
+  session: () => request<AuthSession>("/api/v1/auth/session"),
+  refresh: () => request<SessionUser>("/api/v1/auth/refresh", { method: "POST" }),
   login: (email: string, password: string) =>
     request<SessionUser>("/api/v1/auth/login", {
       method: "POST",
@@ -151,8 +161,18 @@ export const api = {
     request<NetworkPack>(
       `/api/v1/cases/${caseId}/network?hops=${hops}${unmask ? "&unmask=true" : ""}`,
     ),
+  getNetworkNode: (caseId: string, nodeId: string, unmask = false) =>
+    request<NodeDetail>(
+      `/api/v1/cases/${caseId}/network/nodes/${encodeURIComponent(nodeId)}${unmask ? "?unmask=true" : ""}`,
+    ),
+  getEntitySummary: (entityId: string, caseId: string, unmask = false) =>
+    request<EntitySummary>(
+      `/api/v1/entities/${encodeURIComponent(entityId)}/summary?case_id=${encodeURIComponent(caseId)}${unmask ? "&unmask=true" : ""}`,
+    ),
+  getDecisionOptions: (caseId: string) =>
+    request<DecisionOptions>(`/api/v1/cases/${caseId}/decision-options`),
   getEvidence: (caseId: string, itemId: string) =>
-    request<EvidenceItem>(`/api/v1/cases/${caseId}/evidence/${itemId}`),
+    request<EvidenceItem>(`/api/v1/cases/${caseId}/evidence/${encodeURIComponent(itemId)}`),
   assignCase: (caseId: string, assigneeId?: string) =>
     request<CaseDetail>(`/api/v1/cases/${caseId}/assign`, {
       method: "POST",
@@ -201,10 +221,20 @@ export const api = {
     request<{ pages: WikiPage[] }>(`/api/v1/wiki/pages${type ? `?type=${encodeURIComponent(type)}` : ""}`),
   getPage: (slug: string) => request<WikiPage>(`/api/v1/wiki/pages/${slug}`),
   approveDecision: (decisionId: string, note = "") =>
-    request<{ decision_id: string; proposal: WikiProposal; page: WikiPage }>(
-      `/api/v1/decisions/${decisionId}:approve`,
-      { method: "POST", body: JSON.stringify({ note }) },
-    ),
+    request<DecisionReviewResult>(`/api/v1/decisions/${decisionId}:approve`, {
+      method: "POST",
+      body: JSON.stringify({ note }),
+    }),
+  rejectDecision: (decisionId: string, note: string) =>
+    request<DecisionReviewResult>(`/api/v1/decisions/${decisionId}:reject`, {
+      method: "POST",
+      body: JSON.stringify({ note }),
+    }),
+  reopenCase: (caseId: string, reason: string) =>
+    request<{ case_id: string; status: string; audit: AuditEvent }>(`/api/v1/cases/${caseId}/reopen`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }),
 };
 
 export function can(user: SessionUser | null, permission: string): boolean {

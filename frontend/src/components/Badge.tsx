@@ -1,6 +1,14 @@
 import type { Lane } from "../api/types";
 import { laneLabel } from "../lib/format";
-import { RISK_GLYPH, RISK_LABEL, riskLevel, type RiskLevel } from "../lib/risk";
+import {
+  CONFIRM_BAND_LABEL,
+  confirmBand,
+  RISK_GLYPH,
+  RISK_LABEL,
+  riskLevel,
+  type ConfirmBand,
+  type RiskLevel,
+} from "../lib/risk";
 
 /** Workflow lane as a neutral chip (lanes are not risk). */
 export function LaneBadge({ lane }: { lane: Lane }) {
@@ -27,6 +35,15 @@ export function RiskLevelBadge({ level, title }: { level: RiskLevel; title?: str
 }
 
 /** Patient harm, a separate axis from risk. Flagged at 3 and above; lower levels print as muted numbers. */
+export function ConfirmBandBadge({ p }: { p: number }) {
+  const band: ConfirmBand = confirmBand(p);
+  return (
+    <span className={`badge confirm-${band}`} title="P(confirm) band; not a finding">
+      {CONFIRM_BAND_LABEL[band]}
+    </span>
+  );
+}
+
 export function HarmFlag({ harm }: { harm: number }) {
   if (harm < 3) {
     return (

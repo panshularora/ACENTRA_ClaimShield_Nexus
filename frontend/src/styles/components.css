@@ -357,6 +357,30 @@
   color: var(--risk-critical-fg);
 }
 
+.badge.confirm-under50 {
+  border-color: var(--risk-low-border);
+  background: var(--risk-low-bg);
+  color: var(--risk-low-fg);
+}
+
+.badge.confirm-mid {
+  border-color: var(--risk-medium-border);
+  background: var(--risk-medium-bg);
+  color: var(--risk-medium-fg);
+}
+
+.badge.confirm-high {
+  border-color: var(--risk-high-border);
+  background: var(--risk-high-bg);
+  color: var(--risk-high-fg);
+}
+
+.badge.confirm-nearCertain {
+  border-color: var(--risk-critical-border);
+  background: var(--risk-critical-bg);
+  color: var(--risk-critical-fg);
+}
+
 .badge.harm {
   border-color: var(--harm-border);
   background: var(--harm-bg);

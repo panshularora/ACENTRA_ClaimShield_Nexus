@@ -15,7 +15,7 @@ import { BriefPanel } from "./BriefPanel";
 import { CaseHeader } from "./CaseHeader";
 import { ClaimsTable } from "./ClaimsTable";
 import { DecisionBar } from "./DecisionBar";
-import type { DecisionAction } from "./decisionConfig";
+import { configsFromOptions, type DecisionAction } from "./decisionConfig";
 import { EvidenceDrawer } from "./EvidenceDrawer";
 import { FindingsPanel } from "./FindingsPanel";
 import { focusMatches, type EntityFocus } from "./focus";
@@ -67,6 +67,11 @@ export function WorkspacePage() {
     queryFn: () => api.getNetwork(caseId, 2, unmask),
     enabled: caseLoaded,
   });
+  const optionsQuery = useQuery({
+    queryKey: ["decision-options", caseId],
+    queryFn: () => api.getDecisionOptions(caseId),
+    enabled: caseLoaded,
+  });
 
   const assignMut = useMutation({
     mutationFn: () => api.assignCase(caseId),
@@ -82,8 +87,28 @@ export function WorkspacePage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["case", caseId] });
       void queryClient.invalidateQueries({ queryKey: ["brief", caseId] });
+      void queryClient.invalidateQueries({ queryKey: ["decision-options", caseId] });
       void queryClient.invalidateQueries({ queryKey: ["queue"] });
       void queryClient.invalidateQueries({ queryKey: ["wiki-proposals"] });
+    },
+  });
+  const reviewMut = useMutation({
+    mutationFn: (vars: { kind: "approve" | "reject"; note: string; decisionId: string }) =>
+      vars.kind === "approve" ? api.approveDecision(vars.decisionId, vars.note) : api.rejectDecision(vars.decisionId, vars.note),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["case", caseId] });
+      void queryClient.invalidateQueries({ queryKey: ["brief", caseId] });
+      void queryClient.invalidateQueries({ queryKey: ["decision-options", caseId] });
+      void queryClient.invalidateQueries({ queryKey: ["queue"] });
+      void queryClient.invalidateQueries({ queryKey: ["wiki-proposals"] });
+    },
+  });
+  const reopenMut = useMutation({
+    mutationFn: (reason: string) => api.reopenCase(caseId, reason),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["case", caseId] });
+      void queryClient.invalidateQueries({ queryKey: ["decision-options", caseId] });
+      void queryClient.invalidateQueries({ queryKey: ["queue"] });
     },
   });
 
@@ -114,7 +139,23 @@ export function WorkspacePage() {
           ? selection.target
           : selection.source;
     const node = network.nodes.find((n) => n.id === id);
-    return node ? { id: node.id, type: node.type, label: node.label } : null;
+    if (!node) return null;
+    if (selection.kind === "edge") {
+      const edge =
+        network.edges.find((item) => item.id === selection.key) ??
+        network.edges.find(
+          (item) => item.source === selection.source && item.target === selection.target && item.kind === selection.edgeKind,
+        );
+      return {
+        id: node.id,
+        type: node.type,
+        label: node.label,
+        evidenceIds: edge ? [...edge.evidenceIds, `edge:${edge.id}`] : undefined,
+        extraLineIds: edge?.evidence?.line_ids,
+        extraAlertIds: edge?.evidence?.alert_ids,
+      };
+    }
+    return { id: node.id, type: node.type, label: node.label, extraAlertIds: node.alertIds };
   }, [selection, network]);
 
   const matches = useMemo(
@@ -157,16 +198,23 @@ export function WorkspacePage() {
     );
   }
 
-  const closed = Boolean(data && data.status !== "open");
+  const options = optionsQuery.data;
+  const decisionActions = options ? configsFromOptions(options.options) : undefined;
+  const canRecord = options?.can_decide ?? (canDecide && data?.status === "open");
+  const reviewError = reviewMut.error ?? reopenMut.error;
   const decisionError = decideMut.error
     ? decideMut.error instanceof ApiError
       ? decideMut.error.message
       : (decideMut.error as Error).message
-    : !canDecide
-      ? "Your role cannot record a case decision."
-      : closed
-        ? `Case is already ${data?.status}.`
-        : null;
+    : reviewError
+      ? reviewError instanceof ApiError
+        ? reviewError.message
+        : (reviewError as Error).message
+      : !canDecide && !options?.can_approve && !options?.can_reopen
+        ? "Your role cannot record a case decision."
+        : options?.blocked_reason && !options.can_approve && !options.can_reopen
+          ? options.blocked_reason
+          : null;
 
   return (
     <main id="main" className="page workspace">
@@ -265,6 +313,8 @@ export function WorkspacePage() {
           </Panel>
 
           <NetworkPanel
+            caseId={caseId}
+            unmask={unmask}
             model={network}
             loading={networkQuery.isLoading}
             error={networkQuery.error}
@@ -276,6 +326,7 @@ export function WorkspacePage() {
             }
             onJump={jump}
             onOpenProfile={openProfile}
+            onOpenEvidence={openRef}
           />
 
           <Panel
@@ -327,16 +378,32 @@ export function WorkspacePage() {
             className="decision-panel"
           >
             <DecisionBar
-              disabled={!canDecide || closed}
+              actions={decisionActions}
+              minReasonChars={options?.min_reason_chars}
+              disabled={!canRecord}
+              blockedReason={options?.blocked_reason}
               gaps={data.evidence_gaps ?? briefQuery.data?.evidence_gaps ?? []}
               pending={decideMut.isPending}
               error={decisionError}
               result={decideMut.data ?? null}
               existingProposal={data.latest_proposal ?? null}
               alerts={data.alerts}
+              pendingDecision={options?.pending_decision ?? data.pending_decision}
+              canApprove={options?.can_approve}
+              canReopen={options?.can_reopen}
+              reviewPending={reviewMut.isPending || reopenMut.isPending}
               onSubmit={(action, reason, evidenceRefs, ladderStep) =>
                 decideMut.mutate({ action, reason, evidence_refs: evidenceRefs, ladder_step: ladderStep })
               }
+              onApprove={(note) => {
+                const id = (options?.pending_decision ?? data.pending_decision)?.decision_id;
+                if (id) reviewMut.mutate({ kind: "approve", note, decisionId: id });
+              }}
+              onReject={(note) => {
+                const id = (options?.pending_decision ?? data.pending_decision)?.decision_id;
+                if (id) reviewMut.mutate({ kind: "reject", note, decisionId: id });
+              }}
+              onReopen={(reason) => reopenMut.mutate(reason)}
             />
           </Panel>
         </>

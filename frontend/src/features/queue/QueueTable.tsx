@@ -1,5 +1,5 @@
 import type { QueueCase } from "../../api/types";
-import { HarmFlag, LaneBadge, RiskBadge, StatusBadge } from "../../components/Badge";
+import { ConfirmBandBadge, HarmFlag, LaneBadge, RiskBadge, StatusBadge } from "../../components/Badge";
 import { EvidenceBar } from "../../components/EvidenceBar";
 import { horizonRisk, hours, money, pct, screeningLabel, screeningShort, screeningTone, whyPriority } from "../../lib/format";
 import { FactorStrip } from "./FactorBars";
@@ -139,7 +139,10 @@ function QueueRow({ row, horizon, open, compared, canOverride, onOpen, onCompare
           {screeningShort(row.screening_days_left)}
         </span>
       </td>
-      <td className="num">{pct(row.p_confirm)}</td>
+      <td className="num">
+        {pct(row.p_confirm)}
+        <ConfirmBandBadge p={row.p_confirm} />
+      </td>
       <td className="num">{pct(horizonRisk(row, horizon))}</td>
       <td className="num">{money(row.expected_value ?? 0)}</td>
       <td className="num dollars">{money(row.flagged_dollars)}</td>

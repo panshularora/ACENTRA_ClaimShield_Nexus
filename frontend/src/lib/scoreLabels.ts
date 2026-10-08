@@ -15,12 +15,12 @@ export const SCORE_LABELS = {
           ? "Calibrated model, trained on synthetic data; not a finding"
           : "Uncalibrated model score; not a finding"
         : row.score_kind === "uncalibrated_heuristic"
-          ? "Uncalibrated heuristic, not a probability"
+          ? "Heuristic fallback (trained model unavailable); not a calibrated probability"
           : "Score from the API, not a finding",
   },
   expectedValue: {
     label: "Expected value",
-    hint: "P(confirm) × recovery × exposure, plus a harm term; not pure dollars",
+    hint: "Expected recoveries in dollars (P(confirm) × flagged paid)",
   },
   horizon: {
     /** Column or tile label for one horizon, e.g. "60-day risk". */

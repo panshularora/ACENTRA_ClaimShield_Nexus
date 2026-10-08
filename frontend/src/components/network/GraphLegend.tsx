@@ -29,7 +29,7 @@ export function EdgeKindFilter({ edges, enabled, onToggle }: EdgeKindFilterProps
 
 const FAMILY_SAMPLES: { family: EdgeFamily; label: string; arrow: boolean; width: number }[] = [
   { family: "claim", label: "Billed / rendered", arrow: false, width: 1 },
-  { family: "shared", label: "Shared address / TIN / phone", arrow: false, width: 1.5 },
+  { family: "shared", label: "Shared address / TIN / contact", arrow: false, width: 1.5 },
   { family: "ownership", label: "Owns", arrow: true, width: 2 },
   { family: "referral", label: "Referral", arrow: true, width: 2 },
 ];
