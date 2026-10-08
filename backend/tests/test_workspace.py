@@ -113,6 +113,18 @@ def test_workspace_pack_and_decision(client: TestClient) -> None:
     assert after.json()["latest_decision"]["decision_id"] == payload["decision_id"]
 
 
+def test_investigator_can_take_ownership(client: TestClient) -> None:
+    _run_id, case_id = _load_tiny(client)
+    client.post("/api/v1/auth/logout")
+    _login(client, "investigator@demo.claimshield", "demo-investigator")
+    me = client.get("/api/v1/auth/me").json()
+    taken = client.post(f"/api/v1/cases/{case_id}/assign", json={})
+    assert taken.status_code == 200, taken.text
+    assert taken.json()["assignee_id"] == me["id"]
+    other = client.post(f"/api/v1/cases/{case_id}/assign", json={"assignee_id": "USR-NOPE"})
+    assert other.status_code in {403, 422}
+
+
 def test_investigator_can_read_workspace_analyst_cannot(client: TestClient) -> None:
     _run_id, case_id = _load_tiny(client)
     client.post("/api/v1/auth/logout")

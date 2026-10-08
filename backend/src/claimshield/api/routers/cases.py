@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from claimshield.api.deps import check_csrf, get_db, require
 from claimshield.cases.workspace import (
+    assign_case,
     claims_pack,
     evidence_item,
     get_case_or_404,
@@ -27,6 +28,10 @@ class DecisionBody(BaseModel):
     reason: str
     ladder_step: str | None = None
     evidence_refs: list[str] = Field(default_factory=list)
+
+
+class AssignBody(BaseModel):
+    assignee_id: str | None = None
 
 
 @router.get("/{case_id}")
@@ -92,6 +97,23 @@ def get_evidence(
 ) -> dict:
     case = get_case_or_404(session, case_id)
     return evidence_item(session, case, item_id, user)
+
+
+@router.post("/{case_id}/assign", dependencies=[Depends(check_csrf)])
+def post_assign(
+    case_id: str,
+    body: AssignBody,
+    session: Session = Depends(get_db),
+    user: User = Depends(require("case:assign")),
+) -> dict:
+    case = get_case_or_404(session, case_id)
+    return assign_case(
+        session,
+        case=case,
+        user=user,
+        assignee_id=body.assignee_id or user.id,
+        now=datetime.now(UTC),
+    )
 
 
 @router.post("/{case_id}/decisions", dependencies=[Depends(check_csrf)])

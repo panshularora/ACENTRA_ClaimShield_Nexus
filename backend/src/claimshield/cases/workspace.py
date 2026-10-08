@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from claimshield.audit.service import append_event, chain_status
 from claimshield.auth.rbac import has_permission
 from claimshield.core.clock import canonical_iso
-from claimshield.core.errors import NotFound, ValidationFailed
+from claimshield.core.errors import Forbidden, NotFound, ValidationFailed
 from claimshield.core.ids import new_id
 from claimshield.db.models import (
     Alert,
@@ -145,21 +145,33 @@ def can_unmask(user: User) -> bool:
     return has_permission(user.role, "member:unmask") or has_permission(user.role, "admin:*")
 
 
+APPROACH_BY_DETECTOR = {
+    "rules": "hard_rule",
+    "anomaly": "behavioral_anomaly",
+    "graph": "network_graph",
+}
+
+
 def serialize_alert(alert: Alert) -> dict[str, Any]:
     kind = str((alert.evidence or {}).get("kind") or "")
+    evidence = alert.evidence or {}
+    approach = str(evidence.get("approach") or APPROACH_BY_DETECTOR.get(alert.detector, alert.detector))
     return {
         "alert_id": alert.alert_id,
         "detector": alert.detector,
+        "approach": approach,
         "rule_id": alert.rule_id,
         "rule_version": alert.rule_version,
         "rule_title": RULE_TITLES.get(alert.rule_id or "", alert.rule_id),
         "entity_id": alert.entity_id,
         "entity_type": alert.entity_type,
         "score": alert.score,
-        "evidence": alert.evidence or {},
+        "evidence": evidence,
         "line_ids": alert.line_ids or [],
         "kind": kind,
         "label": KIND_LABELS.get(kind, kind.replace("_", " ") if kind else "Signal"),
+        "review_reason": evidence.get("review_reason")
+        or RULE_TITLES.get(alert.rule_id or "", "Review the supporting claims and fields."),
     }
 
 
@@ -217,6 +229,8 @@ def serialize_case(session: Session, case: Case, user: User) -> dict[str, Any]:
         "latest_proposal": _latest_proposal(session, case.case_id),
         "latest_label": _latest_label(session, case.case_id),
         "member_unmask_permitted": can_unmask(user),
+        "can_assign": has_permission(user.role, "case:assign") or has_permission(user.role, "admin:*"),
+        "suspicion_only": True,
     }
 
 
@@ -464,7 +478,11 @@ def template_brief(session: Session, case: Case, user: User) -> dict[str, Any]:
             "title": "Why this case was surfaced",
             "sentences": [
                 {
-                    "text": f"Primary signal family: {top_kind}. Detector set: {', '.join(kinds) if kinds else 'none'}.",
+                    "text": (
+                        f"Primary signal family: {top_kind}. "
+                        f"Approaches used: {', '.join(sorted({str(a.get('approach') or a['detector']) for a in serialized})) or 'none'}. "
+                        "A flag is a reason to review evidence, not a finding of fraud."
+                    ),
                     "cites": signal_cites[:4] or metric_cite,
                 },
                 {"text": why_lane, "cites": metric_cite},
@@ -910,3 +928,33 @@ def record_decision(
         "label": serialize_label(label),
         "note": "Potential FWA pattern requiring investigation. This is not an automatic fraud label.",
     }
+
+
+def assign_case(
+    session: Session,
+    *,
+    case: Case,
+    user: User,
+    assignee_id: str,
+    now: datetime,
+) -> dict[str, Any]:
+    if not has_permission(user.role, "case:assign") and not has_permission(user.role, "admin:*"):
+        raise Forbidden("role lacks case:assign")
+    if user.role == "investigator" and assignee_id != user.id:
+        raise Forbidden("investigators may only take ownership of a case")
+    assignee = session.get(User, assignee_id)
+    if assignee is None or not assignee.is_active:
+        raise ValidationFailed("assignee not found")
+    case.assignee_id = assignee.id
+    append_event(
+        session,
+        actor_id=user.id,
+        role=user.role,
+        action="case.assign",
+        object_type="case",
+        object_id=case.case_id,
+        payload={"assignee_id": assignee.id, "assignee": assignee.display_name},
+        ts=now,
+    )
+    session.flush()
+    return serialize_case(session, case, user)

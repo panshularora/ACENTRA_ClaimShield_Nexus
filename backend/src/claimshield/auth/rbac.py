@@ -20,6 +20,7 @@ PERMISSIONS: Final[Mapping[Role, frozenset[str]]] = {
             "queue:read",
             "case:read",
             "case:decide",
+            "case:assign",
             "member:unmask",
             "wiki:read",
             "rule:read",
