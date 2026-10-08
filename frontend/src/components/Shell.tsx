@@ -51,7 +51,7 @@ export function Shell() {
           <AppLogo />
           <span>
             <strong>ClaimShield Nexus</strong>
-            <small>SIU · post-adjudication · Acentra Health</small>
+            <small>SIU case prioritisation · prototype</small>
           </span>
         </Link>
         <nav className="mast-nav" aria-label="Primary">

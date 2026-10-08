@@ -5,7 +5,7 @@ import "./landing.css";
 
 const CHAPTERS = [
   {
-    kicker: "Acentra Health · Problem 3",
+    kicker: "Acentra Health code-a-thon · Problem 3",
     title: "ClaimShield Nexus",
     body: "Post-adjudication program integrity for Medicaid-like claims. Built to sit downstream of eCAMS and feed an SIU — not to label anyone as fraud.",
     points: [
@@ -113,7 +113,7 @@ export function LandingPage() {
           <span className="brand-mark" aria-hidden="true" />
           <div>
             <strong>ClaimShield Nexus</strong>
-            <em>for Acentra Health</em>
+            <em>Acentra Health code-a-thon prototype</em>
           </div>
         </div>
         <nav>
@@ -124,7 +124,7 @@ export function LandingPage() {
       </header>
 
       <section className="landing-hero" id="story">
-        <p className="kicker">Accelerating better outcomes · program integrity</p>
+        <p className="kicker">Program integrity · post-adjudication</p>
         <h1>Turn a flood of claim alerts into a few cases an SIU can actually work.</h1>
         <p className="lede">
           Rules, peer anomalies, and identity graphs collapse into capacity-ranked cases.

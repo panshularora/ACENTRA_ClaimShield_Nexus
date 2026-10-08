@@ -61,7 +61,7 @@ export function LoginPage() {
           <span className="brand-mark" aria-hidden="true" />
           <div>
             <strong>ClaimShield Nexus</strong>
-            <em>Acentra Health SIU</em>
+            <em>Acentra Health code-a-thon prototype</em>
           </div>
         </Link>
       </header>
