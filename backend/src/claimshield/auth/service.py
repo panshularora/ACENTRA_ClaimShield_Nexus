@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import secrets
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
@@ -22,6 +23,8 @@ from claimshield.core.ids import new_id
 from claimshield.db.models import AuthSession, User
 
 login_limiter = SlidingWindowLimiter(limit=5, window_seconds=60)
+
+SYSTEM_USER_EMAIL = "ingest@internal.claimshield"
 
 DEMO_USERS: list[dict[str, str]] = [
     {
@@ -81,6 +84,28 @@ def seed_demo_users(session: Session, now: datetime | None = None) -> None:
             )
         )
     session.flush()
+
+
+def seed_system_user(session: Session, now: datetime | None = None) -> User:
+    """Machine actor for S3 ingest. Password is random and discarded; login is not used."""
+    instant = now or datetime.now(UTC)
+    existing = session.execute(
+        select(User).where(User.email == SYSTEM_USER_EMAIL)
+    ).scalar_one_or_none()
+    if existing:
+        return existing
+    user = User(
+        id=new_id("USR"),
+        email=SYSTEM_USER_EMAIL,
+        password_hash=hash_password(secrets.token_urlsafe(32)),
+        role=Role.MANAGER.value,
+        display_name="S3 Ingest",
+        is_active=True,
+        created_at=instant,
+    )
+    session.add(user)
+    session.flush()
+    return user
 
 
 def authenticate(

@@ -11,17 +11,17 @@ from claimshield.anomaly.peer import evaluate_anomalies
 from claimshield.audit.service import append_event
 from claimshield.cases.builder import build_cases
 from claimshield.core.config import Settings
+from claimshield.core.errors import NotFound
 from claimshield.core.ids import new_id
 from claimshield.db.models import Alert, Batch, Case, PipelineRun, User
 from claimshield.graph.build import build_graph, strong_component_map
 from claimshield.graph.detect import evaluate_graph
-from claimshield.core.errors import NotFound
 from claimshield.ingest.service import load_tables, persist_dataset
 from claimshield.queue.knapsack import expected_value, knapsack_select
 from claimshield.queue.rank import attach_rank_factors, ranking_policy
 from claimshield.rules.catalog import stamp_catalog
 from claimshield.rules.engine import AlertDraft, evaluate_rules
-from claimshield.synth.generator import generate
+from claimshield.synth.generator import Dataset, generate
 
 
 def discrete_hazard(case: dict[str, Any]) -> tuple[float, float, float]:
@@ -299,6 +299,66 @@ def load_synthetic_batch(
         object_type="batch",
         object_id=batch.batch_id,
         payload={"profile": profile, "seed": seed, "adapter": "synthetic"},
+        ts=instant,
+    )
+    run = None
+    if run_now:
+        run = execute_run(
+            session,
+            batch=batch,
+            user=user,
+            tables=dataset.tables,
+            settings=settings,
+            horizon_days=horizon_days,
+            capacity_hours=capacity_hours,
+            max_slots=max_slots,
+            member_weight=member_weight,
+            now=instant,
+        )
+    return batch, run
+
+
+def load_csv_batch(
+    session: Session,
+    *,
+    user: User,
+    settings: Settings,
+    dataset: Dataset,
+    source: dict[str, Any],
+    horizon_days: int = 60,
+    capacity_hours: float = 40.0,
+    max_slots: int | None = None,
+    member_weight: float | None = None,
+    run_now: bool = True,
+) -> tuple[Batch, PipelineRun | None]:
+    instant = datetime.now(UTC)
+    report = persist_dataset(session, dataset)
+    batch = Batch(
+        batch_id=report["batch_tag"],
+        adapter="s3_csv",
+        status="loaded",
+        profile=dataset.profile,
+        seed=dataset.seed,
+        load_report={
+            "tables": report["tables"],
+            "ground_truth_rows": report["ground_truth_rows"],
+            "scheme_ids": report["scheme_ids"],
+            "data_card": report["data_card"],
+            "source": source,
+        },
+        created_at=instant,
+        created_by=user.id,
+    )
+    session.add(batch)
+    session.flush()
+    append_event(
+        session,
+        actor_id=user.id,
+        role=user.role,
+        action="batch.load",
+        object_type="batch",
+        object_id=batch.batch_id,
+        payload={"adapter": "s3_csv", "bucket": source.get("bucket"), "key": source.get("key")},
         ts=instant,
     )
     run = None

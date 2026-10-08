@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 from collections.abc import Generator
 
 from fastapi import Cookie, Depends, Header, Request
@@ -89,3 +91,18 @@ def check_csrf(
         return
     if not csrf_header or not csrf_cookie or csrf_header != csrf_cookie:
         raise Unauthorized("csrf check failed")
+
+
+def _token_digest(value: str) -> bytes:
+    return hashlib.sha256(value.encode("utf-8")).digest()
+
+
+def require_internal_token(
+    settings: Settings = Depends(get_settings),
+    provided: str | None = Header(default=None, alias="X-ClaimShield-Internal-Token"),
+) -> None:
+    expected = settings.internal_token
+    if not expected or not provided:
+        raise Unauthorized("internal token required")
+    if not hmac.compare_digest(_token_digest(expected), _token_digest(provided)):
+        raise Unauthorized("internal token required")
