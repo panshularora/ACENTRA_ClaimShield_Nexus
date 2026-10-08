@@ -40,9 +40,9 @@ export function LaneHoursChart({ hoursByLane, casesByLane, capacityHours, select
   return (
     <ChartFrame
       title="Where investigator time sits"
-      summary={`Today's desk (harm priority + selected) needs ${hours(desk)} of ${hours(capacityHours)} capacity. ${hours(
-        hoursByLane.overflow,
-      )} sit on the tracked backlog and ${hours(hoursByLane.needs_evidence)} wait for evidence.`}
+      summary={`Today's desk (harm priority + selected) fills ${hours(desk)} against ${hours(capacityHours)} of capacity${
+        desk > capacityHours ? `, ${hours(desk - capacityHours)} over` : ""
+      }. ${hours(hoursByLane.overflow)} sit on the tracked backlog and ${hours(hoursByLane.needs_evidence)} wait for evidence.`}
       legend={
         <ChartLegend
           items={[

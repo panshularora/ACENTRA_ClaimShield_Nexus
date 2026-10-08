@@ -195,6 +195,7 @@ export function ManagerQueuePage() {
     LANE_ORDER.map((lane) => [lane, rows.filter((r) => r.lane === lane).length]),
   ) as Record<Lane, number>;
   const deskHours = hoursByLane.harm_priority + hoursByLane.selected;
+  const overCapacity = Math.max(0, deskHours - applied.capacity);
   const nAlerts = runQuery.data?.n_alerts ?? runQuery.data?.summary.n_alerts ?? 0;
   const nCases = rows.length || runQuery.data?.n_cases || 0;
   const nToday = casesByLane.harm_priority + casesByLane.selected || runQuery.data?.summary.n_selected || 0;
@@ -241,7 +242,11 @@ export function ManagerQueuePage() {
         <dl className="stat-grid kpis">
           <StatTile label="Alerts" value={nAlerts} hint="Raw detector hits" />
           <StatTile label="Cases" value={nCases} hint="After grouping" />
-          <StatTile label="Today's desk" value={nToday} hint={`${hours(deskHours)} of ${hours(applied.capacity)}`} />
+          <StatTile
+            label="Today's desk"
+            value={nToday}
+            hint={`${hours(deskHours)} queued · ${hours(applied.capacity)} capacity`}
+          />
           <StatTile label="Harm priority" value={casesByLane.harm_priority} tone="harm" />
           <StatTile label="Tracked backlog" value={casesByLane.overflow} hint="Still open, not dismissed" />
         </dl>
@@ -250,6 +255,12 @@ export function ManagerQueuePage() {
       <div className="queue-top">
         {runId ? (
           <Panel id="capacity" eyebrow="Capacity" title="Hours by lane">
+            {overCapacity > 0 ? (
+              <p className="banner warn">
+                Today&apos;s desk fills {hours(deskHours)} against {hours(applied.capacity)} of capacity, {hours(overCapacity)}{" "}
+                over. Harm-priority cases are always queued and only part of their hours count against capacity.
+              </p>
+            ) : null}
             {queueQuery.isLoading ? (
               <LoadingState label="Loading lanes…" />
             ) : (
@@ -376,12 +387,16 @@ export function ManagerQueuePage() {
             <summary>How today&apos;s queue is recommended</summary>
             <p>
               {rankingPolicy?.note ??
-                "The model recommends a top-N desk from combined factors inside investigator capacity. Investigators decide. Cases outside today's slots stay open."}
+                "The ranking proposes a top-N desk from combined factors and investigator capacity. Investigators decide. Cases outside today's slots stay open."}
             </p>
             <ol className="compact-list">
               <li>Harm ≥ 4 is taken first for member safety ({hours(hoursByLane.harm_priority)}).</li>
               <li>Remaining hours are packed on the combined rank ({hours(hoursByLane.selected)}).</li>
-              <li>Unused capacity: {hours(Math.max(0, applied.capacity - deskHours))}.</li>
+              <li>
+                {overCapacity > 0
+                  ? `Over capacity: the desk fills ${hours(deskHours)}, ${hours(overCapacity)} more than the ${hours(applied.capacity)} set.`
+                  : `Unused capacity: ${hours(applied.capacity - deskHours)}.`}
+              </li>
               <li>
                 Tracked backlog, outside hours or the {applied.slots}-slot cap, still open ({hours(hoursByLane.overflow)}).
               </li>

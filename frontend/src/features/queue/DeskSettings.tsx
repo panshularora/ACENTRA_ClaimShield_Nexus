@@ -72,7 +72,7 @@ export function DeskSettings({ draft, applied, deskHours, disabled, canRun, hasE
           min={8}
           max={80}
           step={1}
-          hint={`Applied ${hours(applied.capacity)} · queued work ${hours(deskHours)}`}
+          hint={`Applied ${hours(applied.capacity)} · today's desk fills ${hours(deskHours)}`}
           disabled={disabled}
           onChange={(capacity) => set({ capacity })}
         />
