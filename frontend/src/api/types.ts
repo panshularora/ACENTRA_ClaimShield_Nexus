@@ -156,6 +156,17 @@ export interface BriefSection {
   sentences: BriefSentence[];
 }
 
+export interface MatchedPrecedent {
+  page_id: string;
+  slug: string;
+  title: string;
+  source_case: string | null;
+  decision: string | null;
+  why_it_matches: string;
+  matching_facts: string[];
+  citation: string;
+}
+
 export interface CaseBrief {
   case_id: string;
   generator: "template" | "llm";
@@ -164,6 +175,7 @@ export interface CaseBrief {
   action: string;
   evidence_gaps: string[];
   sections: BriefSection[];
+  precedents?: MatchedPrecedent[];
   validator: { checked: number; dropped: number; cited: number };
 }
 
@@ -247,7 +259,78 @@ export interface DecisionRecord {
   ladder_step: string | null;
   reason: string;
   evidence_refs: string[];
+  approved_by?: string | null;
   created_at: string | null;
+}
+
+export interface AuditReceipt {
+  seq: number;
+  hash: string;
+  prev_hash: string;
+  ts: string | null;
+  action: string;
+  actor?: string;
+  actor_id?: string | null;
+  case_id?: string;
+  reason?: string;
+  chain_intact?: boolean;
+  last_seq?: number;
+}
+
+export interface WikiProposal {
+  proposal_id: string;
+  kind: string;
+  status: string;
+  title: string;
+  source_case_id: string;
+  decision_id: string;
+  body: {
+    source_case?: string;
+    decision?: string;
+    outcome?: string;
+    confirmed_pattern?: string[];
+    scheme_tags?: string[];
+    rules?: { rule_id: string; title: string }[];
+    key_evidence?: { alert_id: string; rule_id: string | null; label: string; line_count: number }[];
+    supporting_line_ids?: string[];
+    rationale?: string;
+    limitations?: string[];
+    changes?: string[];
+    sources?: { kind: string; id: string }[];
+    [key: string]: unknown;
+  };
+  banner: string | null;
+  created_by: string;
+  created_at: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
+  page_id: string | null;
+}
+
+export interface WikiPage {
+  page_id: string;
+  slug: string;
+  type: string;
+  title: string;
+  status: string;
+  body: WikiProposal["body"];
+  source_proposal_id: string;
+  created_at: string | null;
+  approved_by: string;
+}
+
+export interface LabelRecord {
+  label_id: string;
+  case_id: string;
+  decision_id: string;
+  action: string;
+  status: string;
+  scheme_tags: string[];
+  rule_ids: string[];
+  created_at: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
 }
 
 export interface DecisionResult {
@@ -259,14 +342,35 @@ export interface DecisionResult {
   ladder_step: string | null;
   evidence_refs: string[];
   created_at: string | null;
-  audit: {
-    seq: number;
-    hash: string;
-    prev_hash: string;
-    ts: string | null;
-    action: string;
-  };
+  audit: AuditReceipt;
+  proposal?: WikiProposal;
+  label?: LabelRecord;
   note: string;
+}
+
+export interface AuditEvent {
+  seq: number;
+  ts: string;
+  actor_id: string | null;
+  actor: string;
+  role: string;
+  action: string;
+  object_type: string;
+  object_id: string;
+  payload: Record<string, unknown>;
+  chain_ok: boolean;
+  hash?: string;
+  prev_hash?: string;
+}
+
+export interface AuditLog {
+  events: AuditEvent[];
+  verification: {
+    intact: boolean;
+    last_seq: number;
+    last_hash: string | null;
+    n_events: number;
+  };
 }
 
 export interface EvidenceItem {
@@ -297,5 +401,7 @@ export interface CaseDetail {
   alerts: CaseAlert[];
   evidence_gaps?: string[];
   latest_decision?: DecisionRecord | null;
+  latest_proposal?: WikiProposal | null;
+  latest_label?: LabelRecord | null;
   member_unmask_permitted?: boolean;
 }

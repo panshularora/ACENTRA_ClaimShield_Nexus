@@ -57,7 +57,9 @@ export function WorkspacePage() {
     }) => api.decide(caseId, vars),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["case", caseId] });
+      void queryClient.invalidateQueries({ queryKey: ["brief", caseId] });
       void queryClient.invalidateQueries({ queryKey: ["queue"] });
+      void queryClient.invalidateQueries({ queryKey: ["wiki-proposals"] });
     },
   });
 
@@ -231,6 +233,7 @@ export function WorkspacePage() {
                 : null
         }
         result={decideMut.data ?? null}
+        existingProposal={data?.latest_proposal ?? null}
         onSubmit={(action, reason) => decideMut.mutate({ action, reason })}
       />
 

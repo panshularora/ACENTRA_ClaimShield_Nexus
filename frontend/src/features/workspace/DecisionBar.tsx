@@ -1,5 +1,6 @@
 import { useState } from "react";
-import type { DecisionResult } from "../../api/types";
+import type { DecisionResult, WikiProposal } from "../../api/types";
+import { ProposalCard } from "../wiki/ProposalCard";
 
 const ACTIONS = [
   { id: "escalate" as const, label: "Escalate", hint: "Refer for further SIU / MFCU consideration." },
@@ -14,6 +15,7 @@ export function DecisionBar({
   pending,
   error,
   result,
+  existingProposal,
   onSubmit,
 }: {
   disabled: boolean;
@@ -21,11 +23,13 @@ export function DecisionBar({
   pending: boolean;
   error: string | null;
   result: DecisionResult | null;
+  existingProposal?: WikiProposal | null;
   onSubmit: (action: (typeof ACTIONS)[number]["id"], reason: string) => void;
 }) {
   const [action, setAction] = useState<(typeof ACTIONS)[number]["id"]>("monitor");
   const [reason, setReason] = useState("");
   const ready = reason.trim().length >= 20 && !disabled && !pending;
+  const proposal = result?.proposal ?? existingProposal ?? null;
 
   return (
     <section className="ws-panel ws-decide" aria-labelledby="decide-title">
@@ -89,13 +93,52 @@ export function DecisionBar({
       {error && <p className="error-text">{error}</p>}
       {result && (
         <div className="banner ok decide-receipt" role="status">
-          <p>
-            Recorded <strong>{result.action}</strong>. Case status is now{" "}
-            <span className="mono">{result.status}</span>. {result.note}
-          </p>
-          <p className="mono">
-            {result.decision_id} · audit seq {result.audit.seq} · {result.audit.hash}
-          </p>
+          <p className="kicker">Audit confirmation</p>
+          <dl className="facts dense audit-facts">
+            <div>
+              <dt>Action</dt>
+              <dd>{result.audit.action}</dd>
+            </div>
+            <div>
+              <dt>Actor</dt>
+              <dd>{result.audit.actor ?? "—"}</dd>
+            </div>
+            <div>
+              <dt>Timestamp</dt>
+              <dd className="mono">{result.audit.ts ?? result.created_at ?? "—"}</dd>
+            </div>
+            <div>
+              <dt>Case ID</dt>
+              <dd className="mono">{result.audit.case_id ?? result.case_id}</dd>
+            </div>
+            <div>
+              <dt>Decision / reason</dt>
+              <dd>
+                {result.action}: {result.audit.reason ?? result.reason}
+              </dd>
+            </div>
+            <div>
+              <dt>Audit sequence</dt>
+              <dd className="mono">{result.audit.seq}</dd>
+            </div>
+            <div>
+              <dt>Hash-chain</dt>
+              <dd>
+                {result.audit.chain_intact == null
+                  ? "not reported"
+                  : result.audit.chain_intact
+                    ? "intact"
+                    : "broken"}
+                {result.audit.last_seq != null ? ` · last seq ${result.audit.last_seq}` : ""}
+              </dd>
+            </div>
+          </dl>
+          <p>{result.note}</p>
+        </div>
+      )}
+      {proposal && (
+        <div className="proposal-embed">
+          <ProposalCard proposal={proposal} compact={proposal.status !== "pending"} />
         </div>
       )}
     </section>

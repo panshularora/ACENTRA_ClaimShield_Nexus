@@ -1,4 +1,6 @@
 import type {
+  AuditEvent,
+  AuditLog,
   BatchDetail,
   BatchSummary,
   CaseBrief,
@@ -13,6 +15,8 @@ import type {
   QueueCase,
   SessionUser,
   TimelineEvent,
+  WikiPage,
+  WikiProposal,
 } from "./types";
 
 export class ApiError extends Error {
@@ -134,6 +138,40 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  getAudit: (params?: { actor?: string; action?: string; from?: string; to?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.actor) q.set("actor", params.actor);
+    if (params?.action) q.set("action", params.action);
+    if (params?.from) q.set("from", params.from);
+    if (params?.to) q.set("to", params.to);
+    const suffix = q.toString() ? `?${q.toString()}` : "";
+    return request<AuditLog>(`/api/v1/audit${suffix}`);
+  },
+  verifyAudit: () => request<AuditLog["verification"]>("/api/v1/audit/verify"),
+  getAuditEvent: (seq: number) => request<AuditEvent>(`/api/v1/audit/${seq}`),
+  listProposals: (status?: string) =>
+    request<{ proposals: WikiProposal[] }>(
+      `/api/v1/wiki/proposals${status ? `?status=${encodeURIComponent(status)}` : ""}`,
+    ),
+  getProposal: (id: string) => request<WikiProposal>(`/api/v1/wiki/proposals/${id}`),
+  approveProposal: (id: string, note = "") =>
+    request<{ proposal: WikiProposal; page: WikiPage }>(`/api/v1/wiki/proposals/${id}:approve`, {
+      method: "POST",
+      body: JSON.stringify({ note }),
+    }),
+  rejectProposal: (id: string, note: string) =>
+    request<WikiProposal>(`/api/v1/wiki/proposals/${id}:reject`, {
+      method: "POST",
+      body: JSON.stringify({ note }),
+    }),
+  listPages: (type?: string) =>
+    request<{ pages: WikiPage[] }>(`/api/v1/wiki/pages${type ? `?type=${encodeURIComponent(type)}` : ""}`),
+  getPage: (slug: string) => request<WikiPage>(`/api/v1/wiki/pages/${slug}`),
+  approveDecision: (decisionId: string, note = "") =>
+    request<{ decision_id: string; proposal: WikiProposal; page: WikiPage }>(
+      `/api/v1/decisions/${decisionId}:approve`,
+      { method: "POST", body: JSON.stringify({ note }) },
+    ),
 };
 
 export function can(user: SessionUser | null, permission: string): boolean {

@@ -1,4 +1,43 @@
-import type { CaseBrief, Cite } from "../../api/types";
+import type { CaseBrief, Cite, MatchedPrecedent } from "../../api/types";
+
+function PrecedentList({
+  hits,
+  onCite,
+}: {
+  hits: MatchedPrecedent[];
+  onCite: (cite: Cite) => void;
+}) {
+  if (hits.length === 0) return null;
+  return (
+    <article className="brief-section precedent-hits">
+      <h3>Approved precedents</h3>
+      {hits.map((hit) => (
+        <div key={hit.page_id} className="precedent-hit">
+          <p>
+            <strong>{hit.title}</strong>{" "}
+            <button
+              type="button"
+              className="cite"
+              onClick={() => onCite({ id: hit.citation, kind: "precedent", label: hit.title })}
+            >
+              {hit.citation}
+            </button>
+          </p>
+          <p>{hit.why_it_matches}</p>
+          <ul className="compact-list">
+            {hit.matching_facts.map((fact) => (
+              <li key={fact}>{fact}</li>
+            ))}
+          </ul>
+          <p className="muted">
+            Source {hit.source_case ?? "—"}
+            {hit.decision ? ` · ${hit.decision}` : ""}
+          </p>
+        </div>
+      ))}
+    </article>
+  );
+}
 
 export function BriefPanel({
   brief,
@@ -25,6 +64,7 @@ export function BriefPanel({
       {brief && (
         <div className="brief-body">
           <p className="brief-action">{brief.action}</p>
+          <PrecedentList hits={brief.precedents ?? []} onCite={onCite} />
           {brief.sections.map((section) => (
             <article key={section.title} className="brief-section">
               <h3>{section.title}</h3>
