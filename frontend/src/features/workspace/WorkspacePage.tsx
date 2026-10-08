@@ -8,6 +8,7 @@ import { normalizeNetwork } from "../../components/network/graphModel";
 import type { GraphSelection } from "../../components/network/networkModel";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Panel";
+import { NotFound } from "../../components/ui/NotFound";
 import { ErrorState, LoadingState } from "../../components/ui/States";
 import { FactorBars } from "../queue/FactorBars";
 import { BriefPanel } from "./BriefPanel";
@@ -49,21 +50,23 @@ export function WorkspacePage() {
   const canAssign = can(user, "case:assign");
 
   const caseQuery = useQuery({ queryKey: ["case", caseId], queryFn: () => api.getCase(caseId), enabled: canRead });
-  const briefQuery = useQuery({ queryKey: ["brief", caseId], queryFn: () => api.getBrief(caseId), enabled: canRead });
+  // Everything else waits for the case, so an unknown case id costs one request (a 404, not retried).
+  const caseLoaded = caseQuery.isSuccess;
+  const briefQuery = useQuery({ queryKey: ["brief", caseId], queryFn: () => api.getBrief(caseId), enabled: caseLoaded });
   const claimsQuery = useQuery({
     queryKey: ["claims", caseId, unmask],
     queryFn: () => api.getClaims(caseId, unmask),
-    enabled: canRead,
+    enabled: caseLoaded,
   });
   const timelineQuery = useQuery({
     queryKey: ["timeline", caseId, unmask],
     queryFn: () => api.getTimeline(caseId, unmask),
-    enabled: canRead,
+    enabled: caseLoaded,
   });
   const networkQuery = useQuery({
     queryKey: ["network", caseId, unmask],
     queryFn: () => api.getNetwork(caseId, 2, unmask),
-    enabled: canRead,
+    enabled: caseLoaded,
   });
 
   const assignMut = useMutation({
@@ -169,7 +172,14 @@ export function WorkspacePage() {
   return (
     <main id="main" className="page workspace">
       {caseQuery.isLoading ? <LoadingState label="Loading case…" /> : null}
-      {caseQuery.error ? (
+      {caseQuery.error instanceof ApiError && caseQuery.error.status === 404 ? (
+        <NotFound title="Case not found">
+          <p>
+            No case <code>{caseId}</code> exists in the current detection run. It may belong to an earlier run, or the
+            link may be mistyped.
+          </p>
+        </NotFound>
+      ) : caseQuery.error ? (
         <ErrorState title="Case unavailable" error={caseQuery.error} onRetry={() => void caseQuery.refetch()} />
       ) : null}
       {data ? (

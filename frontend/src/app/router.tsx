@@ -4,7 +4,7 @@ import {
   createRouter,
   lazyRouteComponent,
 } from "@tanstack/react-router";
-import { Root, RouteError, RoutePending } from "./RouteShells";
+import { Root, RouteError, RouteNotFound, RoutePending } from "./RouteShells";
 
 const rootRoute = createRootRoute({ component: Root });
 
@@ -79,6 +79,7 @@ export const router = createRouter({
   routeTree,
   defaultPendingComponent: RoutePending,
   defaultErrorComponent: RouteError,
+  defaultNotFoundComponent: RouteNotFound,
 });
 
 declare module "@tanstack/react-router" {

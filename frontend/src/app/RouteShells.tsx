@@ -1,4 +1,5 @@
 import { Outlet, useRouterState, type ErrorComponentProps } from "@tanstack/react-router";
+import { NotFound } from "../components/ui/NotFound";
 import { Shell } from "../components/Shell";
 import { ErrorState, LoadingState } from "../components/ui/States";
 
@@ -27,3 +28,16 @@ export function RouteError({ error }: ErrorComponentProps) {
   );
 }
 
+
+export function RouteNotFound() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  return (
+    <main id="main" className="page">
+      <NotFound title="Page not found">
+        <p>
+          There is no page at <code>{pathname}</code>. Check the address, or go back to your work list.
+        </p>
+      </NotFound>
+    </main>
+  );
+}
