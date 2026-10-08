@@ -1,0 +1,151 @@
+/* Signed-in application shell: white top bar with the 3px brand bar (design system §10.4). */
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.mast {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-shell);
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-8);
+  height: var(--shell-topbar-height);
+  padding: 0 var(--page-gutter);
+  border-top: var(--border-width-accent) solid var(--color-brand-bar);
+  border-bottom: var(--border-width) solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.app .mast a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.mast-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.mast-brand strong {
+  display: block;
+  font-size: 0.9375rem;
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+}
+
+.mast-brand small {
+  display: block;
+  color: var(--color-text-muted);
+  font: var(--type-caption);
+}
+
+.app-logo {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.mast-nav {
+  display: flex;
+  gap: var(--space-6);
+  flex: 1;
+  min-width: 0;
+}
+
+.app .mast-nav a {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: -1px;
+  border-bottom: var(--border-width-accent) solid transparent;
+  color: var(--color-text-muted);
+  font: var(--type-label);
+  font-size: var(--font-size-14);
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+
+.app .mast-nav a:hover {
+  color: var(--color-text);
+}
+
+.app .mast-nav a[aria-current="page"] {
+  border-bottom-color: var(--color-brand-strong);
+  color: var(--color-text);
+}
+
+.mast-user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.mast-user-name {
+  display: grid;
+  text-align: right;
+  font-size: var(--font-size-13);
+  line-height: var(--line-height-snug);
+}
+
+.mast-user-name span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+  text-transform: capitalize;
+}
+
+.boot {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-2);
+  min-height: 100vh;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: var(--type-body);
+}
+
+.boot .app-logo {
+  width: 40px;
+  height: 40px;
+}
+
+.boot p:last-child {
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 860px) {
+  .mast {
+    flex-wrap: wrap;
+    height: auto;
+    gap: 0 var(--space-4);
+    padding: var(--space-2) var(--space-4) 0;
+  }
+
+  .mast-brand small,
+  .mast-user-name {
+    display: none;
+  }
+
+  .mast-user {
+    margin-left: auto;
+  }
+
+  .mast-nav {
+    order: 3;
+    flex-basis: 100%;
+    height: 44px;
+    gap: var(--space-5);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+}
