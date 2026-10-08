@@ -82,10 +82,16 @@ function NetworkExplorer({
   const [controls, setControls] = useState<GraphControls | null>(null);
 
   const edges = useMemo(() => model.edges.filter((edge) => enabled[edge.kind] !== false), [model, enabled]);
-  const hops = useMemo(() => hopDistances(model, edges), [model, edges]);
-  const entities = useMemo(() => linkedEntities(model, edges), [model, edges]);
+  // Entities left with no enabled link drop out of the graph and the list (the subject always stays).
+  const visible = useMemo<GraphModel>(() => {
+    const linked = new Set(edges.flatMap((edge) => [edge.source, edge.target]));
+    return { ...model, nodes: model.nodes.filter((node) => node.isSubject || linked.has(node.id)) };
+  }, [model, edges]);
+  const hidden = model.nodes.length - visible.nodes.length;
+  const hops = useMemo(() => hopDistances(visible, edges), [visible, edges]);
+  const entities = useMemo(() => linkedEntities(visible, edges), [visible, edges]);
   const structural = model.edges.some((edge) => edgeMeta(edge.kind).family !== "claim");
-  const summary = networkSummary(model, edges);
+  const summary = networkSummary(visible, edges);
   const onReady = useCallback((next: GraphControls) => setControls(next), []);
   const selectedNodeId = selection?.kind === "node" ? selection.id : null;
 
@@ -164,7 +170,7 @@ function NetworkExplorer({
             >
               <Suspense fallback={<p className="graph-hint">Loading graph…</p>}>
                 <CaseNetworkGraph
-                  model={model}
+                  model={visible}
                   edges={edges}
                   hops={hops}
                   layout={layout}
@@ -175,7 +181,10 @@ function NetworkExplorer({
               </Suspense>
             </div>
           </div>
-          <GraphLegend nodes={model.nodes} edges={edges} />
+          <GraphLegend nodes={visible.nodes} edges={edges} />
+          {hidden > 0 ? (
+            <p className="graph-hint">{count(hidden, "entity", "entities")} hidden: no links of the selected types.</p>
+          ) : null}
           <p className="graph-hint" aria-hidden="true">
             Hover to highlight two hops · click a node or link · scroll to zoom · drag to pan
           </p>
