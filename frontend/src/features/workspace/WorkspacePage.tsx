@@ -119,6 +119,12 @@ export function WorkspacePage() {
                 <span className="muted">{data.primary_entity.specialty}</span>
               )}
             </p>
+            {data.entity_ids && data.entity_ids.length > 1 && (
+              <p className="muted">
+                Network NPIs:{" "}
+                <span className="mono">{data.entity_ids.join(" · ")}</span>
+              </p>
+            )}
             <dl className="facts dense">
               <div>
                 <dt>Status</dt>
@@ -127,6 +133,10 @@ export function WorkspacePage() {
               <div>
                 <dt>P(confirm)</dt>
                 <dd className="mono">{pct(data.p_confirm)}</dd>
+              </div>
+              <div>
+                <dt>Expected value</dt>
+                <dd className="mono">{money(data.expected_value ?? 0)}</dd>
               </div>
               <div>
                 <dt>Flagged</dt>

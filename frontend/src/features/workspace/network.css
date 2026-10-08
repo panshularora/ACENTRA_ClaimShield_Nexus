@@ -1,0 +1,42 @@
+.n3-host {
+  height: 380px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #06141b;
+  border: 1px solid #12323c;
+}
+
+.n3-tip {
+  color: #e8f4ec;
+  background: rgba(6, 20, 27, 0.82);
+  border: 1px solid rgba(158, 230, 184, 0.3);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+  text-align: center;
+  pointer-events: none;
+}
+
+.n3-tip span {
+  display: block;
+  color: #8fb59d;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 9px;
+}
+
+.ws-network .edge-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+  border: 0;
+  margin: 0 0 0.6rem;
+  padding: 0;
+}
+
+.ws-network .edge-filters legend {
+  padding: 0;
+  font-size: 0.75rem;
+  color: var(--ink-2);
+}
