@@ -37,7 +37,14 @@ export function InvestigatorCasesPage() {
     queryFn: () => api.getBatch(batchId!),
     enabled: Boolean(batchId),
   });
-  const runId = batchQuery.data?.runs[0]?.run_id ?? stored?.runId ?? null;
+  const currentRunQuery = useQuery({
+    queryKey: ["current-run"],
+    queryFn: api.getCurrentRun,
+    enabled: canQueue && !canReadBatches,
+    retry: false,
+  });
+  const runId =
+    batchQuery.data?.runs[0]?.run_id ?? currentRunQuery.data?.run_id ?? stored?.runId ?? null;
 
   const queueQuery = useQuery({
     queryKey: ["queue", runId],
@@ -216,6 +223,19 @@ export function InvestigatorCasesPage() {
                         {specialty ? <span>{specialty}</span> : null}
                         <span>Owner {ownerLabel}</span>
                       </p>
+                      {row.alert_group && (
+                        <p className="muted" title={row.alert_group.text}>
+                          {row.alert_group.n_alerts
+                            ? `${row.alert_group.n_alerts} grouped alerts`
+                            : extra?.grouping
+                              ? `${extra.grouping.alert_count} grouped alerts`
+                              : "Grouped alerts"}
+                          {row.alert_group.n_entities > 1
+                            ? ` · ${row.alert_group.n_entities} linked NPIs`
+                            : ""}
+                          {row.harm >= 4 ? " · urgent still visible" : ""}
+                        </p>
+                      )}
                       <dl>
                         <div>
                           <dt>Confirm chance</dt>

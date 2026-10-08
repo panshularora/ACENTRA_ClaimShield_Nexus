@@ -153,6 +153,7 @@ export interface QueueCase {
   recommendation?: "today_queue" | "gather_evidence" | "tracked_backlog" | string;
   override?: QueueOverride | null;
   suspicion_only?: boolean;
+  alert_group?: { n_entities: number; n_alerts?: number; urgent?: boolean; text: string };
 }
 
 export interface PeerGroup {
@@ -185,6 +186,47 @@ export interface CaseAlert {
   line_ids: string[];
   kind?: string;
   label?: string;
+  lineage?: AlertLineage;
+}
+
+export interface DataSource {
+  table: string;
+  role: string;
+}
+
+export interface AlertLineage {
+  detector: string;
+  approach?: string;
+  method: string;
+  kind: string;
+  how?: string | null;
+  tables: DataSource[];
+  fields_used?: string[];
+  line_ids?: string[];
+  comparison_peers_held_out?: string[];
+}
+
+export interface CaseGrouping {
+  rule: string;
+  text: string;
+  entity_ids: string[];
+  alert_count: number;
+  comparison_peers_held_out?: string[];
+}
+
+export interface ProvenanceStep {
+  step: number;
+  name: string;
+  detail: string;
+}
+
+export interface CaseProvenance {
+  extract: string;
+  steps: ProvenanceStep[];
+  data_sources: DataSource[];
+  grouping: CaseGrouping;
+  urgent: { alert_id: string; rule_id: string | null; kind: string; label: string; entity_id: string; line_ids: string[] }[];
+  suspicion_only?: boolean;
 }
 
 export interface ProviderCard {
@@ -274,6 +316,8 @@ export interface ClaimRow {
   adjudicated_date: string | null;
   member: MemberView;
   signals: ClaimSignal[];
+  source_system?: string | null;
+  source_ref?: string | null;
 }
 
 export interface ClaimsPack {
@@ -481,4 +525,6 @@ export interface CaseDetail {
   member_unmask_permitted?: boolean;
   can_assign?: boolean;
   suspicion_only?: boolean;
+  grouping?: CaseGrouping;
+  provenance?: CaseProvenance;
 }

@@ -755,6 +755,13 @@ function QueueRow({
             {row.queue_rank ? <span className="today-rank">#{row.queue_rank}</span> : null}
           </div>
           <span className="mono muted">{row.primary_entity_id}</span>
+          {row.alert_group && (
+            <span className="muted" title={row.alert_group.text}>
+              {row.alert_group.n_alerts ? `${row.alert_group.n_alerts} grouped alerts` : "Grouped alerts"}
+              {row.alert_group.n_entities > 1 ? ` · ${row.alert_group.n_entities} linked NPIs` : ""}
+              {row.alert_group.urgent ? " · urgent still visible" : ""}
+            </span>
+          )}
           {row.override && (
             <span className="muted">Human {row.override.action}</span>
           )}
