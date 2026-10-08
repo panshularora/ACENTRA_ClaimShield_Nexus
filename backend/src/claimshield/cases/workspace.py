@@ -21,6 +21,7 @@ from claimshield.cases.common import (
     serialize_alert,
 )
 from claimshield.cases.decisions import serialize_decision
+from claimshield.cases.network import node_detail
 from claimshield.cases.provenance import alert_lineage, case_provenance, grouping_from_alerts
 from claimshield.core.errors import Forbidden, NotFound, ValidationFailed
 from claimshield.core.ids import new_id
@@ -247,7 +248,11 @@ def evidence_item(session: Session, case: Case, item_id: str, user: User) -> dic
         provider = session.get(Provider, rest)
         if provider is None:
             raise NotFound("evidence item not found")
+        node_detail(session, case, user, rest)  # raises NotFound when the provider is outside the case network
         return {"item_id": item_id, "kind": "provider", "payload": _provider_card(provider, rest)}
+    if kind == "node":
+        detail = node_detail(session, case, user, rest)
+        return {"item_id": item_id, "kind": "node", "payload": detail.model_dump(exclude_none=True)}
     if kind == "metric":
         return {
             "item_id": item_id,

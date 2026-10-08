@@ -10,7 +10,8 @@ from claimshield.api.deps import check_csrf, get_current_user, get_db, require
 from claimshield.auth.rbac import has_permission
 from claimshield.cases.common import get_case_or_404
 from claimshield.cases.decisions import record_decision
-from claimshield.cases.network import network_pack
+from claimshield.cases.network import DEFAULT_REFERRAL_TOP_N, network_pack, node_detail
+from claimshield.cases.network_models import NetworkPack, NodeDetail
 from claimshield.cases.workspace import (
     assign_case,
     claims_pack,
@@ -84,16 +85,31 @@ def get_timeline(
     return timeline_pack(session, case, user, unmask=unmask)
 
 
-@router.get("/{case_id}/network")
+@router.get("/{case_id}/network", response_model=NetworkPack, response_model_exclude_none=True)
 def get_network(
     case_id: str,
     hops: int = Query(default=2, ge=1, le=2),
     unmask: bool = Query(default=False),
+    referral_top_n: int = Query(default=DEFAULT_REFERRAL_TOP_N, ge=1, le=20),
     session: Session = Depends(get_db),
     user: User = Depends(require("case:read")),
-) -> dict:
+) -> NetworkPack:
+    """Subject providers plus up to two relationship hops, with typed, evidence-carrying edges."""
     case = get_case_or_404(session, case_id)
-    return network_pack(session, case, user, hops=hops, unmask=unmask)
+    return network_pack(session, case, user, hops=hops, unmask=unmask, referral_top_n=referral_top_n)
+
+
+@router.get("/{case_id}/network/nodes/{node_id}", response_model=NodeDetail, response_model_exclude_none=True)
+def get_network_node(
+    case_id: str,
+    node_id: str,
+    unmask: bool = Query(default=False),
+    session: Session = Depends(get_db),
+    user: User = Depends(require("case:read")),
+) -> NodeDetail:
+    """Click-through for one network node: linked alerts, flagged claim lines and connections."""
+    case = get_case_or_404(session, case_id)
+    return node_detail(session, case, user, node_id, unmask=unmask)
 
 
 @router.get("/{case_id}/evidence/{item_id}")
