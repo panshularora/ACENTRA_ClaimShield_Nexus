@@ -14,6 +14,7 @@ from claimshield.core.clock import canonical_iso
 from claimshield.core.errors import Forbidden, NotFound, ValidationFailed
 from claimshield.core.ids import new_id
 from claimshield.queue.explain import screening_days_left, why_rank
+from claimshield.queue.rank import rank_pack_for_case, recommendation_for
 from claimshield.rules.catalog import rule_title as catalog_title
 from claimshield.db.models import (
     Alert,
@@ -28,7 +29,9 @@ from claimshield.db.models import (
     Member,
     Owner,
     OwnershipLink,
+    PipelineRun,
     Provider,
+    QueueOverride,
     Referral,
     User,
     WikiPage,
@@ -225,6 +228,21 @@ def serialize_case(session: Session, case: Case, user: User) -> dict[str, Any]:
         ).scalars().all()
     )
     latest = decisions[0] if decisions else None
+    peers = list(session.execute(select(Case).where(Case.run_id == case.run_id)).scalars().all())
+    run = session.get(PipelineRun, case.run_id)
+    member_weight = float((run.summary or {}).get("member_weight") or 1.0) if run else 1.0
+    horizon = int(run.horizon_days or 60) if run else 60
+    factors = rank_pack_for_case(case, horizon_days=horizon, peers=peers, member_weight=member_weight)
+    override = (
+        session.execute(
+            select(QueueOverride)
+            .where(QueueOverride.case_id == case.case_id)
+            .order_by(QueueOverride.created_at.desc())
+        )
+        .scalars()
+        .first()
+    )
+    shown = override if override and override.action != "release" else None
     return {
         "case_id": case.case_id,
         "run_id": case.run_id,
@@ -248,7 +266,19 @@ def serialize_case(session: Session, case: Case, user: User) -> dict[str, Any]:
         "f90": case.f90,
         "sla_due": iso(case.sla_due),
         "screening_days_left": screening_days_left(case),
-        "why_rank": why_rank(case),
+        "rank_factors": factors,
+        "recommendation": recommendation_for(case.lane),
+        "why_rank": why_rank(case, factors),
+        "override": (
+            {
+                "action": shown.action,
+                "reason": shown.reason,
+                "actor_id": shown.actor_id,
+                "prior_lane": shown.prior_lane,
+            }
+            if shown
+            else None
+        ),
         "alerts": [serialize_alert(a) for a in alerts],
         "evidence_gaps": evidence_gaps(alerts, case),
         "latest_decision": serialize_decision(latest) if latest else None,
@@ -1005,6 +1035,105 @@ def record_decision(
         "proposal": serialize_proposal(proposal),
         "label": serialize_label(label),
         "note": "Potential FWA pattern requiring investigation. This is not an automatic fraud label.",
+    }
+
+
+OVERRIDE_ACTIONS = ("promote", "defer", "release")
+
+
+def record_rank_override(
+    session: Session,
+    *,
+    case: Case,
+    user: User,
+    action: str,
+    reason: str,
+    now: datetime,
+) -> dict[str, Any]:
+    if not (
+        has_permission(user.role, "queue:configure")
+        or has_permission(user.role, "case:decide")
+        or has_permission(user.role, "admin:*")
+    ):
+        raise Forbidden("role cannot override queue rank")
+    if action not in OVERRIDE_ACTIONS:
+        raise ValidationFailed("action must be promote, defer, or release")
+    text = (reason or "").strip()
+    if len(text) < 20:
+        raise ValidationFailed("reason must be at least 20 characters")
+    if case.status in {"dismissed", "escalated"}:
+        raise ValidationFailed("a closed case is not re-queued here")
+    prior = case.lane
+    if action == "promote":
+        if case.lane in {"harm_priority", "selected"}:
+            raise ValidationFailed("case is already in today's recommended queue")
+        case.lane = "selected"
+    elif action == "defer":
+        if case.lane == "overflow":
+            raise ValidationFailed("case is already on the tracked backlog")
+        case.lane = "overflow"
+    else:
+        latest = (
+            session.execute(
+                select(QueueOverride)
+                .where(QueueOverride.case_id == case.case_id)
+                .order_by(QueueOverride.created_at.desc())
+            )
+            .scalars()
+            .first()
+        )
+        if latest is None or latest.action == "release":
+            raise ValidationFailed("no override to release")
+        case.lane = latest.prior_lane
+    row = QueueOverride(
+        override_id=new_id("QOV"),
+        case_id=case.case_id,
+        run_id=case.run_id,
+        actor_id=user.id,
+        action=action,
+        reason=text,
+        prior_lane=prior,
+        created_at=now,
+    )
+    session.add(row)
+    event = append_event(
+        session,
+        actor_id=user.id,
+        role=user.role,
+        action="queue.override",
+        object_type="case",
+        object_id=case.case_id,
+        payload={
+            "override_id": row.override_id,
+            "action": action,
+            "prior_lane": prior,
+            "lane": case.lane,
+            "status": case.status,
+        },
+        ts=now,
+    )
+    session.flush()
+    verification = chain_status(session)
+    return {
+        "case_id": case.case_id,
+        "lane": case.lane,
+        "status": case.status,
+        "recommendation": recommendation_for(case.lane),
+        "override": {
+            "action": action,
+            "reason": text,
+            "actor_id": user.id,
+            "prior_lane": prior,
+        },
+        "audit": {
+            "seq": event.seq,
+            "hash": event.hash,
+            "prev_hash": event.prev_hash,
+            "ts": iso(event.ts),
+            "action": event.action,
+            "chain_intact": verification["intact"],
+        },
+        "note": "Human override recorded. Overflow stays open on the tracked backlog and is not a dismissal.",
     }
 
 

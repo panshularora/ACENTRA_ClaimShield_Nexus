@@ -33,6 +33,8 @@ def test_workspace_pack_and_decision(client: TestClient) -> None:
     assert case["primary_entity"]["provider_id"] == case["primary_entity_id"]
     assert case.get("screening_days_left") is not None
     assert case.get("why_rank", {}).get("text")
+    assert case.get("rank_factors", {}).get("composite") is not None
+    assert case.get("recommendation") in {"today_queue", "gather_evidence", "tracked_backlog"}
 
     brief = client.get(f"/api/v1/cases/{case_id}/brief")
     assert brief.status_code == 200

@@ -350,6 +350,19 @@ class Case(Base):
     f90: Mapped[float | None] = mapped_column(Float, nullable=True)
 
 
+class QueueOverride(Base):
+    __tablename__ = "queue_override"
+
+    override_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    case_id: Mapped[str] = mapped_column(String(32), index=True)
+    run_id: Mapped[str] = mapped_column(String(32), index=True)
+    actor_id: Mapped[str] = mapped_column(String(32))
+    action: Mapped[str] = mapped_column(String(16))
+    reason: Mapped[str] = mapped_column(Text)
+    prior_lane: Mapped[str] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class Decision(Base):
     __tablename__ = "decision"
 

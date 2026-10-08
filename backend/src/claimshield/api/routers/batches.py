@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from claimshield.api.deps import check_csrf, get_db, require
 from claimshield.core.config import Settings, get_settings
 from claimshield.core.errors import NotFound
-from claimshield.db.models import Alert, Batch, Case, PipelineRun, User
+from claimshield.db.models import Alert, Batch, Case, PipelineRun, QueueOverride, User
 from claimshield.pipeline.service import (
     latest_batch,
     latest_run,
@@ -16,6 +16,7 @@ from claimshield.pipeline.service import (
     recompute_run,
 )
 from claimshield.queue.explain import run_payload, screening_days_left, why_rank
+from claimshield.queue.rank import rank_pack_for_case, recommendation_for
 
 router = APIRouter(prefix="/api/v1", tags=["batches"])
 
@@ -26,6 +27,8 @@ class LoadBatchBody(BaseModel):
     seed: int = 7
     horizon_days: int = 60
     capacity_hours: float = Field(default=40.0, gt=0)
+    max_slots: int = Field(default=20, ge=1, le=200)
+    member_weight: float = Field(default=1.0, ge=0.25, le=3.0)
     run_now: bool = True
 
 
@@ -43,6 +46,9 @@ class RecomputeBody(BaseModel):
     batch_id: str | None = None
     horizon_days: int = 60
     capacity_hours: float = Field(default=40.0, gt=0)
+    max_slots: int = Field(default=20, ge=1, le=200)
+    member_weight: float = Field(default=1.0, ge=0.25, le=3.0)
+    harm_lambda: float | None = Field(default=None, gt=0)
 
 
 @router.post("/batches", dependencies=[Depends(check_csrf)])
@@ -60,6 +66,8 @@ def create_batch(
         seed=body.seed,
         horizon_days=body.horizon_days,
         capacity_hours=body.capacity_hours,
+        max_slots=body.max_slots,
+        member_weight=body.member_weight,
         run_now=body.run_now,
     )
     return BatchOut(
@@ -99,6 +107,9 @@ def start_run(
         batch=batch,
         horizon_days=body.horizon_days,
         capacity_hours=body.capacity_hours,
+        max_slots=body.max_slots,
+        member_weight=body.member_weight,
+        harm_lambda=body.harm_lambda,
     )
     n_alerts = session.execute(select(Alert).where(Alert.run_id == run.run_id)).scalars().all()
     n_cases = session.execute(select(Case).where(Case.run_id == run.run_id)).scalars().all()
@@ -189,16 +200,50 @@ def get_queue(
     run = session.get(PipelineRun, run_id)
     if run is None:
         raise NotFound("run not found")
-    cases = session.execute(select(Case).where(Case.run_id == run_id)).scalars().all()
+    cases = list(session.execute(select(Case).where(Case.run_id == run_id)).scalars().all())
+    member_weight = float((run.summary or {}).get("member_weight") or 1.0)
+    horizon = int(run.horizon_days or 60)
+    packs = {
+        case.case_id: rank_pack_for_case(
+            case, horizon_days=horizon, peers=cases, member_weight=member_weight
+        )
+        for case in cases
+    }
+    today = [c for c in cases if c.lane in {"harm_priority", "selected"}]
+    today.sort(key=lambda c: packs[c.case_id]["composite"], reverse=True)
+    ranks = {c.case_id: i + 1 for i, c in enumerate(today)}
+    latest_override: dict[str, QueueOverride] = {}
+    for row in session.execute(
+        select(QueueOverride)
+        .where(QueueOverride.run_id == run_id)
+        .order_by(QueueOverride.created_at.desc())
+    ).scalars():
+        latest_override.setdefault(row.case_id, row)
     order = {"harm_priority": 0, "selected": 1, "needs_evidence": 2, "overflow": 3}
     cases = sorted(
         cases,
-        key=lambda c: (order.get(c.lane, 9), -(c.expected_value or 0.0)),
+        key=lambda c: (order.get(c.lane, 9), -packs[c.case_id]["composite"]),
     )
-    return [_case_brief(c) for c in cases]
+    return [
+        _case_brief(
+            c,
+            factors=packs[c.case_id],
+            queue_rank=ranks.get(c.case_id),
+            override=latest_override.get(c.case_id),
+        )
+        for c in cases
+    ]
 
 
-def _case_brief(case: Case) -> dict:
+def _case_brief(
+    case: Case,
+    *,
+    factors: dict | None = None,
+    queue_rank: int | None = None,
+    override: QueueOverride | None = None,
+) -> dict:
+    pack = factors or {}
+    shown = override if override and override.action != "release" else None
     return {
         "case_id": case.case_id,
         "lane": case.lane,
@@ -218,6 +263,19 @@ def _case_brief(case: Case) -> dict:
         "f90": case.f90,
         "sla_due": case.sla_due.isoformat() if case.sla_due else None,
         "screening_days_left": screening_days_left(case),
-        "why_rank": why_rank(case),
+        "rank_factors": pack,
+        "queue_rank": queue_rank,
+        "recommendation": recommendation_for(case.lane),
+        "why_rank": why_rank(case, pack),
+        "override": (
+            {
+                "action": shown.action,
+                "reason": shown.reason,
+                "actor_id": shown.actor_id,
+                "prior_lane": shown.prior_lane,
+            }
+            if shown
+            else None
+        ),
         "suspicion_only": True,
     }

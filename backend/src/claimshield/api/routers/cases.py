@@ -6,7 +6,9 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from claimshield.api.deps import check_csrf, get_db, require
+
+from claimshield.api.deps import check_csrf, get_current_user, get_db, require
+from claimshield.auth.rbac import has_permission
 from claimshield.cases.workspace import (
     assign_case,
     claims_pack,
@@ -14,10 +16,12 @@ from claimshield.cases.workspace import (
     get_case_or_404,
     network_pack,
     record_decision,
+    record_rank_override,
     serialize_case,
     template_brief,
     timeline_pack,
 )
+from claimshield.core.errors import Forbidden
 from claimshield.db.models import User
 
 router = APIRouter(prefix="/api/v1/cases", tags=["cases"])
@@ -32,6 +36,11 @@ class DecisionBody(BaseModel):
 
 class AssignBody(BaseModel):
     assignee_id: str | None = None
+
+
+class RankOverrideBody(BaseModel):
+    action: str
+    reason: str
 
 
 @router.get("/{case_id}")
@@ -112,6 +121,30 @@ def post_assign(
         case=case,
         user=user,
         assignee_id=body.assignee_id or user.id,
+        now=datetime.now(UTC),
+    )
+
+
+@router.post("/{case_id}/rank", dependencies=[Depends(check_csrf)])
+def post_rank_override(
+    case_id: str,
+    body: RankOverrideBody,
+    session: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    if not (
+        has_permission(user.role, "queue:configure")
+        or has_permission(user.role, "case:decide")
+        or has_permission(user.role, "admin:*")
+    ):
+        raise Forbidden("role cannot override queue rank")
+    case = get_case_or_404(session, case_id)
+    return record_rank_override(
+        session,
+        case=case,
+        user=user,
+        action=body.action,
+        reason=body.reason,
         now=datetime.now(UTC),
     )
 

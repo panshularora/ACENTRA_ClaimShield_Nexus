@@ -7,11 +7,11 @@ def expected_value(case: dict, *, horizon_days: int, recovery: float, harm_lambd
     return case["p_confirm"] * recovery * dollars + harm_lambda * case["harm"] * max(1, case["members_affected"])
 
 
-def knapsack_select(cases: list[dict], *, capacity_hours: float) -> list[dict]:
+def knapsack_select(cases: list[dict], *, capacity_hours: float, value_key: str = "ev") -> list[dict]:
     units = max(1, int(round(capacity_hours * 2)))  # half hours
     n = len(cases)
     weights = [max(1, int(round(c["estimated_hours"] * 2))) for c in cases]
-    values = [c.get("ev", 0.0) for c in cases]
+    values = [float(c.get(value_key, c.get("composite", c.get("ev", 0.0))) or 0.0) for c in cases]
     dp = [[0.0] * (units + 1) for _ in range(n + 1)]
     for i in range(1, n + 1):
         w = weights[i - 1]

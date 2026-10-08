@@ -4,6 +4,7 @@ from datetime import date, datetime
 from typing import Any
 
 from claimshield.db.models import Case, PipelineRun
+from claimshield.queue.rank import recommendation_for
 
 
 def screening_days_left(case: Case, *, today: date | None = None) -> int | None:
@@ -13,34 +14,46 @@ def screening_days_left(case: Case, *, today: date | None = None) -> int | None:
     return (due - (today or date.today())).days
 
 
-def why_rank(case: Case) -> dict[str, Any]:
+def why_rank(case: Case, factors: dict[str, Any] | None = None) -> dict[str, Any]:
+    rec = recommendation_for(case.lane)
+    composite = (factors or {}).get("composite")
     if case.lane == "harm_priority":
         return {
             "code": "harm_override",
+            "recommendation": rec,
             "text": (
                 f"Harm {case.harm} is at the CMS-style override. "
-                "Beneficiary harm takes a reserved slice of hours before dollar ranking."
+                "Beneficiary harm takes a reserved slice of hours before other factors."
             ),
         }
     if case.lane == "needs_evidence":
         return {
             "code": "evidence_floor",
+            "recommendation": rec,
             "text": (
-                f"Evidence strength {case.evidence_strength:.0%} is below the 0.40 floor, "
-                "so this case is not packed into today's hours."
+                f"High-impact concern with evidence strength {case.evidence_strength:.0%} "
+                "below the 0.40 floor. Recommend prompt information gathering, not dismissal."
             ),
         }
     if case.lane == "overflow":
         return {
-            "code": "capacity",
-            "text": "Outside remaining investigator hours after the knapsack fill.",
+            "code": "tracked_backlog",
+            "recommendation": rec,
+            "text": (
+                "Outside today's capacity or top-slot cap. The case stays open on a tracked "
+                "backlog for reassessment when hours, evidence, or member impact change."
+            ),
         }
+    bits = []
+    if composite is not None:
+        bits.append(f"combined rank {float(composite):.0%}")
+    bits.append(f"P(confirm) {case.p_confirm:.0%}")
+    bits.append(f"${case.flagged_dollars:,.0f} flagged")
+    bits.append(f"harm {case.harm} × {case.members_affected} members")
     return {
-        "code": "expected_value",
-        "text": (
-            f"Selected on expected value ${case.expected_value or 0:,.0f} "
-            f"(P(confirm) {case.p_confirm:.0%} on ${case.flagged_dollars:,.0f} flagged)."
-        ),
+        "code": "multi_factor",
+        "recommendation": rec,
+        "text": "Recommended for today's queue on " + "; ".join(bits) + ".",
     }
 
 
@@ -55,4 +68,7 @@ def run_payload(run: PipelineRun, *, n_alerts: int, n_cases: int) -> dict[str, A
         "horizon_days": run.horizon_days,
         "capacity_hours": (run.summary or {}).get("capacity_hours"),
         "screening_days": (run.summary or {}).get("screening_days"),
+        "max_slots": (run.summary or {}).get("max_slots"),
+        "member_weight": (run.summary or {}).get("member_weight"),
+        "ranking_policy": (run.summary or {}).get("ranking_policy"),
     }

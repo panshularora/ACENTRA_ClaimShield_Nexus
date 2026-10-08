@@ -18,6 +18,7 @@ from claimshield.graph.detect import evaluate_graph
 from claimshield.core.errors import NotFound
 from claimshield.ingest.service import load_tables, persist_dataset
 from claimshield.queue.knapsack import expected_value, knapsack_select
+from claimshield.queue.rank import attach_rank_factors, ranking_policy
 from claimshield.rules.catalog import stamp_catalog
 from claimshield.rules.engine import AlertDraft, evaluate_rules
 from claimshield.synth.generator import generate
@@ -41,6 +42,7 @@ def assign_lanes(
     capacity_hours: float,
     harm_capacity_share: float,
     evidence_min: float,
+    max_slots: int = 20,
 ) -> None:
     harm = [c for c in cases if c["harm"] >= 4]
     rest = [c for c in cases if c["harm"] < 4]
@@ -53,10 +55,30 @@ def assign_lanes(
     workable = [c for c in rest if c["evidence_strength"] >= evidence_min]
     for case in needs:
         case["lane"] = "needs_evidence"
-    selected_rest = knapsack_select(workable, capacity_hours=remaining)
+    selected_rest = knapsack_select(workable, capacity_hours=remaining, value_key="composite")
     chosen = {c["case_id"] for c in selected_rest}
     for case in workable:
         case["lane"] = "selected" if case["case_id"] in chosen else "overflow"
+    _apply_slot_cap(cases, max_slots=max_slots)
+
+
+def _apply_slot_cap(cases: list[dict[str, Any]], *, max_slots: int) -> None:
+    """Keep harm-priority cases; trim selected so today's recommended set fits max_slots."""
+    cap = max(1, int(max_slots))
+    harm = [c for c in cases if c["lane"] == "harm_priority"]
+    selected = [c for c in cases if c["lane"] == "selected"]
+    leftover = cap - len(harm)
+    if leftover >= len(selected):
+        return
+    if leftover <= 0:
+        for case in selected:
+            case["lane"] = "overflow"
+        return
+    ranked = sorted(selected, key=lambda c: float(c.get("composite") or 0.0), reverse=True)
+    keep = {c["case_id"] for c in ranked[:leftover]}
+    for case in selected:
+        if case["case_id"] not in keep:
+            case["lane"] = "overflow"
 
 
 def detect(
@@ -68,6 +90,8 @@ def detect(
     capacity_hours: float,
     harm_capacity_share: float = 0.35,
     evidence_min: float = 0.4,
+    max_slots: int = 20,
+    member_weight: float = 1.0,
 ) -> dict[str, Any]:
     graph = build_graph(tables)
     strong = strong_component_map(graph)
@@ -78,15 +102,18 @@ def detect(
     )
     cases = build_cases(alerts, tables, strong)
     for case in cases:
-        case["ev"] = expected_value(
+        case["expected_value"] = expected_value(
             case, horizon_days=horizon_days, recovery=recovery, harm_lambda=harm_lambda
         )
+        case["ev"] = case["expected_value"]
         case["f30"], case["f60"], case["f90"] = discrete_hazard(case)
+    attach_rank_factors(cases, horizon_days=horizon_days, member_weight=member_weight)
     assign_lanes(
         cases,
         capacity_hours=capacity_hours,
         harm_capacity_share=harm_capacity_share,
         evidence_min=evidence_min,
+        max_slots=max_slots,
     )
     selected = sum(1 for c in cases if c["lane"] in {"harm_priority", "selected"})
     return {
@@ -95,6 +122,9 @@ def detect(
         "graph_nodes": graph.number_of_nodes(),
         "graph_edges": graph.number_of_edges(),
         "selected": selected,
+        "ranking_policy": ranking_policy(
+            max_slots=max_slots, member_weight=member_weight, capacity_hours=capacity_hours
+        ),
     }
 
 
@@ -127,7 +157,7 @@ def persist_detection(
                 evidence_strength=case["evidence_strength"],
                 estimated_hours=case["estimated_hours"],
                 p_confirm=case["p_confirm"],
-                expected_value=float(case.get("ev") or 0.0),
+                expected_value=float(case.get("expected_value") or case.get("ev") or 0.0),
                 f30=case["f30"],
                 f60=case["f60"],
                 f90=case["f90"],
@@ -161,6 +191,9 @@ def execute_run(
     settings: Settings,
     horizon_days: int = 60,
     capacity_hours: float = 40.0,
+    max_slots: int | None = None,
+    member_weight: float | None = None,
+    harm_lambda: float | None = None,
     now: datetime | None = None,
 ) -> PipelineRun:
     instant = now or datetime.now(UTC)
@@ -175,14 +208,19 @@ def execute_run(
     )
     session.add(run)
     session.flush()
+    slots = int(max_slots if max_slots is not None else settings.max_queue_slots)
+    impact = float(member_weight if member_weight is not None else settings.default_member_weight)
+    lambda_h = float(harm_lambda if harm_lambda is not None else settings.harm_lambda)
     result = detect(
         tables,
         horizon_days=horizon_days,
         recovery=settings.default_recovery_rate,
-        harm_lambda=settings.harm_lambda,
+        harm_lambda=lambda_h,
         capacity_hours=capacity_hours,
         harm_capacity_share=settings.harm_capacity_share,
         evidence_min=settings.evidence_strength_min,
+        max_slots=slots,
+        member_weight=impact,
     )
     sla_due = instant.date() + timedelta(days=int(settings.screening_days))
     for case in result["cases"]:
@@ -197,7 +235,10 @@ def execute_run(
         "capacity_hours": capacity_hours,
         "horizon_days": horizon_days,
         "screening_days": int(settings.screening_days),
-        "harm_lambda": settings.harm_lambda,
+        "harm_lambda": lambda_h,
+        "max_slots": slots,
+        "member_weight": impact,
+        "ranking_policy": result["ranking_policy"],
         "recompute": False,
         "lanes": _lane_counts(result["cases"]),
     }
@@ -226,6 +267,8 @@ def load_synthetic_batch(
     seed: int,
     horizon_days: int = 60,
     capacity_hours: float = 40.0,
+    max_slots: int | None = None,
+    member_weight: float | None = None,
     run_now: bool = True,
 ) -> tuple[Batch, PipelineRun | None]:
     instant = datetime.now(UTC)
@@ -268,6 +311,8 @@ def load_synthetic_batch(
             settings=settings,
             horizon_days=horizon_days,
             capacity_hours=capacity_hours,
+            max_slots=max_slots,
+            member_weight=member_weight,
             now=instant,
         )
     return batch, run
@@ -300,6 +345,9 @@ def recompute_run(
     batch: Batch | None = None,
     horizon_days: int = 60,
     capacity_hours: float = 40.0,
+    max_slots: int | None = None,
+    member_weight: float | None = None,
+    harm_lambda: float | None = None,
 ) -> PipelineRun:
     target = batch or latest_batch(session)
     if target is None:
@@ -313,6 +361,9 @@ def recompute_run(
         settings=settings,
         horizon_days=horizon_days,
         capacity_hours=capacity_hours,
+        max_slots=max_slots,
+        member_weight=member_weight,
+        harm_lambda=harm_lambda,
     )
     summary = dict(run.summary or {})
     summary["recompute"] = True

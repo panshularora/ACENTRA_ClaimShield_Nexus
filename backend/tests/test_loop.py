@@ -88,6 +88,87 @@ def test_recompute_run_endpoint_and_current_run(client: TestClient) -> None:
     assert "why_rank" in row
     assert "screening_days_left" in row
     assert row["suspicion_only"] is True
+    assert "rank_factors" in row
+    assert "composite" in row["rank_factors"]
+    assert row["recommendation"] in {"today_queue", "gather_evidence", "tracked_backlog"}
+    assert body["summary"]["ranking_policy"]["overflow_is_dismissal"] is False
+
+
+def test_member_weight_and_slot_cap_change_queue(client: TestClient) -> None:
+    run_id, _rows = _load_tiny(client)
+    low = client.post(
+        "/api/v1/runs",
+        json={"horizon_days": 60, "capacity_hours": 80, "max_slots": 4, "member_weight": 0.3},
+    )
+    high = client.post(
+        "/api/v1/runs",
+        json={"horizon_days": 60, "capacity_hours": 80, "max_slots": 4, "member_weight": 2.5},
+    )
+    assert low.status_code == 200, low.text
+    assert high.status_code == 200, high.text
+    assert low.json()["run_id"] != run_id
+    q_low = client.get(f"/api/v1/runs/{low.json()['run_id']}/queue").json()
+    q_high = client.get(f"/api/v1/runs/{high.json()['run_id']}/queue").json()
+    today_low = [r for r in q_low if r["lane"] in {"harm_priority", "selected"}]
+    today_high = [r for r in q_high if r["lane"] in {"harm_priority", "selected"}]
+    harm_n = sum(1 for r in q_low if r["lane"] == "harm_priority")
+    assert len(today_low) <= max(4, harm_n)
+    assert len(today_high) <= max(4, sum(1 for r in q_high if r["lane"] == "harm_priority"))
+    overflow = [r for r in q_low if r["lane"] == "overflow"]
+    assert overflow
+    assert all(r["status"] == "open" for r in overflow)
+    assert all(r["recommendation"] == "tracked_backlog" for r in overflow)
+
+
+def test_human_override_promote_and_defer(client: TestClient) -> None:
+    run_id, rows = _load_tiny(client)
+    overflow = next((r for r in rows if r["lane"] == "overflow"), None)
+    today = next((r for r in rows if r["lane"] in {"selected", "harm_priority"}), rows[0])
+    if overflow is None:
+        tight = client.post(
+            "/api/v1/runs",
+            json={"horizon_days": 60, "capacity_hours": 12, "max_slots": 2, "member_weight": 1.0},
+        )
+        assert tight.status_code == 200, tight.text
+        run_id = tight.json()["run_id"]
+        rows = client.get(f"/api/v1/runs/{run_id}/queue").json()
+        overflow = next(r for r in rows if r["lane"] == "overflow")
+        today = next(r for r in rows if r["lane"] in {"selected", "harm_priority"})
+
+    short = client.post(
+        f"/api/v1/cases/{overflow['case_id']}/rank",
+        json={"action": "promote", "reason": "too short"},
+    )
+    assert short.status_code == 422
+
+    promoted = client.post(
+        f"/api/v1/cases/{overflow['case_id']}/rank",
+        json={
+            "action": "promote",
+            "reason": "Wider pattern across NPIs; pull this onto today's desk for records request.",
+        },
+    )
+    assert promoted.status_code == 200, promoted.text
+    assert promoted.json()["lane"] == "selected"
+    assert promoted.json()["status"] == "open"
+    assert promoted.json()["recommendation"] == "today_queue"
+
+    deferred = client.post(
+        f"/api/v1/cases/{today['case_id']}/rank",
+        json={
+            "action": "defer",
+            "reason": "Hours are tighter this week; keep the case open on the tracked backlog.",
+        },
+    )
+    assert deferred.status_code == 200, deferred.text
+    assert deferred.json()["lane"] == "overflow"
+    assert deferred.json()["status"] == "open"
+    assert deferred.json()["recommendation"] == "tracked_backlog"
+
+    after = client.get(f"/api/v1/runs/{run_id}/queue").json()
+    by_id = {r["case_id"]: r for r in after}
+    assert by_id[overflow["case_id"]]["override"]["action"] == "promote"
+    assert by_id[today["case_id"]]["lane"] == "overflow"
 
 
 def test_decision_proposal_approval_and_brief_citation(client: TestClient) -> None:
