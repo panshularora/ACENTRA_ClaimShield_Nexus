@@ -107,6 +107,8 @@ No decision semantics were changed.
 | After the full redesign | 331.42 kB | 105.74 kB |
 
 three.js + R3F now ship in a 935 kB chunk loaded only by `/` and `/login` (the login page reuses the scene).
+Splitting routes also stopped `landing.css` from being global; the login page relied on it for its brand
+lockup, so `LoginPage` now imports it (`fix(login): restore the brand lockup…`).
 Recharts (≈368 kB) loads with the first page that has a chart; Cytoscape + fcose (≈568 kB) loads only when a
 case network renders. Vite still prints its 500 kB advisory for those lazy chunks.
 
