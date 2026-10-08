@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { ClaimRow, ClaimsPack } from "../../api/types";
 import { EmptyState, ErrorState, LoadingState } from "../../components/ui/States";
-import { money } from "../../lib/format";
+import { money, neutralLabel } from "../../lib/format";
 
 type SortKey = "dos" | "paid" | "code" | "provider" | "member";
 type SortDir = "ascending" | "descending";
@@ -166,8 +166,8 @@ export function ClaimsTable({ pack, loading, error, onOpenLine, focusLineIds, fo
                       {row.signals.length === 0
                         ? "—"
                         : row.signals.map((s) => (
-                            <span key={s.alert_id} className="badge" title={s.label}>
-                              {s.rule_id ?? s.label}
+                            <span key={s.alert_id} className="badge" title={neutralLabel(s.label)}>
+                              {s.rule_id ?? neutralLabel(s.label)}
                             </span>
                           ))}
                     </span>

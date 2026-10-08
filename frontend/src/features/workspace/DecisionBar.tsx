@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { CaseAlert, DecisionResult, WikiProposal } from "../../api/types";
+import { alertLabel } from "../../lib/format";
 import { ProposalCard } from "../wiki/ProposalCard";
 import {
   DECISION_ACTIONS,
@@ -14,7 +15,7 @@ function groupAlerts(alerts: CaseAlert[]): { key: string; rule: string; label: s
   const map = new Map<string, { key: string; rule: string; label: string; refs: string[] }>();
   for (const alert of alerts) {
     const rule = alert.rule_id ?? alert.detector;
-    const label = alert.label ?? alert.rule_title ?? alert.detector;
+    const label = alertLabel(alert);
     const key = `${rule}|${label}`;
     const prev = map.get(key);
     const ref = `alert:${alert.alert_id}`;

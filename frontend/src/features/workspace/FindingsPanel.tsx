@@ -1,5 +1,6 @@
 import type { CaseAlert } from "../../api/types";
 import { EmptyState } from "../../components/ui/States";
+import { alertLabel } from "../../lib/format";
 import { PeerCompare } from "./PeerCompare";
 import { AlertLineageBlock } from "./ProvenancePanel";
 
@@ -69,7 +70,7 @@ export function FindingsPanel({ alerts, focusAlertIds, focusLabel, onOpen }: Fin
                   <span className="mono muted">{alert.rule_id ?? alert.detector}</span>
                   {alert.policy_ref ? <span className="muted">Policy {alert.policy_ref}</span> : null}
                 </div>
-                <h4>{alert.label ?? alert.rule_title ?? alert.rule_id}</h4>
+                <h4>{alertLabel(alert)}</h4>
                 {alert.review_reason ? <p>{alert.review_reason}</p> : null}
                 <p className="muted">
                   <span className="mono">{alert.entity_id}</span> · {lineIds.length} supporting claim line
