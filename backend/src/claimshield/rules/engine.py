@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
 from typing import Any
 
 import pandas as pd
@@ -19,6 +18,7 @@ class AlertDraft:
     line_ids: list[str]
     score: float
     evidence: dict[str, Any] = field(default_factory=dict)
+    related_entity_ids: list[str] = field(default_factory=list)
 
 
 def evaluate_rules(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
@@ -36,6 +36,8 @@ def evaluate_rules(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
     alerts.extend(_pos_mismatch(tables))
     alerts.extend(_ambulance_overlap(tables))
     alerts.extend(_clone_billing(tables))
+    alerts.extend(_stay_compression(tables))
+    alerts.extend(_mileage_padding(tables))
     return alerts
 
 
@@ -99,17 +101,23 @@ def _unit_caps(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
     lines = tables["claim_line"].merge(tables["claim"][["claim_id", "billing_provider_id"]], on="claim_id")
     for code, cap in UNIT_CAPS.items():
         hit = lines[(lines.code == code) & (lines.units > cap)]
-        for _, row in hit.iterrows():
+        for prov, grp in hit.groupby("billing_provider_id"):
             out.append(
                 AlertDraft(
                     detector="rules",
                     rule_id="R-UNIT-001",
                     rule_version=1,
-                    entity_id=str(row.billing_provider_id),
+                    entity_id=str(prov),
                     entity_type="provider",
-                    line_ids=[row.line_id],
+                    line_ids=grp["line_id"].tolist()[:40],
                     score=1.0,
-                    evidence={"kind": "unit_cap", "code": code, "units": float(row.units), "cap": cap},
+                    evidence={
+                        "kind": "unit_cap",
+                        "code": code,
+                        "n_lines": int(len(grp)),
+                        "max_units": float(grp["units"].max()),
+                        "cap": cap,
+                    },
                 )
             )
     return out
@@ -125,18 +133,23 @@ def _after_death(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
     merged["date_of_death"] = pd.to_datetime(merged["date_of_death"]).dt.date
     merged["dos_from"] = pd.to_datetime(merged["dos_from"]).dt.date
     hit = merged[merged["dos_from"] > merged["date_of_death"]]
-    out = []
-    for _, row in hit.iterrows():
+    out: list[AlertDraft] = []
+    for prov, grp in hit.groupby("billing_provider_id"):
         out.append(
             AlertDraft(
                 detector="rules",
                 rule_id="R-DEATH-001",
                 rule_version=1,
-                entity_id=str(row.billing_provider_id),
+                entity_id=str(prov),
                 entity_type="provider",
-                line_ids=[row.line_id],
+                line_ids=grp["line_id"].tolist()[:40],
                 score=1.0,
-                evidence={"kind": "after_death", "member_id": row.member_id, "dod": str(row.date_of_death)},
+                evidence={
+                    "kind": "after_death",
+                    "n_lines": int(len(grp)),
+                    "member_ids": sorted({str(m) for m in grp["member_id"].tolist()})[:8],
+                    "dod": str(grp.iloc[0]["date_of_death"]),
+                },
             )
         )
     return out
@@ -169,14 +182,18 @@ def _inpatient_overlap(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
     stays = tables.get("inpatient_stay")
     if stays is None or stays.empty:
         return []
-    claims = tables["claim"][["claim_id", "member_id", "billing_provider_id"]]
+    claims = tables["claim"][["claim_id", "member_id", "billing_provider_id", "claim_type"]]
     lines = tables["claim_line"].merge(claims, on="claim_id")
+    community = {"home_health", "behavioral_health"}
+    lines = lines[lines.claim_type.isin(community) | lines.code.isin(["ABA-60", "PSY-60", "HH-VISIT"])]
+    if lines.empty:
+        return []
     lines["dos_from"] = pd.to_datetime(lines["dos_from"]).dt.date
     stays = stays.copy()
     stays["admit"] = pd.to_datetime(stays["admit"]).dt.date
     stays["discharge"] = pd.to_datetime(stays["discharge"]).dt.date
-    out = []
-    for _, stay in stays.iterrows():
+    hits = []
+    for stay in stays.itertuples(index=False):
         mask = (
             (lines.member_id == stay.member_id)
             & (lines.dos_from >= stay.admit)
@@ -186,16 +203,29 @@ def _inpatient_overlap(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
         hit = lines[mask]
         if hit.empty:
             continue
+        hits.append(hit)
+    if not hits:
+        return []
+    all_hit = pd.concat(hits, ignore_index=True).drop_duplicates("line_id")
+    out: list[AlertDraft] = []
+    for prov, grp in all_hit.groupby("billing_provider_id"):
+        codes = set(grp["code"].astype(str))
+        if len(grp) < 2 and "ABA-60" not in codes:
+            continue
         out.append(
             AlertDraft(
                 detector="rules",
                 rule_id="R-IP-001",
                 rule_version=1,
-                entity_id=str(hit.iloc[0].billing_provider_id),
+                entity_id=str(prov),
                 entity_type="provider",
-                line_ids=hit["line_id"].tolist(),
+                line_ids=grp["line_id"].tolist()[:40],
                 score=1.0,
-                evidence={"kind": "inpatient_overlap", "member_id": stay.member_id},
+                evidence={
+                    "kind": "inpatient_overlap",
+                    "n_lines": int(len(grp)),
+                    "member_ids": sorted({str(m) for m in grp["member_id"].tolist()})[:8],
+                },
             )
         )
     return out
@@ -208,28 +238,46 @@ def _evv_missing(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
         return []
     lines = tables["claim_line"].merge(hh[["claim_id", "member_id", "billing_provider_id"]], on="claim_id")
     evv = tables["evv_visit"]
-    if evv.empty:
-        covered = set()
+    if evv is None or evv.empty:
+        covered: set[tuple[Any, ...]] = set()
     else:
         evv = evv.copy()
         evv["day"] = pd.to_datetime(evv["start_ts"]).dt.date
-        covered = set(zip(evv["member_id"], evv["day"], strict=False))
+        covered = set(
+            zip(evv["member_id"].astype(str), evv["provider_id"].astype(str), evv["day"], strict=False)
+        )
     lines["dos_from"] = pd.to_datetime(lines["dos_from"]).dt.date
-    out = []
-    for _, row in lines.iterrows():
-        key = (row.member_id, row.dos_from)
-        if key in covered:
-            continue
+    lines["member_id"] = lines["member_id"].astype(str)
+    lines["billing_provider_id"] = lines["billing_provider_id"].astype(str)
+    miss_mask = [
+        (row.member_id, row.billing_provider_id, row.dos_from) not in covered
+        for row in lines.itertuples(index=False)
+    ]
+    missed = lines[miss_mask]
+    if missed.empty:
+        return []
+    totals = lines.groupby("billing_provider_id").size()
+    out: list[AlertDraft] = []
+    for prov, grp in missed.groupby("billing_provider_id"):
+        n_miss = int(len(grp))
+        n_total = int(totals.get(prov, n_miss))
+        miss_rate = n_miss / max(1, n_total)
         out.append(
             AlertDraft(
                 detector="rules",
                 rule_id="R-EVV-001",
                 rule_version=1,
-                entity_id=str(row.billing_provider_id),
+                entity_id=str(prov),
                 entity_type="provider",
-                line_ids=[row.line_id],
-                score=0.9,
-                evidence={"kind": "evv_missing", "member_id": row.member_id},
+                line_ids=grp["line_id"].tolist()[:40],
+                score=round(min(1.0, 0.35 + 0.6 * miss_rate), 3),
+                evidence={
+                    "kind": "evv_missing",
+                    "n_missing": n_miss,
+                    "n_home_health": n_total,
+                    "miss_rate": round(miss_rate, 3),
+                    "member_ids": sorted({str(m) for m in grp["member_id"].tolist()})[:8],
+                },
             )
         )
     return out
@@ -299,18 +347,22 @@ def _sex_implausible(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
     lines = tables["claim_line"].merge(tables["claim"][["claim_id", "member_id", "billing_provider_id"]], on="claim_id")
     lines = lines.merge(members, on="member_id")
     hit = lines[(lines.code == "PROC-MALE-01") & (lines.sex == "F")]
-    out = []
-    for _, row in hit.iterrows():
+    out: list[AlertDraft] = []
+    for prov, grp in hit.groupby("billing_provider_id"):
         out.append(
             AlertDraft(
                 detector="rules",
                 rule_id="R-SEX-001",
                 rule_version=1,
-                entity_id=str(row.billing_provider_id),
+                entity_id=str(prov),
                 entity_type="provider",
-                line_ids=[row.line_id],
+                line_ids=grp["line_id"].tolist()[:40],
                 score=1.0,
-                evidence={"kind": "sex_implausible", "member_id": row.member_id},
+                evidence={
+                    "kind": "sex_implausible",
+                    "n_lines": int(len(grp)),
+                    "member_ids": sorted({str(m) for m in grp["member_id"].tolist()})[:8],
+                },
             )
         )
     return out
@@ -323,17 +375,21 @@ def _pos_mismatch(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
     office_codes = {f"EM-EST-{i}" for i in range(1, 6)}
     hit = lines[lines.code.isin(office_codes) & lines.pos.isin(["21", "23", "41"])]
     out: list[AlertDraft] = []
-    for _, row in hit.iterrows():
+    for prov, grp in hit.groupby("billing_provider_id"):
         out.append(
             AlertDraft(
                 detector="rules",
                 rule_id="R-POS-001",
                 rule_version=1,
-                entity_id=str(row.billing_provider_id),
+                entity_id=str(prov),
                 entity_type="provider",
-                line_ids=[row.line_id],
-                score=0.8,
-                evidence={"kind": "pos_mismatch", "code": row.code, "pos": row.pos},
+                line_ids=grp["line_id"].tolist()[:40],
+                score=0.55,
+                evidence={
+                    "kind": "pos_mismatch",
+                    "n_lines": int(len(grp)),
+                    "pos_values": sorted({str(p) for p in grp["pos"].tolist()}),
+                },
             )
         )
     return out
@@ -393,6 +449,91 @@ def _clone_billing(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
                     "members": int(grp["member_id"].nunique()),
                     "code": str(key[2]),
                     "paid": float(key[3]),
+                },
+            )
+        )
+    return out
+
+
+def _stay_compression(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
+    stays = tables.get("inpatient_stay")
+    claims = tables["claim"]
+    if stays is None or stays.empty:
+        same = claims[
+            (claims.claim_type == "facility")
+            & claims["admit"].notna()
+            & claims["discharge"].notna()
+        ].copy()
+        if same.empty:
+            return []
+        same["admit"] = pd.to_datetime(same["admit"]).dt.date
+        same["discharge"] = pd.to_datetime(same["discharge"]).dt.date
+        same = same[same["admit"] == same["discharge"]]
+    else:
+        stays = stays.copy()
+        stays["admit"] = pd.to_datetime(stays["admit"]).dt.date
+        stays["discharge"] = pd.to_datetime(stays["discharge"]).dt.date
+        same = stays[stays["admit"] == stays["discharge"]]
+    if same.empty:
+        return []
+    lines = tables["claim_line"].merge(
+        claims[["claim_id", "member_id", "billing_provider_id", "claim_type"]], on="claim_id"
+    )
+    lines["dos_from"] = pd.to_datetime(lines["dos_from"]).dt.date
+    out: list[AlertDraft] = []
+    for stay in same.itertuples(index=False):
+        member_id = str(stay.member_id)
+        day = stay.admit
+        hit = lines[(lines.member_id.astype(str) == member_id) & (lines.dos_from == day)]
+        high = hit[(hit.code == "FAC-DRG-HI") | (hit.paid >= 10_000) | (hit.claim_type == "facility")]
+        if high.empty:
+            continue
+        out.append(
+            AlertDraft(
+                detector="rules",
+                rule_id="R-STAY-001",
+                rule_version=1,
+                entity_id=str(high.iloc[0].billing_provider_id),
+                entity_type="provider",
+                line_ids=high["line_id"].tolist()[:20],
+                score=0.9,
+                evidence={
+                    "kind": "stay_compression",
+                    "member_id": member_id,
+                    "admit": str(day),
+                    "discharge": str(day),
+                    "max_paid": float(high["paid"].max()),
+                },
+            )
+        )
+    return out
+
+
+def _mileage_padding(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
+    providers = tables["provider"][["provider_id", "rural"]]
+    lines = tables["claim_line"].merge(
+        tables["claim"][["claim_id", "billing_provider_id"]], on="claim_id"
+    )
+    lines = lines.merge(providers, left_on="billing_provider_id", right_on="provider_id", how="left")
+    hit = lines[(lines.code == "A0425") & (lines.units > 80) & (lines.rural != True)]  # noqa: E712
+    if hit.empty:
+        return []
+    out: list[AlertDraft] = []
+    for prov, grp in hit.groupby("billing_provider_id"):
+        out.append(
+            AlertDraft(
+                detector="rules",
+                rule_id="R-MILE-001",
+                rule_version=1,
+                entity_id=str(prov),
+                entity_type="provider",
+                line_ids=grp["line_id"].tolist()[:20],
+                score=0.7,
+                evidence={
+                    "kind": "mileage_padding",
+                    "n_lines": int(len(grp)),
+                    "max_miles": float(grp["units"].max()),
+                    "urban_cap": 80,
                 },
             )
         )

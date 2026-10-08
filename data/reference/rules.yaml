@@ -64,3 +64,28 @@ rules:
     title: Identical paid amount cloned across many members same day
     severity: 3
     policy_ref: SIU-CLONE
+  - rule_id: R-STAY-001
+    kind: stay_compression
+    title: High-DRG facility claim with same-day admit and discharge
+    severity: 3
+    policy_ref: SCHRUPP-STAY
+  - rule_id: R-MILE-001
+    kind: mileage_padding
+    title: Urban ambulance mileage above plausible cap
+    severity: 2
+    policy_ref: OEI-09-12-00351
+  - rule_id: G-RING-001
+    kind: identity_ring
+    title: Shared owner, TIN, or bank across multiple NPIs
+    severity: 4
+    policy_ref: 42CFR-455.104
+  - rule_id: G-REF-001
+    kind: referral_monopoly
+    title: Referral volume concentrated on one receiver
+    severity: 3
+    policy_ref: OIG-SFA-TELEFRAUD
+  - rule_id: G-OWN-001
+    kind: excluded_owner
+    title: Owner name matches synthetic LEIE record
+    severity: 4
+    policy_ref: LEIE

@@ -21,6 +21,7 @@ def test_rules_catch_planted_hard_hits(tiny_dataset) -> None:
         "sex_implausible",
         "pos_mismatch",
         "clone_billing",
+        "stay_compression",
     }:
         assert expected in kinds, f"missing {expected}; have {kinds}"
 

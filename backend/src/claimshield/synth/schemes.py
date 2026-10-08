@@ -154,10 +154,13 @@ def plant_all_schemes(
 ) -> None:
     gt: list[dict[str, Any]] = []
     members = ds.tables["member"]
+    living = members[members["date_of_death"].isna()]
+    if living.empty:
+        living = members
     span = max(20, (end - start).days - 15)
 
     def pick_member() -> str:
-        return str(members.iloc[int(rng.integers(0, len(members)))].member_id)
+        return str(living.iloc[int(rng.integers(0, len(living)))].member_id)
 
     def pick_dos(offset: int = 30) -> date:
         return start + timedelta(days=int(rng.integers(offset, span)))
@@ -235,14 +238,10 @@ def plant_all_schemes(
     gt.append(_gt_row(scheme_id="S04", scheme_type="excess_units", variant="B",
                       provider_id=amb.provider_id, line_ids=split, notes="split across lines same day"))
 
-    # S05 after death
+    # S05 after death — decedents are planted in the member table before claims
     dead = members[members.date_of_death.notna()]
     if dead.empty:
-        members = ds.tables["member"]
-        idx = 0
-        members.loc[members.index[idx], "date_of_death"] = start + timedelta(days=50)
-        ds.tables["member"] = members
-        dead = members[members.date_of_death.notna()]
+        raise RuntimeError("generator must plant decedents before claims")
     decedent = dead.iloc[0]
     dme = _providers_by_line(ds, "dme").iloc[0]
     after = decedent.date_of_death + timedelta(days=12)
@@ -286,17 +285,19 @@ def plant_all_schemes(
         gt.append(_gt_row(scheme_id="S08", scheme_type="inpatient_overlap", variant="A",
                           provider_id=bh.provider_id, line_ids=[l], member_ids=[stay.member_id]))
 
-    # S09 missing EVV
-    hh = _providers_by_line(ds, "home_health").iloc[0]
+    # S09 missing EVV — use a different agency than S10 so the case stays EVV-only
+    hh_all = _providers_by_line(ds, "home_health")
+    hh_s09 = hh_all.iloc[min(2, len(hh_all) - 1)]
     mem = pick_member()
     dos = pick_dos()
-    l = _append_line(ds, rng, provider_id=hh.provider_id, member_id=mem, dos=dos, code=HOME_VISIT,
+    l = _append_line(ds, rng, provider_id=hh_s09.provider_id, member_id=mem, dos=dos, code=HOME_VISIT,
                      minutes=60, claim_type="home_health", paid=88, pos=POS_HOME)
     gt.append(_gt_row(scheme_id="S09", scheme_type="evv_missing", variant="A",
-                      provider_id=hh.provider_id, line_ids=[l], member_ids=[mem],
+                      provider_id=hh_s09.provider_id, line_ids=[l], member_ids=[mem],
                       notes="home visit with no EVV row"))
 
     # S10 excessive home health visits vs peers
+    hh = hh_all.iloc[0]
     ids = []
     heavy_member = pick_member()
     for i in range(28):
@@ -311,13 +312,14 @@ def plant_all_schemes(
     # S11 excluded party
     excl = ds.tables["exclusion_record"].iloc[0]
     target = ds.tables["provider"].iloc[-1]
-    ds.tables["provider"].loc[ds.tables["provider"].provider_id == target.provider_id, "npi_syn"] = (
-        excl.npi if excl.npi else target.npi_syn
-    )
-    if not excl.npi:
-        ds.tables["exclusion_record"].loc[
-            ds.tables["exclusion_record"].excl_id == excl.excl_id, "npi"
-        ] = target.npi_syn
+    excl_npi = excl.npi if pd.notna(excl.npi) and excl.npi else None
+    npi = str(excl_npi or target.npi_syn)
+    ds.tables["provider"].loc[
+        ds.tables["provider"].provider_id == target.provider_id, "npi_syn"
+    ] = npi
+    ds.tables["exclusion_record"].loc[
+        ds.tables["exclusion_record"].excl_id == excl.excl_id, "npi"
+    ] = npi
     l = _append_line(ds, rng, provider_id=target.provider_id, member_id=pick_member(),
                      dos=pick_dos(), code="EM-EST-3", paid=130)
     gt.append(_gt_row(scheme_id="S11", scheme_type="excluded_party", variant="A",
@@ -375,7 +377,7 @@ def plant_all_schemes(
                       provider_id=prof.provider_id, line_ids=[l]))
 
     # S14 sex-implausible: prostate-related synth code on female
-    female = members[members.sex == "F"].iloc[0]
+    female = living[living.sex == "F"].iloc[0]
     l = _append_line(ds, rng, provider_id=prof.provider_id, member_id=female.member_id, dos=pick_dos(),
                      code="PROC-MALE-01", paid=800, dx=["SYN-DX-PROSTATE"])
     gt.append(_gt_row(scheme_id="S14", scheme_type="sex_implausible", variant="A",
@@ -552,10 +554,13 @@ def _plant_ring(ds: "Dataset", rng: np.random.Generator, fake: Faker, start: dat
         )
     ds.tables["provider"] = pd.concat([ds.tables["provider"], pd.DataFrame(new_provs)], ignore_index=True)
     orderer = _providers_by_line(ds, "professional").iloc[0].provider_id
+    living_ids = ds.tables["member"][ds.tables["member"]["date_of_death"].isna()]["member_id"].tolist()
+    if not living_ids:
+        living_ids = ds.tables["member"]["member_id"].tolist()
     line_ids = []
     member_ids = []
     for i in range(24):
-        mem = str(ds.tables["member"].iloc[int(rng.integers(0, len(ds.tables["member"])))].member_id)
+        mem = str(living_ids[int(rng.integers(0, len(living_ids)))])
         member_ids.append(mem)
         pid = new_provs[i % n]["provider_id"]
         code = DME_CATH if kind == "telefraud" else "PSY-60"
@@ -660,12 +665,15 @@ def _plant_shell(ds: "Dataset", rng: np.random.Generator, fake: Faker, start: da
             ],
             ignore_index=True,
         )
+    living_ids = ds.tables["member"][ds.tables["member"]["date_of_death"].isna()]["member_id"].tolist()
+    if not living_ids:
+        living_ids = ds.tables["member"]["member_id"].tolist()
     line_ids = [
         _append_line(
             ds,
             rng,
             provider_id=pids[i % 5],
-            member_id=str(ds.tables["member"].iloc[i % len(ds.tables["member"])].member_id),
+            member_id=str(living_ids[i % len(living_ids)]),
             dos=start + timedelta(days=20 + i),
             code=HOME_VISIT,
             minutes=40,

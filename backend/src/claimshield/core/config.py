@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     demo_mode: bool = True
     data_profile: str = "tiny"
     evidence_strength_min: float = 0.4
+    harm_capacity_share: float = 0.35
     harm_override_level: int = 4
     default_recovery_rate: float = 0.5
     batch_reject_stop_pct: float = 5.0

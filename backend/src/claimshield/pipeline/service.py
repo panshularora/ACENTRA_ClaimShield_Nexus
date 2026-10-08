@@ -12,7 +12,8 @@ from claimshield.cases.builder import build_cases
 from claimshield.core.config import Settings
 from claimshield.core.ids import new_id
 from claimshield.db.models import Alert, Batch, Case, PipelineRun, User
-from claimshield.graph.build import build_graph, communities_for
+from claimshield.graph.build import build_graph, strong_component_map
+from claimshield.graph.detect import evaluate_graph
 from claimshield.ingest.service import persist_dataset
 from claimshield.queue.knapsack import expected_value, knapsack_select
 from claimshield.rules.engine import AlertDraft, evaluate_rules
@@ -20,44 +21,77 @@ from claimshield.synth.generator import generate
 
 
 def discrete_hazard(case: dict[str, Any]) -> tuple[float, float, float]:
-    base = min(0.9, 0.12 + 0.35 * float(case["p_confirm"]) + 0.04 * int(case["harm"]))
-    f30 = round(base, 3)
-    f60 = round(min(0.97, base + 0.14), 3)
-    f90 = round(min(0.99, base + 0.24), 3)
-    return f30, f60, f90
+    """Constant monthly hazard, discrete-time CDF at 1/2/3 months."""
+    monthly = 0.05 + 0.28 * float(case["p_confirm"]) + 0.03 * int(case["harm"])
+    monthly = min(0.65, max(0.02, monthly))
+    case["monthly_hazard"] = round(monthly, 4)
+
+    def cdf(months: int) -> float:
+        return round(1.0 - (1.0 - monthly) ** months, 3)
+
+    return cdf(1), cdf(2), cdf(3)
 
 
-def detect(tables: dict[str, pd.DataFrame], *, horizon_days: int, recovery: float, harm_lambda: float, capacity_hours: float) -> dict[str, Any]:
-    alerts = evaluate_rules(tables) + evaluate_anomalies(tables)
+def assign_lanes(
+    cases: list[dict[str, Any]],
+    *,
+    capacity_hours: float,
+    harm_capacity_share: float,
+    evidence_min: float,
+) -> None:
+    harm = [c for c in cases if c["harm"] >= 4]
+    rest = [c for c in cases if c["harm"] < 4]
+    for case in harm:
+        case["lane"] = "harm_priority"
+    harm_hours = sum(float(c["estimated_hours"]) for c in harm)
+    reserved = min(harm_hours, max(0.0, float(capacity_hours) * harm_capacity_share))
+    remaining = max(0.5, float(capacity_hours) - reserved)
+    needs = [c for c in rest if c["evidence_strength"] < evidence_min]
+    workable = [c for c in rest if c["evidence_strength"] >= evidence_min]
+    for case in needs:
+        case["lane"] = "needs_evidence"
+    selected_rest = knapsack_select(workable, capacity_hours=remaining)
+    chosen = {c["case_id"] for c in selected_rest}
+    for case in workable:
+        case["lane"] = "selected" if case["case_id"] in chosen else "overflow"
+
+
+def detect(
+    tables: dict[str, pd.DataFrame],
+    *,
+    horizon_days: int,
+    recovery: float,
+    harm_lambda: float,
+    capacity_hours: float,
+    harm_capacity_share: float = 0.35,
+    evidence_min: float = 0.4,
+) -> dict[str, Any]:
     graph = build_graph(tables)
-    communities = communities_for(graph)
-    cases = build_cases(alerts, tables, communities)
+    strong = strong_component_map(graph)
+    alerts = (
+        evaluate_rules(tables)
+        + evaluate_anomalies(tables)
+        + evaluate_graph(tables, graph, strong)
+    )
+    cases = build_cases(alerts, tables, strong)
     for case in cases:
         case["ev"] = expected_value(
             case, horizon_days=horizon_days, recovery=recovery, harm_lambda=harm_lambda
         )
         case["f30"], case["f60"], case["f90"] = discrete_hazard(case)
-    priority = [c for c in cases if c["harm"] >= 4]
-    rest = [c for c in cases if c["harm"] < 4]
-    used = sum(float(c["estimated_hours"]) for c in priority)
-    remaining = max(0.5, float(capacity_hours) - used)
-    selected_rest = knapsack_select(rest, capacity_hours=remaining)
-    chosen = {c["case_id"] for c in priority} | {c["case_id"] for c in selected_rest}
-    for case in cases:
-        if case["harm"] >= 4:
-            case["lane"] = "harm_priority"
-        elif case["case_id"] in chosen:
-            case["lane"] = "selected"
-        elif case["evidence_strength"] < 0.4:
-            case["lane"] = "needs_evidence"
-        else:
-            case["lane"] = "overflow"
+    assign_lanes(
+        cases,
+        capacity_hours=capacity_hours,
+        harm_capacity_share=harm_capacity_share,
+        evidence_min=evidence_min,
+    )
+    selected = sum(1 for c in cases if c["lane"] in {"harm_priority", "selected"})
     return {
         "alerts": alerts,
         "cases": cases,
         "graph_nodes": graph.number_of_nodes(),
         "graph_edges": graph.number_of_edges(),
-        "selected": len(chosen),
+        "selected": selected,
     }
 
 
@@ -82,6 +116,7 @@ def persist_detection(
                 sla_due=None,
                 primary_entity_id=case["primary_entity_id"],
                 primary_entity_type=case["primary_entity_type"],
+                entity_ids=case.get("entity_ids") or [case["primary_entity_id"]],
                 harm=case["harm"],
                 severity=case["severity"],
                 members_affected=case["members_affected"],
@@ -89,6 +124,7 @@ def persist_detection(
                 evidence_strength=case["evidence_strength"],
                 estimated_hours=case["estimated_hours"],
                 p_confirm=case["p_confirm"],
+                expected_value=float(case.get("ev") or 0.0),
                 f30=case["f30"],
                 f60=case["f60"],
                 f90=case["f90"],
@@ -142,6 +178,8 @@ def execute_run(
         recovery=settings.default_recovery_rate,
         harm_lambda=250.0,
         capacity_hours=capacity_hours,
+        harm_capacity_share=settings.harm_capacity_share,
+        evidence_min=settings.evidence_strength_min,
     )
     persist_detection(session, run_id=run.run_id, alerts=result["alerts"], cases=result["cases"])
     summary = {

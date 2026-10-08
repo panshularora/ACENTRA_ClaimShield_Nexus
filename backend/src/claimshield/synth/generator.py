@@ -82,7 +82,19 @@ def generate(profile: str = "tiny", seed: int = 7) -> Dataset:
         rng, spec, members, providers, facilities, start, end
     )
     referrals = _referrals(rng, spec, members, providers, start, end)
-    evv = _evv(rng, spec, members, providers, locations, start, end)
+    evv = pd.DataFrame(
+        columns=[
+            "visit_id",
+            "aide_id",
+            "member_id",
+            "provider_id",
+            "start_ts",
+            "end_ts",
+            "lat",
+            "lon",
+            "service_type",
+        ]
+    )
     rx = _rx(rng, spec, members, providers, start, end)
     exclusions = _exclusions(rng, fake, providers, start)
 
@@ -105,6 +117,13 @@ def generate(profile: str = "tiny", seed: int = 7) -> Dataset:
         "eligibility_span": _eligibility(members, start, end),
     }
     plant_all_schemes(ds, rng, fake, start, end, spec)
+    skip_evv: set[str] = set()
+    if not ds.ground_truth.empty:
+        for _, row in ds.ground_truth[ds.ground_truth["scheme_id"] == "S09"].iterrows():
+            ids = row.line_ids
+            if isinstance(ids, list):
+                skip_evv.update(str(x) for x in ids)
+    _attach_home_health_evv(ds, rng, skip_line_ids=skip_evv)
     _investigations(ds, rng, start, end, spec)
     ds.data_card = {
         "profile": profile,
@@ -166,7 +185,7 @@ def _members(
         sex = str(rng.choice(["F", "M"], p=[0.52, 0.48]))
         age = int(rng.choice([6, 14, 28, 45, 67, 78], p=[0.08, 0.07, 0.25, 0.28, 0.2, 0.12]))
         dob = date(start.year - age, int(rng.integers(1, 13)), int(rng.integers(1, 28)))
-        died = rng.random() < 0.015
+        died = rng.random() < 0.015 or i < 2
         dod = _add_days(start, int(rng.integers(40, (end - start).days - 10))) if died else None
         loc = family_addr[i % len(family_addr)] if rng.random() < 0.12 else loc_ids[int(rng.integers(0, len(loc_ids)))]
         rows.append(
@@ -334,6 +353,9 @@ def _legitimate_claims(
     lines = []
     stays = []
     member_ids = members["member_id"].tolist()
+    living_ids = members.loc[members["date_of_death"].isna(), "member_id"].astype(str).tolist()
+    if not living_ids:
+        living_ids = [str(m) for m in member_ids]
     prov_by_line = {
         line: providers[providers.service_line == line]["provider_id"].tolist()
         for line in SERVICE_LINES
@@ -343,8 +365,8 @@ def _legitimate_claims(
         line_type = str(rng.choice(SERVICE_LINES, p=[0.28, 0.1, 0.08, 0.08, 0.08, 0.14, 0.16, 0.08]))
         pool = prov_by_line.get(line_type) or providers["provider_id"].tolist()
         provider_id = str(rng.choice(pool))
-        member_id = str(rng.choice(member_ids))
         dos = _add_days(start, int(rng.integers(0, span)))
+        member_id = str(rng.choice(living_ids))
         lag = int(rng.integers(0, 45))
         received = _add_days(dos, lag)
         claim_id = _rid(rng, "CLM")
@@ -442,43 +464,47 @@ def _referrals(
     return pd.DataFrame(rows)
 
 
-def _evv(
-    rng: np.random.Generator,
-    spec: Profile,
-    members: pd.DataFrame,
-    providers: pd.DataFrame,
-    locations: pd.DataFrame,
-    start: date,
-    end: date,
-) -> pd.DataFrame:
-    hh = providers[providers.service_line == "home_health"]
-    pids = hh["provider_id"].tolist() or providers["provider_id"].tolist()
-    mids = members["member_id"].tolist()
-    loc_lookup = locations.set_index("location_id")
-    span = max(1, (end - start).days)
-    rows = []
-    for _ in range(spec.n_evv):
-        member = members.iloc[int(rng.integers(0, len(members)))]
-        loc = loc_lookup.loc[member.location_id]
-        day = _add_days(start, int(rng.integers(0, span)))
+def _attach_home_health_evv(
+    ds: Dataset, rng: np.random.Generator, *, skip_line_ids: set[str]
+) -> None:
+    """Write an EVV row for every home-health claim line except planted S09 misses."""
+    claims = ds.tables["claim"]
+    hh = claims[claims.claim_type == "home_health"]
+    if hh.empty:
+        return
+    lines = ds.tables["claim_line"].merge(
+        hh[["claim_id", "member_id", "billing_provider_id"]], on="claim_id"
+    )
+    members = ds.tables["member"].set_index("member_id")
+    locations = ds.tables["location"].set_index("location_id")
+    rows: list[dict[str, Any]] = []
+    for row in lines.itertuples(index=False):
+        if str(row.line_id) in skip_line_ids:
+            continue
+        member = members.loc[row.member_id]
+        loc = locations.loc[member.location_id]
+        dos = pd.Timestamp(row.dos_from).date()
         hour = int(rng.integers(7, 18))
-        start_ts = datetime(day.year, day.month, day.day, hour, int(rng.integers(0, 50)), tzinfo=timezone.utc)
-        end_ts = start_ts + timedelta(minutes=int(rng.integers(30, 90)))
-        jitter = 0.0 if rng.random() > 0.04 else float(rng.uniform(0.2, 1.5))
+        start_ts = datetime(dos.year, dos.month, dos.day, hour, int(rng.integers(0, 50)), tzinfo=timezone.utc)
+        minutes = int(row.minutes) if pd.notna(row.minutes) and row.minutes else 45
         rows.append(
             {
                 "visit_id": _rid(rng, "EVV"),
                 "aide_id": _rid(rng, "AID", 6),
-                "member_id": member.member_id,
-                "provider_id": str(rng.choice(pids)),
+                "member_id": row.member_id,
+                "provider_id": str(row.billing_provider_id),
                 "start_ts": start_ts,
-                "end_ts": end_ts,
-                "lat": float(loc.lat) + jitter,
-                "lon": float(loc.lon) + jitter,
+                "end_ts": start_ts + timedelta(minutes=minutes),
+                "lat": float(loc.lat),
+                "lon": float(loc.lon),
                 "service_type": "personal_care",
             }
         )
-    return pd.DataFrame(rows)
+    extra = pd.DataFrame(rows)
+    if extra.empty:
+        return
+    existing = ds.tables["evv_visit"]
+    ds.tables["evv_visit"] = pd.concat([existing, extra], ignore_index=True)
 
 
 def _rx(

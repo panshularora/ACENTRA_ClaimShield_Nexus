@@ -133,7 +133,10 @@ def get_queue(
         raise NotFound("run not found")
     cases = session.execute(select(Case).where(Case.run_id == run_id)).scalars().all()
     order = {"harm_priority": 0, "selected": 1, "needs_evidence": 2, "overflow": 3}
-    cases = sorted(cases, key=lambda c: (order.get(c.lane, 9), -c.flagged_dollars))
+    cases = sorted(
+        cases,
+        key=lambda c: (order.get(c.lane, 9), -(c.expected_value or 0.0)),
+    )
     return [_case_brief(c) for c in cases]
 
 
@@ -143,6 +146,7 @@ def _case_brief(case: Case) -> dict:
         "lane": case.lane,
         "status": case.status,
         "primary_entity_id": case.primary_entity_id,
+        "entity_ids": case.entity_ids or [case.primary_entity_id],
         "harm": case.harm,
         "severity": case.severity,
         "members_affected": case.members_affected,
@@ -150,6 +154,7 @@ def _case_brief(case: Case) -> dict:
         "evidence_strength": case.evidence_strength,
         "estimated_hours": case.estimated_hours,
         "p_confirm": case.p_confirm,
+        "expected_value": case.expected_value,
         "f30": case.f30,
         "f60": case.f60,
         "f90": case.f90,
