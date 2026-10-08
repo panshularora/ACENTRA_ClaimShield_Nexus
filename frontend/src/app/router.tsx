@@ -1,27 +1,15 @@
 import {
-  Outlet,
   createRootRoute,
   createRoute,
   createRouter,
   lazyRouteComponent,
-  useRouterState,
 } from "@tanstack/react-router";
-import { Shell } from "../components/Shell";
+import { Root, RouteError, RoutePending } from "./RouteShells";
 
-function Root() {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  if (pathname === "/" || pathname === "/login") {
-    return <Outlet />;
-  }
-  return <Shell />;
-}
+const rootRoute = createRootRoute({ component: Root });
 
-// Every page is its own chunk. three.js and React Three Fiber are only imported by the public
-// landing and login pages, so they no longer ship in the main bundle.
-const rootRoute = createRootRoute({
-  component: Root,
-});
-
+// Every page is code-split so the three.js landing scene, the chart library and
+// the network graph only download on the routes that use them.
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
@@ -43,7 +31,10 @@ const queueRoute = createRoute({
 const casesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/investigator/cases",
-  component: lazyRouteComponent(() => import("../features/cases/InvestigatorCasesPage"), "InvestigatorCasesPage"),
+  component: lazyRouteComponent(
+    () => import("../features/cases/InvestigatorCasesPage"),
+    "InvestigatorCasesPage",
+  ),
 });
 
 const workspaceRoute = createRoute({
@@ -61,7 +52,10 @@ const proposalsRoute = createRoute({
 const proposalDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/wiki/proposals/$proposalId",
-  component: lazyRouteComponent(() => import("../features/wiki/WikiProposalDetailPage"), "WikiProposalDetailPage"),
+  component: lazyRouteComponent(
+    () => import("../features/wiki/WikiProposalDetailPage"),
+    "WikiProposalDetailPage",
+  ),
 });
 
 const auditRoute = createRoute({
@@ -81,7 +75,11 @@ const routeTree = rootRoute.addChildren([
   auditRoute,
 ]);
 
-export const router = createRouter({ routeTree });
+export const router = createRouter({
+  routeTree,
+  defaultPendingComponent: RoutePending,
+  defaultErrorComponent: RouteError,
+});
 
 declare module "@tanstack/react-router" {
   interface Register {

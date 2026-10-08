@@ -17,6 +17,9 @@ export function pct(value: number | null | undefined): string {
   return `${Math.round(value * 100)}%`;
 }
 
+/** Queue lanes in desk order: harm first, then selected, evidence, backlog. */
+export const LANE_ORDER: Lane[] = ["harm_priority", "selected", "needs_evidence", "overflow"];
+
 export function laneLabel(lane: Lane): string {
   switch (lane) {
     case "harm_priority":
@@ -102,4 +105,66 @@ export function screeningTone(days: number | null | undefined): "ok" | "warn" | 
   if (days <= 7) return "hot";
   if (days <= 15) return "warn";
   return "ok";
+}
+
+export function compactMoney(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
+export function count(value: number, noun: string, plural = `${noun}s`): string {
+  return `${value.toLocaleString("en-US")} ${value === 1 ? noun : plural}`;
+}
+
+const monthDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+const monthYear = new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+
+/** Formats a UTC epoch-ms date as "Jan 4". */
+export function shortDate(ms: number): string {
+  return monthDay.format(ms);
+}
+
+/** Formats a UTC epoch-ms date as "Jan 2024". */
+export function monthLabel(ms: number): string {
+  return monthYear.format(ms);
+}
+
+/** Parses an ISO date (YYYY-MM-DD) to UTC epoch ms, or null when absent/invalid. */
+export function isoDateMs(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const ms = Date.parse(`${value.slice(0, 10)}T00:00:00Z`);
+  return Number.isNaN(ms) ? null : ms;
+}
+
+/** Start (Monday, UTC) of the ISO week containing the given epoch-ms date. */
+export function weekStartMs(ms: number): number {
+  const date = new Date(ms);
+  const offset = (date.getUTCDay() + 6) % 7;
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() - offset);
+}
+
+export function humanize(value: string): string {
+  const text = value.replaceAll("_", " ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+// dateStyle/timeStyle cannot be combined with timeZoneName, so the fields are spelled out.
+const dateTimeFormat = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZoneName: "short",
+});
+
+/** Formats an ISO timestamp in the viewer's time zone, with a zone label; falls back to the raw text. */
+export function dateTime(value: string | null | undefined): string {
+  if (!value) return "—";
+  const ms = Date.parse(value);
+  return Number.isNaN(ms) ? value : dateTimeFormat.format(ms);
 }

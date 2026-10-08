@@ -1,6 +1,22 @@
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useAuth } from "../auth/AuthProvider";
+import { AppLogo } from "./ui/AppLogo";
+
+interface NavItem {
+  to: "/manager/queue" | "/investigator/cases" | "/wiki/proposals" | "/audit";
+  label: string;
+  /** Path prefix that marks this item as the current section. */
+  section: string;
+  permission: string;
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { to: "/manager/queue", label: "Queue", section: "/manager/queue", permission: "queue:read" },
+  { to: "/investigator/cases", label: "Cases", section: "/investigator/", permission: "case:read" },
+  { to: "/wiki/proposals", label: "Precedents", section: "/wiki/", permission: "wiki:read" },
+  { to: "/audit", label: "Audit", section: "/audit", permission: "audit:read" },
+];
 
 export function Shell() {
   const { user, loading, logout, allowed } = useAuth();
@@ -15,20 +31,15 @@ export function Shell() {
 
   if (loading) {
     return (
-      <div className="boot">
-        <span className="brand-mark" aria-hidden="true" />
+      <div className="boot" role="status">
+        <AppLogo />
         <p>ClaimShield Nexus</p>
-        <p className="muted">Checking session…</p>
+        <p>Checking session…</p>
       </div>
     );
   }
 
   if (!user) return null;
-
-  const showQueue = allowed("queue:read");
-  const showCases = allowed("case:read");
-  const showWiki = allowed("wiki:read");
-  const showAudit = allowed("audit:read");
 
   return (
     <div className="app">
@@ -37,45 +48,31 @@ export function Shell() {
       </a>
       <header className="mast">
         <Link to="/" className="mast-brand">
-          <span className="brand-mark" aria-hidden="true" />
-          <div>
+          <AppLogo />
+          <span>
             <strong>ClaimShield Nexus</strong>
-            <p>SIU · post-adjudication · Acentra Health</p>
-          </div>
+            <small>SIU · post-adjudication · Acentra Health</small>
+          </span>
         </Link>
         <nav className="mast-nav" aria-label="Primary">
-          {showQueue && (
-            <Link to="/manager/queue" className={pathname.startsWith("/manager/queue") ? "active" : ""}>
-              Queue
-            </Link>
-          )}
-          {showCases && (
+          {NAV_ITEMS.filter((item) => allowed(item.permission)).map((item) => (
             <Link
-              to="/investigator/cases"
-              className={pathname.startsWith("/investigator/") ? "active" : ""}
+              key={item.to}
+              to={item.to}
+              aria-current={pathname.startsWith(item.section) ? "page" : undefined}
             >
-              Cases
+              {item.label}
             </Link>
-          )}
-          {showWiki && (
-            <Link to="/wiki/proposals" className={pathname.startsWith("/wiki/") ? "active" : ""}>
-              Precedents
-            </Link>
-          )}
-          {showAudit && (
-            <Link to="/audit" className={pathname.startsWith("/audit") ? "active" : ""}>
-              Audit
-            </Link>
-          )}
+          ))}
         </nav>
         <div className="mast-user">
-          <span>
+          <span className="mast-user-name">
             {user.display_name}
-            <em>{user.role}</em>
+            <span>{user.role}</span>
           </span>
           <button
             type="button"
-            className="btn ghost"
+            className="btn small ghost"
             onClick={() => {
               void logout().then(() => navigate({ to: "/login" }));
             }}
@@ -84,7 +81,9 @@ export function Shell() {
           </button>
         </div>
       </header>
-      <Outlet />
+      <div className="app-main">
+        <Outlet />
+      </div>
     </div>
   );
 }
