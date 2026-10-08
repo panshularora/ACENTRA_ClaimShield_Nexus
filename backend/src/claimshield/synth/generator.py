@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import numpy as np
@@ -78,9 +79,7 @@ def generate(profile: str = "tiny", seed: int = 7) -> Dataset:
     providers = _providers(rng, fake, spec, locations, start)
     owners, ownership, contacts = _ownership(rng, fake, spec, providers, start)
     facilities = _facilities(rng, locations)
-    claims, lines, stays = _legitimate_claims(
-        rng, spec, members, providers, facilities, start, end
-    )
+    claims, lines, stays = _legitimate_claims(rng, spec, members, providers, facilities, start, end)
     referrals = _referrals(rng, spec, members, providers, start, end)
     evv = pd.DataFrame(
         columns=[
@@ -128,10 +127,10 @@ def generate(profile: str = "tiny", seed: int = 7) -> Dataset:
     ds.data_card = {
         "profile": profile,
         "seed": seed,
-        "n_members": int(len(ds.tables["member"])),
-        "n_providers": int(len(ds.tables["provider"])),
-        "n_claim_lines": int(len(ds.tables["claim_line"])),
-        "n_schemes": int(len(ds.ground_truth)),
+        "n_members": len(ds.tables["member"]),
+        "n_providers": len(ds.tables["provider"]),
+        "n_claim_lines": len(ds.tables["claim_line"]),
+        "n_schemes": len(ds.ground_truth),
         "code_systems": sorted(ds.tables["claim_line"]["code_system"].unique().tolist()),
         "base_rates": "design knobs, not prevalence estimates",
         "limitations": [
@@ -260,7 +259,7 @@ def _ownership(
         bank = _rid(rng, "BK", 8)
         contacts.append({"entity_id": oid, "entity_type": "owner", "kind": "phone", "value_hash": phone})
         contacts.append({"entity_id": oid, "entity_type": "owner", "kind": "bank_token", "value_hash": bank})
-    owner_ids = [o["owner_id"] for o in owners]
+    owner_ids = [str(o["owner_id"]) for o in owners]
     for _, prov in providers.iterrows():
         oid = owner_ids[int(rng.integers(0, len(owner_ids)))]
         links.append(
@@ -319,7 +318,7 @@ def _pick_code(rng: np.random.Generator, line: str) -> tuple[str, str, str, int 
         code = str(rng.choice(EM_LEVELS, p=[0.08, 0.22, 0.4, 0.22, 0.08]))
         return CODE_SYSTEM_SYNTH, code, POS_OFFICE, None, None
     if line == "behavioral_health":
-        code = str(rng.choice(BH_TIMED + [ABA_HOUR]))
+        code = str(rng.choice([*BH_TIMED, ABA_HOUR]))
         minutes = {"PSY-30": 30, "PSY-45": 45, "PSY-60": 60, ABA_HOUR: 60}[code]
         return CODE_SYSTEM_SYNTH, code, POS_OFFICE, minutes, None
     if line == "laboratory":
@@ -356,10 +355,7 @@ def _legitimate_claims(
     living_ids = members.loc[members["date_of_death"].isna(), "member_id"].astype(str).tolist()
     if not living_ids:
         living_ids = [str(m) for m in member_ids]
-    prov_by_line = {
-        line: providers[providers.service_line == line]["provider_id"].tolist()
-        for line in SERVICE_LINES
-    }
+    prov_by_line = {line: providers[providers.service_line == line]["provider_id"].tolist() for line in SERVICE_LINES}
     fac_ids = facilities["facility_id"].tolist() or [None]
     for _ in range(n):
         line_type = str(rng.choice(SERVICE_LINES, p=[0.28, 0.1, 0.08, 0.08, 0.08, 0.14, 0.16, 0.08]))
@@ -464,17 +460,13 @@ def _referrals(
     return pd.DataFrame(rows)
 
 
-def _attach_home_health_evv(
-    ds: Dataset, rng: np.random.Generator, *, skip_line_ids: set[str]
-) -> None:
+def _attach_home_health_evv(ds: Dataset, rng: np.random.Generator, *, skip_line_ids: set[str]) -> None:
     """Write an EVV row for every home-health claim line except planted S09 misses."""
     claims = ds.tables["claim"]
     hh = claims[claims.claim_type == "home_health"]
     if hh.empty:
         return
-    lines = ds.tables["claim_line"].merge(
-        hh[["claim_id", "member_id", "billing_provider_id"]], on="claim_id"
-    )
+    lines = ds.tables["claim_line"].merge(hh[["claim_id", "member_id", "billing_provider_id"]], on="claim_id")
     members = ds.tables["member"].set_index("member_id")
     locations = ds.tables["location"].set_index("location_id")
     rows: list[dict[str, Any]] = []
@@ -485,7 +477,7 @@ def _attach_home_health_evv(
         loc = locations.loc[member.location_id]
         dos = pd.Timestamp(row.dos_from).date()
         hour = int(rng.integers(7, 18))
-        start_ts = datetime(dos.year, dos.month, dos.day, hour, int(rng.integers(0, 50)), tzinfo=timezone.utc)
+        start_ts = datetime(dos.year, dos.month, dos.day, hour, int(rng.integers(0, 50)), tzinfo=UTC)
         minutes = int(row.minutes) if pd.notna(row.minutes) and row.minutes else 45
         rows.append(
             {
@@ -515,12 +507,12 @@ def _rx(
     start: date,
     end: date,
 ) -> pd.DataFrame:
-    prescribers = providers[providers.service_line == "professional"]["provider_id"].tolist() or providers[
-        "provider_id"
-    ].tolist()
-    pharmacies = providers[providers.service_line == "pharmacy"]["provider_id"].tolist() or providers[
-        "provider_id"
-    ].tolist()
+    prescribers = (
+        providers[providers.service_line == "professional"]["provider_id"].tolist() or providers["provider_id"].tolist()
+    )
+    pharmacies = (
+        providers[providers.service_line == "pharmacy"]["provider_id"].tolist() or providers["provider_id"].tolist()
+    )
     span = max(1, (end - start).days)
     rows = []
     for _ in range(spec.n_rx):
@@ -539,9 +531,7 @@ def _rx(
     return pd.DataFrame(rows)
 
 
-def _exclusions(
-    rng: np.random.Generator, fake: Faker, providers: pd.DataFrame, start: date
-) -> pd.DataFrame:
+def _exclusions(rng: np.random.Generator, fake: Faker, providers: pd.DataFrame, start: date) -> pd.DataFrame:
     rows = []
     for _ in range(max(4, len(providers) // 80)):
         rows.append(
@@ -550,7 +540,7 @@ def _exclusions(
                 "lastname": fake.last_name(),
                 "firstname": fake.first_name(),
                 "busname": "",
-                "dob": date(1965, 3, 12),
+                "dob": None,  # filled from excl_id below so the RNG stream is unchanged
                 "address": fake.street_address(),
                 "npi": None if rng.random() < 0.7 else random_npi(rng),
                 "excl_type": str(rng.choice(["1128a1", "1128b4", "1128a2"])),
@@ -558,7 +548,15 @@ def _exclusions(
                 "rein_date": None,
             }
         )
+    for row in rows:
+        row["dob"] = _stable_dob(str(row["excl_id"]))
     return pd.DataFrame(rows)
+
+
+def _stable_dob(key: str) -> date:
+    """A date of birth between 1945 and 1984 derived from the record id (no RNG draw)."""
+    offset = int.from_bytes(hashlib.sha256(key.encode()).digest()[:4], "big") % (40 * 365)
+    return date(1945, 1, 1) + timedelta(days=offset)
 
 
 def _investigations(ds: Dataset, rng: np.random.Generator, start: date, end: date, spec: Profile) -> None:
@@ -577,8 +575,10 @@ def _investigations(ds: Dataset, rng: np.random.Generator, start: date, end: dat
         closed = _add_days(opened, int(rng.integers(10, 80)))
         true_bad = True
         noisy_unsub = true_bad and rng.random() < 0.15
-        outcome = "unsubstantiated" if noisy_unsub else str(
-            rng.choice(["substantiated", "education", "referred"], p=[0.5, 0.3, 0.2])
+        outcome = (
+            "unsubstantiated"
+            if noisy_unsub
+            else str(rng.choice(["substantiated", "education", "referred"], p=[0.5, 0.3, 0.2]))
         )
         inv_rows.append(
             {

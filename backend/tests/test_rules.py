@@ -44,13 +44,8 @@ def test_rule_catalog_stamps_policy_refs(tiny_dataset) -> None:
     assert death.evidence["rule_title"]
 
 
-def test_harm_lambda_changes_expected_value() -> None:
-    case = {
-        "p_confirm": 0.4,
-        "flagged_dollars": 1000.0,
-        "harm": 4,
-        "members_affected": 2,
-    }
-    low = expected_value(case, horizon_days=60, recovery=0.5, harm_lambda=50.0)
-    high = expected_value(case, horizon_days=60, recovery=0.5, harm_lambda=250.0)
-    assert high > low
+def test_expected_value_is_dollars_only() -> None:
+    case = {"p_confirm": 0.4, "flagged_dollars": 1000.0, "harm": 4, "members_affected": 2}
+    value = expected_value(case, horizon_days=60, recovery=0.5)
+    assert value == 0.4 * 0.5 * (1000.0 + 1000.0 * 60 / 90)
+    assert expected_value({**case, "harm": 1, "members_affected": 40}, horizon_days=60, recovery=0.5) == value

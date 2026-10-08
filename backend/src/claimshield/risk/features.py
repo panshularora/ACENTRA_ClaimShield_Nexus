@@ -196,9 +196,7 @@ def provider_features(
     providers = tables["provider"][["provider_id", "service_line"]].copy()
     providers["provider_id"] = providers["provider_id"].astype(str)
     pids = providers["provider_id"].tolist()
-    feats: dict[str, dict[str, float]] = {
-        pid: dict.fromkeys(PROVIDER_FEATURES, 0.0) for pid in pids
-    }
+    feats: dict[str, dict[str, float]] = {pid: dict.fromkeys(PROVIDER_FEATURES, 0.0) for pid in pids}
 
     lines = tables["claim_line"][["line_id", "claim_id", "dos_from", "paid"]].merge(
         tables["claim"][["claim_id", "billing_provider_id", "member_id"]], on="claim_id"
@@ -210,9 +208,7 @@ def provider_features(
 
     last_30 = lines[lines["dos"] > ts - timedelta(days=30)]
     last_90 = lines[lines["dos"] > ts - timedelta(days=90)]
-    prior_60 = lines[
-        (lines["dos"] > ts - timedelta(days=90)) & (lines["dos"] <= ts - timedelta(days=30))
-    ]
+    prior_60 = lines[(lines["dos"] > ts - timedelta(days=90)) & (lines["dos"] <= ts - timedelta(days=30))]
     n30 = last_30.groupby("billing_provider_id").size()
     n90 = last_90.groupby("billing_provider_id").size()
     np60 = prior_60.groupby("billing_provider_id").size()

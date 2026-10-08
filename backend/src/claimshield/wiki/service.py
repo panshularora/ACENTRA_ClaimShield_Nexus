@@ -2,20 +2,21 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from collections.abc import Sequence
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from claimshield.audit.service import append_event
-from claimshield.cases.workspace import KIND_LABELS, RULE_TITLES, alerts_for, iso, serialize_alert
-from claimshield.core.errors import Conflict, NotFound, ValidationFailed
+from claimshield.cases.common import KIND_LABELS, RULE_TITLES, alerts_for, iso, serialize_alert
+from claimshield.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
 from claimshield.core.ids import new_id
-from claimshield.db.models import Case, Decision, Label, Provider, User, WikiPage, WikiProposal
+from claimshield.db.models import Alert, Case, Decision, Label, Provider, User, WikiPage, WikiProposal
 
 
-def _scheme_tags(alerts: list) -> list[str]:
+def _scheme_tags(alerts: Sequence[Alert]) -> list[str]:
     tags: list[str] = []
     for alert in alerts:
         kind = (alert.evidence or {}).get("kind")
@@ -24,7 +25,7 @@ def _scheme_tags(alerts: list) -> list[str]:
     return tags
 
 
-def _rule_ids(alerts: list) -> list[str]:
+def _rule_ids(alerts: Sequence[Alert]) -> list[str]:
     ids: list[str] = []
     for alert in alerts:
         if alert.rule_id and alert.rule_id not in ids:
@@ -101,19 +102,20 @@ def draft_precedent(
             if lid not in line_ids:
                 line_ids.append(lid)
     title = f"Precedent: {decision.action} · {top}"
-    body = {
+    body: dict[str, Any] = {
         "source_case": case.case_id,
         "primary_entity_type": case.primary_entity_type,
         "primary_entity_id": case.primary_entity_id,
         "primary_entity_name": provider.name if provider else case.primary_entity_id,
         "decision": decision.action,
         "outcome": case.status,
-        "confirmed_pattern": pattern,
+        # A screening decision confirms nothing: the pattern is recorded as observed, with the
+        # decision attached, so later briefs do not inherit dismissed or monitored cases as proof.
+        "observed_pattern": pattern,
+        "pattern_status": "observed",
+        "decision_context": f"{decision.action} — reason: {decision.reason[:280]}",
         "scheme_tags": tags,
-        "rules": [
-            {"rule_id": r, "title": RULE_TITLES.get(r, r)}
-            for r in rules
-        ],
+        "rules": [{"rule_id": r, "title": RULE_TITLES.get(r, r)} for r in rules],
         "key_evidence": [
             {
                 "alert_id": a["alert_id"],
@@ -212,9 +214,18 @@ def _linked_label(session: Session, decision_id: str) -> Label | None:
     return session.execute(select(Label).where(Label.decision_id == decision_id)).scalar_one_or_none()
 
 
-def approve_proposal(session: Session, *, proposal: WikiProposal, user: User, note: str, now: datetime) -> WikiPage:
+def _review_guard(session: Session, proposal: WikiProposal, user: User) -> None:
+    """Segregation of duties: nobody reviews a precedent drafted from their own work."""
     if proposal.status != "pending":
         raise Conflict("proposal is not pending")
+    decision = session.get(Decision, proposal.decision_id)
+    authors = {proposal.created_by, decision.actor_id if decision else None}
+    if user.id in authors:
+        raise Forbidden("a precedent cannot be reviewed by the person who drafted or decided it")
+
+
+def approve_proposal(session: Session, *, proposal: WikiProposal, user: User, note: str, now: datetime) -> WikiPage:
+    _review_guard(session, proposal, user)
     page = WikiPage(
         page_id=new_id("PAGE"),
         slug=f"precedent-{proposal.decision_id.lower()}",
@@ -237,9 +248,6 @@ def approve_proposal(session: Session, *, proposal: WikiProposal, user: User, no
         label.status = "approved"
         label.approved_by = user.id
         label.approved_at = now
-    decision = session.get(Decision, proposal.decision_id)
-    if decision is not None:
-        decision.approved_by = user.id
     session.flush()
     append_event(
         session,
@@ -259,8 +267,7 @@ def approve_proposal(session: Session, *, proposal: WikiProposal, user: User, no
 
 
 def reject_proposal(session: Session, *, proposal: WikiProposal, user: User, note: str, now: datetime) -> WikiProposal:
-    if proposal.status != "pending":
-        raise Conflict("proposal is not pending")
+    _review_guard(session, proposal, user)
     text = (note or "").strip()
     if len(text) < 20:
         raise ValidationFailed("reject note must be at least 20 characters")
@@ -336,10 +343,4 @@ def proposal_for_case(session: Session, case_id: str) -> WikiProposal | None:
 def label_for_case(session: Session, case_id: str) -> Label | None:
     return session.execute(
         select(Label).where(Label.case_id == case_id).order_by(Label.created_at.desc()).limit(1)
-    ).scalar_one_or_none()
-
-
-def proposal_for_decision(session: Session, decision_id: str) -> WikiProposal | None:
-    return session.execute(
-        select(WikiProposal).where(WikiProposal.decision_id == decision_id)
     ).scalar_one_or_none()

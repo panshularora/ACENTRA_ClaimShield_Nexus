@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
@@ -15,7 +17,7 @@ from claimshield.pipeline.service import (
     load_synthetic_batch,
     recompute_run,
 )
-from claimshield.queue.explain import run_payload, screening_days_left, why_rank
+from claimshield.queue.explain import LANE_LABELS, run_payload, screening_days_left, why_rank
 from claimshield.queue.rank import rank_pack_for_case, recommendation_for
 from claimshield.risk.present import risk_fields
 
@@ -23,11 +25,11 @@ router = APIRouter(prefix="/api/v1", tags=["batches"])
 
 
 class LoadBatchBody(BaseModel):
-    adapter: str = "synthetic"
-    profile: str = "tiny"
+    adapter: str = Field(default="synthetic", max_length=32)
+    profile: str = Field(default="tiny", max_length=32)
     seed: int = 7
-    horizon_days: int = 60
-    capacity_hours: float = Field(default=40.0, gt=0)
+    horizon_days: int = Field(default=60, ge=1, le=365)
+    capacity_hours: float = Field(default=40.0, gt=0, le=10_000)
     max_slots: int = Field(default=20, ge=1, le=200)
     member_weight: float = Field(default=1.0, ge=0.25, le=3.0)
     run_now: bool = True
@@ -39,17 +41,16 @@ class BatchOut(BaseModel):
     status: str
     profile: str | None
     seed: int | None
-    load_report: dict
-    run: dict | None = None
+    load_report: dict[str, Any]
+    run: dict[str, Any] | None = None
 
 
 class RecomputeBody(BaseModel):
-    batch_id: str | None = None
-    horizon_days: int = 60
-    capacity_hours: float = Field(default=40.0, gt=0)
+    batch_id: str | None = Field(default=None, max_length=32)
+    horizon_days: int = Field(default=60, ge=1, le=365)
+    capacity_hours: float = Field(default=40.0, gt=0, le=10_000)
     max_slots: int = Field(default=20, ge=1, le=200)
     member_weight: float = Field(default=1.0, ge=0.25, le=3.0)
-    harm_lambda: float | None = Field(default=None, gt=0)
 
 
 @router.post("/batches", dependencies=[Depends(check_csrf)])
@@ -97,7 +98,7 @@ def start_run(
     session: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
     user: User = Depends(require("run:start")),
-) -> dict:
+) -> dict[str, Any]:
     batch = session.get(Batch, body.batch_id) if body.batch_id else latest_batch(session)
     if body.batch_id and batch is None:
         raise NotFound("batch not found")
@@ -110,7 +111,6 @@ def start_run(
         capacity_hours=body.capacity_hours,
         max_slots=body.max_slots,
         member_weight=body.member_weight,
-        harm_lambda=body.harm_lambda,
     )
     n_alerts = session.execute(select(Alert).where(Alert.run_id == run.run_id)).scalars().all()
     n_cases = session.execute(select(Case).where(Case.run_id == run.run_id)).scalars().all()
@@ -121,7 +121,7 @@ def start_run(
 def get_current_run(
     session: Session = Depends(get_db),
     _: User = Depends(require("queue:read")),
-) -> dict:
+) -> dict[str, Any]:
     run = latest_run(session)
     if run is None:
         raise NotFound("no completed run")
@@ -134,7 +134,7 @@ def get_current_run(
 def list_batches(
     session: Session = Depends(get_db),
     _: User = Depends(require("batch:read")),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     rows = session.execute(select(Batch).order_by(Batch.created_at.desc())).scalars().all()
     return [
         {
@@ -154,15 +154,13 @@ def get_batch(
     batch_id: str,
     session: Session = Depends(get_db),
     _: User = Depends(require("batch:read")),
-) -> dict:
+) -> dict[str, Any]:
     batch = session.get(Batch, batch_id)
     if batch is None:
         raise NotFound("batch not found")
     runs = (
         session.execute(
-            select(PipelineRun)
-            .where(PipelineRun.batch_id == batch_id)
-            .order_by(PipelineRun.created_at.desc())
+            select(PipelineRun).where(PipelineRun.batch_id == batch_id).order_by(PipelineRun.created_at.desc())
         )
         .scalars()
         .all()
@@ -183,7 +181,7 @@ def get_run(
     run_id: str,
     session: Session = Depends(get_db),
     _: User = Depends(require("queue:read")),
-) -> dict:
+) -> dict[str, Any]:
     run = session.get(PipelineRun, run_id)
     if run is None:
         raise NotFound("run not found")
@@ -197,7 +195,7 @@ def get_queue(
     run_id: str,
     session: Session = Depends(get_db),
     _: User = Depends(require("queue:read")),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     run = session.get(PipelineRun, run_id)
     if run is None:
         raise NotFound("run not found")
@@ -205,9 +203,7 @@ def get_queue(
     member_weight = float((run.summary or {}).get("member_weight") or 1.0)
     horizon = int(run.horizon_days or 60)
     packs = {
-        case.case_id: rank_pack_for_case(
-            case, horizon_days=horizon, peers=cases, member_weight=member_weight
-        )
+        case.case_id: rank_pack_for_case(case, horizon_days=horizon, peers=cases, member_weight=member_weight)
         for case in cases
     }
     today = [c for c in cases if c.lane in {"harm_priority", "selected"}]
@@ -215,9 +211,7 @@ def get_queue(
     ranks = {c.case_id: i + 1 for i, c in enumerate(today)}
     latest_override: dict[str, QueueOverride] = {}
     for row in session.execute(
-        select(QueueOverride)
-        .where(QueueOverride.run_id == run_id)
-        .order_by(QueueOverride.created_at.desc())
+        select(QueueOverride).where(QueueOverride.run_id == run_id).order_by(QueueOverride.created_at.desc())
     ).scalars():
         latest_override.setdefault(row.case_id, row)
     order = {"harm_priority": 0, "selected": 1, "needs_evidence": 2, "overflow": 3}
@@ -226,14 +220,9 @@ def get_queue(
         key=lambda c: (order.get(c.lane, 9), -packs[c.case_id]["composite"]),
     )
     alert_counts = dict(
-        session.execute(
-            select(Alert.case_id, func.count()).where(Alert.run_id == run_id).group_by(Alert.case_id)
-        ).all()
+        session.execute(select(Alert.case_id, func.count()).where(Alert.run_id == run_id).group_by(Alert.case_id)).all()
     )
-    risks = {
-        r.case_id: r
-        for r in session.execute(select(CaseRisk).where(CaseRisk.run_id == run_id)).scalars()
-    }
+    risks = {r.case_id: r for r in session.execute(select(CaseRisk).where(CaseRisk.run_id == run_id)).scalars()}
     return [
         _case_brief(
             c,
@@ -250,12 +239,12 @@ def get_queue(
 def _case_brief(
     case: Case,
     *,
-    factors: dict | None = None,
+    factors: dict[str, Any] | None = None,
     queue_rank: int | None = None,
     override: QueueOverride | None = None,
     n_alerts: int = 0,
     risk: CaseRisk | None = None,
-) -> dict:
+) -> dict[str, Any]:
     pack = factors or {}
     shown = override if override and override.action != "release" else None
     entity_ids = case.entity_ids or [case.primary_entity_id]
@@ -267,6 +256,9 @@ def _case_brief(
         "primary_entity_id": case.primary_entity_id,
         "entity_ids": entity_ids,
         "harm": case.harm,
+        "priority_override": bool(case.override_kinds) or case.harm >= 4,
+        "override_kinds": case.override_kinds or [],
+        "lane_label": LANE_LABELS.get(case.lane, case.lane),
         "severity": case.severity,
         "members_affected": case.members_affected,
         "flagged_dollars": case.flagged_dollars,
@@ -287,7 +279,7 @@ def _case_brief(
         "alert_group": {
             "n_entities": n_entities,
             "n_alerts": n_alerts,
-            "urgent": case.harm >= 4,
+            "urgent": case.harm >= 4 or bool(case.override_kinds),
             "text": (
                 "Linked NPIs (owner, TIN, contact, or referral). Comparison peers are not in this case."
                 if n_entities > 1

@@ -48,14 +48,8 @@ def _as_list(value: Any) -> list[str]:
     return []
 
 
-def index_ground_truth(
-    tables: dict[str, pd.DataFrame], ground_truth: pd.DataFrame
-) -> GroundTruthIndex:
-    fraud = (
-        ground_truth[ground_truth["is_fraud"].astype(bool)]
-        if not ground_truth.empty
-        else ground_truth
-    )
+def index_ground_truth(tables: dict[str, pd.DataFrame], ground_truth: pd.DataFrame) -> GroundTruthIndex:
+    fraud = ground_truth[ground_truth["is_fraud"].astype(bool)] if not ground_truth.empty else ground_truth
     fraud_lines: dict[str, tuple[str, bool]] = {}
     link_parties: dict[str, set[tuple[str, bool]]] = {}
     for row in fraud.itertuples(index=False):
@@ -88,9 +82,7 @@ def index_ground_truth(
     )
 
 
-def first_event_after(
-    gt: GroundTruthIndex, cutoff: date, *, include_held_out: bool = False
-) -> dict[str, date]:
+def first_event_after(gt: GroundTruthIndex, cutoff: date, *, include_held_out: bool = False) -> dict[str, date]:
     """Earliest event strictly after the cutoff, per provider (held-out schemes excluded)."""
     later = gt.events[gt.events["event_date"] > cutoff]
     if not include_held_out:
@@ -111,9 +103,7 @@ def interval_of(event: date | None, cutoff: date) -> int | None:
     return (days - 1) // INTERVAL_DAYS + 1
 
 
-def horizon_labels(
-    event_interval: int | None, cutoff: date, data_end: date
-) -> dict[str, float | None]:
+def horizon_labels(event_interval: int | None, cutoff: date, data_end: date) -> dict[str, float | None]:
     """y_30/y_60/y_90: 1/0 when the window is fully observed, None when censored."""
     out: dict[str, float | None] = {}
     for h in HORIZONS:
@@ -125,9 +115,7 @@ def horizon_labels(
     return out
 
 
-def case_confirm_label(
-    case: dict[str, Any], gt: GroundTruthIndex, cutoff: date
-) -> tuple[int, bool]:
+def case_confirm_label(case: dict[str, Any], gt: GroundTruthIndex, cutoff: date) -> tuple[int, bool]:
     """(label, held_out_only) for one case built at the cutoff."""
     tags: set[tuple[str, bool]] = set()
     for lid in case.get("line_ids") or []:
@@ -137,9 +125,7 @@ def case_confirm_label(
     subjects = {str(e) for e in case.get("entity_ids") or [case.get("primary_entity_id")] if e}
     for eid in subjects:
         tags |= gt.link_parties.get(eid, set())
-    active = gt.events[
-        gt.events["provider_id"].isin(subjects) & (gt.events["event_date"] <= cutoff)
-    ]
+    active = gt.events[gt.events["provider_id"].isin(subjects) & (gt.events["event_date"] <= cutoff)]
     tags |= set(zip(active["scheme_id"], active["held_out"].astype(bool), strict=True))
     if not tags:
         return 0, False

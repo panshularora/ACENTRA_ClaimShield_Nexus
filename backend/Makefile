@@ -1,7 +1,7 @@
-.PHONY: sync test demo generate train lint
+.PHONY: sync test demo generate train lint format typecheck check
 
 sync:
-	uv sync --extra dev
+	uv sync --frozen --extra dev
 
 test:
 	uv run pytest
@@ -17,3 +17,12 @@ train:
 
 lint:
 	uv run ruff check src tests
+	uv run ruff format --check src tests
+
+format:
+	uv run ruff format src tests
+
+typecheck:
+	uv run mypy
+
+check: lint typecheck test

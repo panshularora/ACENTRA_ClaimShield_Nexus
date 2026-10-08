@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -26,7 +28,7 @@ def ingest_from_s3(
     body: IngestBody,
     session: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
-) -> dict:
+) -> dict[str, Any]:
     user: User = seed_system_user(session)
     store = build_store(settings)
     return ingest_s3_object(

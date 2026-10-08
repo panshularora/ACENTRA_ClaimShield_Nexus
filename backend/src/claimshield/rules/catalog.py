@@ -58,7 +58,8 @@ def rule_title(rule_id: str | None, fallback: str | None = None) -> str | None:
 def stamp_catalog(alerts: list[Any]) -> list[Any]:
     catalog = load_rule_catalog()
     for alert in alerts:
-        spec = catalog.get(getattr(alert, "rule_id", None))
+        rule_id = getattr(alert, "rule_id", None)
+        spec = catalog.get(rule_id) if isinstance(rule_id, str) else None
         if not spec:
             continue
         evidence = getattr(alert, "evidence", None)

@@ -43,9 +43,7 @@ class LogisticScorer:
         return np.asarray(np.clip(z, -Z_CLIP, Z_CLIP), dtype=float)
 
     def raw_logit(self, X: pd.DataFrame) -> np.ndarray:
-        return np.asarray(
-            self._standardize(X) @ np.asarray(self.coef) + self.intercept, dtype=float
-        )
+        return np.asarray(self._standardize(X) @ np.asarray(self.coef) + self.intercept, dtype=float)
 
     def logit(self, X: pd.DataFrame) -> np.ndarray:
         return self.platt_a * self.raw_logit(X) + self.platt_b

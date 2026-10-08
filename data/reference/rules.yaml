@@ -3,7 +3,7 @@ rules:
     kind: duplicate
     title: Same member, provider, code, date of service
     severity: 3
-    policy_ref: NCCI-SYN-DUP
+    policy_ref: CLAIMS-DUP
   - rule_id: R-PTP-001
     kind: ptp_pair
     title: Procedure-to-procedure unbundling (indicator 0)
@@ -36,19 +36,19 @@ rules:
     policy_ref: CURES-EVV
   - rule_id: R-LEIE-001
     kind: excluded_party
-    title: Billing NPI matches synthetic LEIE
+    title: Provider matches synthetic LEIE (NPI and name agree, DOS after exclusion)
     severity: 4
     policy_ref: LEIE
   - rule_id: R-RX-001
     kind: doctor_shopping
-    title: High-MME opioids across 4+ prescribers and pharmacies
+    title: Multiple-prescriber / multiple-pharmacy opioid pattern (member-level)
     severity: 3
     policy_ref: OEI-02-17-00250
   - rule_id: R-SEX-001
     kind: sex_implausible
-    title: Sex-incompatible synthetic procedure
-    severity: 3
-    policy_ref: NCCI-DEM
+    title: Sex-procedure coding conflict (data-quality check; KX/CC45 excluded)
+    severity: 1
+    policy_ref: CODE-EDITOR-SEX
   - rule_id: R-POS-001
     kind: pos_mismatch
     title: Office E/M billed at inpatient or ambulance POS
@@ -56,14 +56,14 @@ rules:
     policy_ref: CMS-POS
   - rule_id: R-AMB-001
     kind: ambulance_overlap
-    title: Overlapping ambulance trips same vehicle-day
-    severity: 3
+    title: Several long recorded ambulance trips on one crew-day (overlap not tested)
+    severity: 2
     policy_ref: OEI-09-12-00351
   - rule_id: R-CLONE-001
     kind: clone_billing
-    title: Identical paid amount cloned across many members same day
+    title: Same-day volume of one service across many members far above peers
     severity: 3
-    policy_ref: SIU-CLONE
+    policy_ref: SIU-VOLUME
   - rule_id: R-STAY-001
     kind: stay_compression
     title: High-DRG facility claim with same-day admit and discharge
@@ -86,6 +86,6 @@ rules:
     policy_ref: OIG-SFA-TELEFRAUD
   - rule_id: G-OWN-001
     kind: excluded_owner
-    title: Owner name matches synthetic LEIE record
+    title: Owner matches synthetic LEIE record (name, DOB and address agree)
     severity: 4
     policy_ref: LEIE

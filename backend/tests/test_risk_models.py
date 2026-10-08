@@ -22,7 +22,6 @@ def _detect(tables, **kwargs):
         tables,
         horizon_days=60,
         recovery=0.5,
-        harm_lambda=250.0,
         capacity_hours=40.0,
         **kwargs,
     )
@@ -37,9 +36,7 @@ def artifact():
 
 def test_hazard_curve_is_monotone_for_any_input(artifact) -> None:
     rng = np.random.default_rng(11)
-    X = pd.DataFrame(
-        rng.normal(0, 3, size=(2000, len(PROVIDER_FEATURES))), columns=PROVIDER_FEATURES
-    )
+    X = pd.DataFrame(rng.normal(0, 3, size=(2000, len(PROVIDER_FEATURES))), columns=PROVIDER_FEATURES)
     curve = artifact.hazard.cumulative(X)
     assert curve.shape == (2000, len(HORIZONS))
     assert ((curve >= 0) & (curve <= 1)).all()
@@ -104,9 +101,7 @@ def test_panel_world_and_fit_are_deterministic_for_a_seed() -> None:
     assert one.scorer == two.scorer
 
 
-def test_missing_or_broken_artifact_falls_back_to_the_labelled_heuristic(
-    tmp_path, tiny_dataset
-) -> None:
+def test_missing_or_broken_artifact_falls_back_to_the_labelled_heuristic(tmp_path, tiny_dataset) -> None:
     assert load_artifact(tmp_path / "absent.json") is None
     broken = tmp_path / "broken.json"
     broken.write_text("{not json")
@@ -133,9 +128,7 @@ def test_trained_scores_are_probabilities_with_factors(tiny_dataset, artifact) -
         risk = case["risk"]
         assert 0.0 < case["p_confirm"] < 1.0
         assert risk["p_confirm_factors"], case["kinds"]
-        assert {"feature", "label", "value", "contribution", "direction"} <= set(
-            risk["p_confirm_factors"][0]
-        )
+        assert {"feature", "label", "value", "contribution", "direction"} <= set(risk["p_confirm_factors"][0])
         if case["f30"] is not None:
             assert 0.0 < case["f30"] <= case["f60"] <= case["f90"] < 1.0
             assert risk["risk_factors"]

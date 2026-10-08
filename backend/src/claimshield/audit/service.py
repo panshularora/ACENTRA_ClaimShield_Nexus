@@ -180,8 +180,8 @@ def public_log(
 
 
 def get_event(session: Session, seq: int) -> dict[str, Any]:
-    pack = public_log(session)
-    for event in pack["events"]:
+    events: list[dict[str, Any]] = public_log(session)["events"]
+    for event in events:
         if event["seq"] == seq:
             return event
     raise NotFound("audit event not found")

@@ -14,18 +14,36 @@ def screening_days_left(case: Case, *, today: date | None = None) -> int | None:
     return (due - (today or date.today())).days
 
 
+LANE_LABELS = {
+    "harm_priority": "Priority override (program integrity / potential beneficiary harm)",
+    "selected": "Today's queue",
+    "needs_evidence": "Needs evidence",
+    "overflow": "Tracked backlog",
+}
+OVERRIDE_LABELS = {
+    "after_death": "services after the member's date of death",
+    "excluded_party": "an excluded provider",
+    "excluded_owner": "an excluded owner",
+}
+
+
+def override_text(case: Case) -> str:
+    """Why a case is in the priority-override lane, in plain words."""
+    reasons = [OVERRIDE_LABELS.get(k, k.replace("_", " ")) for k in (case.override_kinds or [])]
+    if case.harm >= 4:
+        reasons.insert(0, f"potential beneficiary harm (level {case.harm})")
+    joined = ", ".join(reasons) or "a priority-override signal"
+    return (
+        f"Priority override for {joined}. Override cases are taken before dollar-ranked work, "
+        "and their hours count against today's capacity."
+    )
+
+
 def why_rank(case: Case, factors: dict[str, Any] | None = None) -> dict[str, Any]:
     rec = recommendation_for(case.lane)
     composite = (factors or {}).get("composite")
     if case.lane == "harm_priority":
-        return {
-            "code": "harm_override",
-            "recommendation": rec,
-            "text": (
-                f"Harm {case.harm} is at the CMS-style override. "
-                "Beneficiary harm takes a reserved slice of hours before other factors."
-            ),
-        }
+        return {"code": "priority_override", "recommendation": rec, "text": override_text(case)}
     if case.lane == "needs_evidence":
         return {
             "code": "evidence_floor",
@@ -71,4 +89,5 @@ def run_payload(run: PipelineRun, *, n_alerts: int, n_cases: int) -> dict[str, A
         "max_slots": (run.summary or {}).get("max_slots"),
         "member_weight": (run.summary or {}).get("member_weight"),
         "ranking_policy": (run.summary or {}).get("ranking_policy"),
+        "capacity": (run.summary or {}).get("capacity"),
     }

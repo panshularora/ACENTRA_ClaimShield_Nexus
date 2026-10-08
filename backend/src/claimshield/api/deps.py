@@ -2,23 +2,24 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 
-from fastapi import Cookie, Depends, Header, Request
+from fastapi import Depends, Header, Request
+from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from claimshield.auth.rbac import require_permission
 from claimshield.auth.service import user_from_access
 from claimshield.core.config import Settings, get_settings
-from claimshield.core.errors import Unauthorized
+from claimshield.core.errors import ClaimShieldError, Unauthorized
 from claimshield.db.models import User
 from claimshield.db.session import create_engine, session_factory
 
-_engine = None
+_engine: Engine | None = None
 _factory: sessionmaker[Session] | None = None
 
 
-def get_engine():
+def get_engine() -> Engine | None:
     return _engine
 
 
@@ -45,6 +46,12 @@ def get_db() -> Generator[Session, None, None]:
     try:
         yield db
         db.commit()
+    except ClaimShieldError as exc:
+        if exc.persist_changes:
+            db.commit()
+        else:
+            db.rollback()
+        raise
     except Exception:
         db.rollback()
         raise
@@ -74,7 +81,7 @@ def get_current_user(
     return user_from_access(session, settings, token)
 
 
-def require(permission: str):
+def require(permission: str) -> Callable[..., User]:
     def dep(user: User = Depends(get_current_user)) -> User:
         require_permission(user.role, permission)
         return user
@@ -82,14 +89,19 @@ def require(permission: str):
     return dep
 
 
-def check_csrf(
-    settings: Settings = Depends(get_settings),
-    csrf_header: str | None = Header(default=None, alias="X-CSRF-Token"),
-    csrf_cookie: str | None = Cookie(default=None, alias="cs_csrf"),
-) -> None:
-    if not settings.cookie_secure and csrf_header is None:
+def check_csrf(request: Request, settings: Settings = Depends(get_settings)) -> None:
+    """Double-submit CSRF check for cookie-authenticated writes.
+
+    A request that carries the auth cookies must echo the CSRF cookie in ``X-CSRF-Token``;
+    a missing header is rejected. Bearer-token clients send no ambient credentials, so
+    there is nothing for a cross-site request to ride on and the check does not apply.
+    """
+    cookies = request.cookies
+    if not cookies.get(settings.access_cookie_name) and not cookies.get(settings.refresh_cookie_name):
         return
-    if not csrf_header or not csrf_cookie or csrf_header != csrf_cookie:
+    header = request.headers.get("X-CSRF-Token") or ""
+    cookie = cookies.get(settings.csrf_cookie_name) or ""
+    if not header or not cookie or not hmac.compare_digest(header.encode(), cookie.encode()):
         raise Unauthorized("csrf check failed")
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from math import exp
+from typing import Any
 
 import pandas as pd
 
@@ -17,7 +18,6 @@ STRONG_KINDS = frozenset(
         "ptp_pair",
         "unit_cap",
         "inpatient_overlap",
-        "sex_implausible",
         "stay_compression",
         "identity_ring",
     }
@@ -35,8 +35,14 @@ MEDIUM_KINDS = frozenset(
         "mileage_padding",
     }
 )
-HARM4_KINDS = frozenset({"after_death", "excluded_party", "excluded_owner"})
-HARM3_KINDS = frozenset({"inpatient_overlap", "doctor_shopping", "daily_minutes_cap"})
+# Beneficiary harm (CMS PIM scale, top = risk to a living member): a multi-prescriber opioid
+# pattern, services billed during an inpatient stay, and impossible daily therapy hours.
+HARM4_KINDS = frozenset({"doctor_shopping", "inpatient_overlap", "daily_minutes_cap"})
+# An excluded provider or owner still treating members is a potential unsafe-provider signal.
+HARM3_KINDS = frozenset({"excluded_party", "excluded_owner"})
+# Program-integrity override: act now (stop payment exposure, refer), whatever the dollar rank.
+# Services after death cannot harm that member, so they set priority, not harm.
+PRIORITY_OVERRIDE_KINDS = frozenset({"after_death", "excluded_party", "excluded_owner"})
 # Merge NPIs into one case only for a specific visible link. Statistical peers stay out.
 LINK_KINDS = frozenset({"identity_ring", "excluded_owner", "referral_monopoly"})
 
@@ -45,7 +51,7 @@ def build_cases(
     alerts: list[AlertDraft],
     tables: dict[str, pd.DataFrame],
     communities: dict[str, str] | dict[str, int],
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     _ = communities
     groups = _group_alerts(alerts)
     claims = tables["claim"]
@@ -60,13 +66,12 @@ def build_cases(
         dollars = float(sum(paid_by_line.get(lid, 0.0) for lid in line_ids))
         members: set[str] = set()
         if line_ids:
-            hit = lines[lines.line_id.isin(line_ids)].merge(
-                claims[["claim_id", "member_id"]], on="claim_id"
-            )
+            hit = lines[lines.line_id.isin(line_ids)].merge(claims[["claim_id", "member_id"]], on="claim_id")
             members = set(hit["member_id"].astype(str).tolist())
         kinds = {str(a.evidence.get("kind")) for a in group}
         detectors = {a.detector for a in group}
         harm = _harm(kinds)
+        override_kinds = sorted(kinds & PRIORITY_OVERRIDE_KINDS)
         severity = _severity(kinds)
         evidence = _evidence_strength(kinds, detectors, group)
         n_providers = max(1, len(entity_ids))
@@ -82,13 +87,15 @@ def build_cases(
             {
                 "case_id": new_id("CASE"),
                 "primary_entity_id": primary,
-                "primary_entity_type": "provider",
+                "primary_entity_type": group[0].entity_type,
                 "entity_ids": entity_ids,
                 "alert_count": len(group),
                 "line_ids": line_ids,
                 "members_affected": len(members),
                 "flagged_dollars": round(dollars, 2),
                 "harm": harm,
+                "priority_override": bool(override_kinds),
+                "override_kinds": override_kinds,
                 "severity": severity,
                 "evidence_strength": round(evidence, 3),
                 "estimated_hours": hours,
@@ -151,7 +158,7 @@ def _entity_ids_for(group: list[AlertDraft]) -> list[str]:
     return seen
 
 
-def _grouping_for(group: list[AlertDraft], entity_ids: list[str]) -> dict:
+def _grouping_for(group: list[AlertDraft], entity_ids: list[str]) -> dict[str, Any]:
     kinds = {str(a.evidence.get("kind") or "") for a in group}
     held_out: list[str] = []
     subjects = set(entity_ids)

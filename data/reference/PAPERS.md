@@ -20,7 +20,7 @@ Li, Huang, Ayvaci, Setia (M&SOM / related IS literature) and the CMS Fraud Preve
 
 | ID | Scheme | Primary sources |
 | --- | --- | --- |
-| S01 | Duplicate billing | OIG nursing-home duplicates A-01-04-00003; NCCI |
+| S01 | Duplicate billing | OIG nursing-home duplicates A-01-04-00003; payer duplicate-claim edit (not NCCI) |
 | S02 | E/M upcoding | OIG OEI-04-10-00180 |
 | S03 | Panel unbundling | CMS Medicaid NCCI PTP files |
 | S04 | Excess units / MUE | CMS MUE / MAI 3 same-day split |
@@ -37,7 +37,7 @@ Li, Huang, Ayvaci, Setia (M&SOM / related IS literature) and the CMS Fraud Preve
 | G3 | Shell cluster / straw owners | 42 CFR 455.104; Gold Rush straw owners |
 | C1 | Camouflage just under thresholds | DOJ 2026 hospice metric gaming |
 | S13 | Place-of-service mismatch | CMS POS policy; common FWA edit |
-| S14 | Sex-implausible procedure | NCCI medically unlikely / demographic edits |
+| S14 | Sex–procedure conflict edit | Code-editor logic; KX / condition code 45 bypass per CMS R1877CP (data-quality check, not FWA) |
 | S15 | Weekend mill | Peer-anomaly literature; office-only specialties |
 | S16 | Mileage padding | OIG ambulance OEI-09-12-00351 |
 | S17 | Referral monopoly (HHI) | Kickback / Stark pattern; graph layer |

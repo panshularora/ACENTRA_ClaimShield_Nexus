@@ -276,9 +276,7 @@ class InvestigationSubject(Base):
     __tablename__ = "investigation_subject"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    investigation_id: Mapped[str] = mapped_column(
-        ForeignKey("investigation.investigation_id"), index=True
-    )
+    investigation_id: Mapped[str] = mapped_column(ForeignKey("investigation.investigation_id"), index=True)
     provider_id: Mapped[str] = mapped_column(String(32), index=True)
 
 
@@ -338,6 +336,8 @@ class Case(Base):
     primary_entity_type: Mapped[str] = mapped_column(String(16), default="provider")
     entity_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
     harm: Mapped[int] = mapped_column(Integer, default=1)
+    # Program-integrity override kinds (after_death, excluded_party, excluded_owner); empty = none.
+    override_kinds: Mapped[list[str]] = mapped_column(JSON, default=list)
     severity: Mapped[int] = mapped_column(Integer, default=1)
     members_affected: Mapped[int] = mapped_column(Integer, default=0)
     flagged_dollars: Mapped[float] = mapped_column(Float, default=0.0)
@@ -386,10 +386,15 @@ class Decision(Base):
     case_id: Mapped[str] = mapped_column(String(32), index=True)
     actor_id: Mapped[str] = mapped_column(String(32))
     action: Mapped[str] = mapped_column(String(32))
+    # recorded | pending_approval | approved | rejected
+    status: Mapped[str] = mapped_column(String(24), default="recorded", index=True)
+    prior_status: Mapped[str | None] = mapped_column(String(24), nullable=True)
     ladder_step: Mapped[str | None] = mapped_column(String(64), nullable=True)
     reason: Mapped[str] = mapped_column(Text)
     evidence_refs: Mapped[list[str]] = mapped_column(JSON, default=list)
     approved_by: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 

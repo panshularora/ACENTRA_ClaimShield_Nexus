@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -13,6 +14,7 @@ from claimshield.api.routers import aws as aws_router
 from claimshield.api.routers import batches as batches_router
 from claimshield.api.routers import cases as cases_router
 from claimshield.api.routers import decisions as decisions_router
+from claimshield.api.routers import entities as entities_router
 from claimshield.api.routers import health as health_router
 from claimshield.api.routers import models as models_router
 from claimshield.api.routers import wiki as wiki_router
@@ -24,14 +26,17 @@ from claimshield.db.base import Base
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI):
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
+    settings.assert_safe_to_start()
     factory = configure_engine(settings)
     engine = get_engine()
     assert engine is not None
     Base.metadata.create_all(bind=engine)
     with factory() as session:
-        seed_demo_users(session)
+        if settings.demo_mode:
+            # Demo accounts have published passwords; never create them in a real deployment.
+            seed_demo_users(session)
         seed_system_user(session)
         session.commit()
     yield
@@ -63,6 +68,7 @@ def create_app() -> FastAPI:
     app.include_router(audit_router.router)
     app.include_router(wiki_router.router)
     app.include_router(decisions_router.router)
+    app.include_router(entities_router.router)
     app.include_router(aws_router.router)
     app.include_router(models_router.router)
     return app

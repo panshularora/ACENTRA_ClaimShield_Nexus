@@ -6,7 +6,6 @@ from claimshield.synth.codes import CODE_SYSTEM_SYNTH
 from claimshield.synth.generator import generate
 from claimshield.synth.luhn import is_luhn
 
-
 FORBIDDEN_FEATURE_COLS = {
     "scheme_id",
     "scheme_type",

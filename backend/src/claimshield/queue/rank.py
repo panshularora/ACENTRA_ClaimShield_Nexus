@@ -46,7 +46,7 @@ def _p90(values: list[float]) -> float:
     if not values:
         return 1.0
     ordered = sorted(values)
-    idx = min(len(ordered) - 1, max(0, int(round(0.9 * (len(ordered) - 1)))))
+    idx = min(len(ordered) - 1, max(0, round(0.9 * (len(ordered) - 1))))
     return max(float(ordered[idx]), 1.0)
 
 
@@ -90,7 +90,7 @@ def factor_scores(
     dollars = float(_get(case, "flagged_dollars") or 0.0)
     evidence = float(_get(case, "evidence_strength") or 0.0)
     return {
-        "severity": round(min(1.0, max(harm, severity) / 5.0), 4),
+        "severity": round(min(1.0, max(harm, severity) / 4.0), 4),  # both scales run 1-4
         "exposure": round(min(1.0, dollars / max(dollar_scale, 1.0)), 4),
         "member": round(min(1.0, (harm * members) / max(member_scale, 1.0)), 4),
         "evidence": round(min(1.0, max(0.0, evidence)), 4),
@@ -123,9 +123,7 @@ def attach_rank_factors(
     today: date | None = None,
 ) -> None:
     dollar_scale = _p90([float(c.get("flagged_dollars") or 0.0) for c in cases])
-    member_scale = _p90(
-        [int(c.get("harm") or 0) * max(1, int(c.get("members_affected") or 0)) for c in cases]
-    )
+    member_scale = _p90([int(c.get("harm") or 0) * max(1, int(c.get("members_affected") or 0)) for c in cases])
     for case in cases:
         scores = factor_scores(
             case,
@@ -172,12 +170,11 @@ def rank_pack_for_case(
     peers: list[Any],
     member_weight: float = 1.0,
 ) -> dict[str, Any]:
-    dollar_scale = _p90([float(_get(c, "flagged_dollars") or 0.0) for c in peers] or [float(_get(case, "flagged_dollars") or 0.0)])
+    dollar_scale = _p90(
+        [float(_get(c, "flagged_dollars") or 0.0) for c in peers] or [float(_get(case, "flagged_dollars") or 0.0)]
+    )
     member_scale = _p90(
-        [
-            int(_get(c, "harm") or 0) * max(1, int(_get(c, "members_affected") or 0))
-            for c in peers
-        ]
+        [int(_get(c, "harm") or 0) * max(1, int(_get(c, "members_affected") or 0)) for c in peers]
         or [int(_get(case, "harm") or 0) * max(1, int(_get(case, "members_affected") or 0))]
     )
     scores = factor_scores(

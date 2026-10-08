@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any, Mapping
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 
 def _canonical(row: Mapping[str, Any]) -> str:
@@ -25,7 +26,7 @@ def chain_hash(prev_hash: str, row: Mapping[str, Any]) -> str:
     return hashlib.sha256(material.encode("utf-8")).hexdigest()
 
 
-def verify_chain(events: list[Mapping[str, Any]], *, genesis: str | None = None) -> bool:
+def verify_chain(events: Sequence[Mapping[str, Any]], *, genesis: str | None = None) -> bool:
     previous = genesis if genesis is not None else "0" * 64
     for event in events:
         expected_prev = event.get("prev_hash")

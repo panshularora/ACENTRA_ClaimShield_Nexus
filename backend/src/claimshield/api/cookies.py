@@ -9,14 +9,15 @@ from claimshield.core.config import Settings
 
 def set_auth_cookies(response: Response, settings: Settings, *, access: str, refresh: str) -> str:
     csrf = secrets.token_urlsafe(24)
-    cookie_kw: dict[str, object] = {
-        "httponly": True,
-        "secure": settings.cookie_secure,
-        "samesite": settings.cookie_samesite,
-        "path": "/",
-    }
-    response.set_cookie(settings.access_cookie_name, access, **cookie_kw)
-    response.set_cookie(settings.refresh_cookie_name, refresh, **cookie_kw)
+    for name, value in ((settings.access_cookie_name, access), (settings.refresh_cookie_name, refresh)):
+        response.set_cookie(
+            name,
+            value,
+            httponly=True,
+            secure=settings.cookie_secure,
+            samesite=settings.cookie_samesite,
+            path="/",
+        )
     response.set_cookie(
         settings.csrf_cookie_name,
         csrf,

@@ -24,7 +24,5 @@ class DetectorOutput:
 def run_detectors(tables: dict[str, pd.DataFrame]) -> DetectorOutput:
     graph = build_graph(tables)
     strong = strong_component_map(graph)
-    alerts = stamp_catalog(
-        evaluate_rules(tables) + evaluate_anomalies(tables) + evaluate_graph(tables, graph, strong)
-    )
+    alerts = stamp_catalog(evaluate_rules(tables) + evaluate_anomalies(tables) + evaluate_graph(tables, graph, strong))
     return DetectorOutput(graph=graph, strong=strong, alerts=alerts)

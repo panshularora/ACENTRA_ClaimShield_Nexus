@@ -72,7 +72,7 @@ def select_peer_group(
     chosen: pd.DataFrame | None = None
     dims: list[str] = []
     label = ""
-    for dims, label in attempts:
+    for dims, label in attempts:  # noqa: B007 - the last attempted tier labels the comparison below
         mask = pd.Series(True, index=pool.index)
         if "specialty" in dims:
             mask &= pool.specialty == rec.specialty
@@ -87,7 +87,7 @@ def select_peer_group(
             break
         chosen = others
     assert chosen is not None
-    n = int(len(chosen))
+    n = len(chosen)
     relaxed = "rural" not in dims or n < MIN_PEERS_TO_FLAG
     if n < MIN_PEERS_RELAXED:
         confidence = "insufficient"
@@ -236,8 +236,7 @@ def _home_health_iqr(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
                     "fence": round(float(fence), 2),
                     "robust_z": round(z, 3),
                     "review_reason": (
-                        "Visit volume sits above the peer IQR fence for the same specialty/type/"
-                        "geography cell."
+                        "Visit volume sits above the peer IQR fence for the same specialty/type/geography cell."
                     ),
                     **stats,
                     "peer_group": group,

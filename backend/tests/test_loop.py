@@ -57,7 +57,7 @@ def test_audit_rbac(client: TestClient) -> None:
 
 
 def test_recompute_run_endpoint_and_current_run(client: TestClient) -> None:
-    _run_id, rows = _load_tiny(client)
+    _run_id, _rows = _load_tiny(client)
     members_before = client.get("/api/v1/batches")
     assert members_before.status_code == 200
     n_batches = len(members_before.json())
@@ -176,16 +176,13 @@ def test_decision_proposal_approval_and_brief_citation(client: TestClient) -> No
     source = queue[0]["case_id"]
     source_rules = _rules_for(client, source)
     other = next(
-        (
-            row["case_id"]
-            for row in queue[1:]
-            if _rules_for(client, row["case_id"]) & source_rules
-        ),
+        (row["case_id"] for row in queue[1:] if _rules_for(client, row["case_id"]) & source_rules),
         queue[1]["case_id"],
     )
 
     _logout(client)
     _login(client, "investigator@demo.claimshield", "demo-investigator")
+    assert client.post(f"/api/v1/cases/{source}/assign", json={}).status_code == 200
     decided = client.post(
         f"/api/v1/cases/{source}/decisions",
         json={
@@ -274,6 +271,7 @@ def test_decision_proposal_approval_and_brief_citation(client: TestClient) -> No
     second = queue[1]["case_id"] if queue[1]["case_id"] != source else queue[2]["case_id"] if len(queue) > 2 else other
     if second == source:
         second = other
+    assert client.post(f"/api/v1/cases/{second}/assign", json={}).status_code == 200
     decided2 = client.post(
         f"/api/v1/cases/{second}/decisions",
         json={
@@ -282,7 +280,16 @@ def test_decision_proposal_approval_and_brief_citation(client: TestClient) -> No
         },
     )
     assert decided2.status_code == 200, decided2.text
+    assert decided2.json()["status"] == "pending_approval"
+    assert decided2.json()["proposal"] is None
     alias_id = decided2.json()["decision_id"]
+
+    _logout(client)
+    _login(client, "manager@demo.claimshield", "demo-manager")
+    escalated = client.post(f"/api/v1/decisions/{alias_id}:approve", json={"note": ""})
+    assert escalated.status_code == 200, escalated.text
+    assert escalated.json()["status"] == "escalated"
+    assert escalated.json()["proposal"]["decision_id"] == alias_id
 
     _logout(client)
     _login(client, "analyst@demo.claimshield", "demo-analyst")

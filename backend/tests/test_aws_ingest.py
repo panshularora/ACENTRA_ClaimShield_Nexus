@@ -18,7 +18,7 @@ TOKEN = "test-internal-token-do-not-commit"
 def aws_client(tmp_path, monkeypatch) -> Generator[TestClient, None, None]:
     db = tmp_path / "claimshield.db"
     monkeypatch.setenv("CLAIMSHIELD_DATABASE_URL", f"sqlite+pysqlite:///{db.as_posix()}")
-    monkeypatch.setenv("CLAIMSHIELD_JWT_SIGNING_KEY", "test-signing-key-32-bytes-min!!")
+    monkeypatch.setenv("CLAIMSHIELD_JWT_SIGNING_KEY", "test-signing-key-at-least-32-bytes-long")
     monkeypatch.setenv("CLAIMSHIELD_COOKIE_SECURE", "false")
     monkeypatch.setenv("CLAIMSHIELD_DEMO_MODE", "true")
     monkeypatch.setenv("CLAIMSHIELD_INTERNAL_TOKEN", TOKEN)
@@ -99,10 +99,7 @@ def test_invalid_csv_rejected(aws_client: TestClient, tmp_path) -> None:
     incoming.mkdir()
     files = {
         "member.csv": "member_id,name,dob,sex,location_id\nMBR-1,A,2020-01-01,F,LOC-1\n",
-        "provider.csv": (
-            "provider_id,name,kind,specialty,service_line,location_id\n"
-            "PRV-1,P,md,pcp,pcp,LOC-1\n"
-        ),
+        "provider.csv": ("provider_id,name,kind,specialty,service_line,location_id\nPRV-1,P,md,pcp,pcp,LOC-1\n"),
         "claim.csv": "not,a,claim\n1,2,3\n",
         "claim_line.csv": (
             "line_id,claim_id,rendering_provider_id,dos_from,dos_to,code,charge,allowed,paid\n"

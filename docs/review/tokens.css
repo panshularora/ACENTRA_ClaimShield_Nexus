@@ -1,0 +1,411 @@
+/* =============================================================================
+   ClaimShield Nexus: design tokens  (v1.0, 08 Oct 2026)
+   Calm, light-first enterprise analytics for Medicaid SIU investigators.
+
+   HOW TO USE
+   - Import once, before index.css:  import "./styles/tokens.css";  (src/main.tsx)
+   - Only these custom properties are defined here, plus three tiny global rules at
+     the bottom (reduced motion, tabular numerals, dark theme). Names never collide
+     with the legacy vars in src/index.css (--ink, --paper, --rule, --sans ...),
+     so the landing/login pages keep their look until components are migrated.
+   - Layer 1 = primitives (--green-*, --neutral-*, --risk-*, ...). Do not use
+     primitives in components; use Layer 2 semantic aliases (--color-*, --chart-*,
+     --graph-*, --risk-*-bg/fg/border, --type-*).
+
+   SOURCES (evidence in /workspace/claimshield-review/brand-evidence/)
+   [A1] https://acentra.com/hubfs/hub_generated/template_assets/1/184274071100/1791304273528/template_theme-overrides.min.css
+        (body, h1/h2/h5, a, .hs-button, header, footer, .page-center)
+   [A2] https://acentra.com/hubfs/hub_generated/template_assets/1/192307331385/1791304275583/template_child_v2.css
+        (Inter / Roboto @font-face, eyebrow h6, menu links, accordion, tabs)
+   [A3] https://acentra.com/hubfs/hub_generated/template_assets/1/184273342061/1791304272562/template_main.min.css
+        (nav, header alert, form errors)
+   [A4] Logo pixels: https://acentra.com/hubfs/footer-logo.svg (embedded PNG),
+        .../images/logo-retina.png, .../images/Symbol-retina.png
+   [A5] https://acentra.com/hubfs/AcentraHealth_December2024/images/hero-bg.jpg (pixels)
+   [A6] Headless-Chrome computed styles on https://acentra.com/ and /about-us
+        (computed_styles.json, fonts_network.json)
+   [A7] module CSS: module_solutions-tabber / module_two-column-tabber (tab underline 3px #2bbc2b)
+   Contrast numbers quoted in comments were computed by scripts/palette.py (WCAG 2.x).
+   ============================================================================= */
+
+:root {
+  color-scheme: light;
+
+  /* ---------------------------------------------------------------------------
+     1. PRIMITIVES
+     --------------------------------------------------------------------------- */
+
+  /* 1a. Green ramp. OKLCH hue ~147, built around the three sampled Acentra greens,
+         which keep their exact hex at the step where their lightness lands. */
+  --green-50:  #ecfced;
+  --green-100: #d9f8db;
+  --green-200: #b8f1bd;
+  --green-300: #90e39a;
+  --green-400: #5cd370;
+  --green-500: #2bbc2b; /* ACENTRA PRIMARY GREEN [A1][A4]: logo fill, .hs-button bg, active nav, tab underline; 142 CSS uses */
+  --green-600: #209b47; /* ACENTRA DARK GREEN [A1]: h1, h5, depth-1 nav links, date-picker selected; 39 CSS uses */
+  --green-700: #1c873e; /* ACENTRA EYEBROW GREEN [A2]: h6 eyebrow ("OUR SOLUTIONS"), share links; 10 CSS uses */
+  --green-800: #1e672d;
+  --green-900: #174c21;
+  --green-950: #103216;
+
+  /* 1b. Neutrals: teal-tinted grays (OKLCH hue 200, chroma 0.003-0.03), between the
+         Acentra ink (#042126, hue 211) and Acentra teals (#11615b / #e4f3f2, hue 187-192).
+         Deliberately NOT Tailwind slate (hue ~257). */
+  --neutral-0:   #ffffff; /* Acentra page background [A1] body{background-color:#fff} */
+  --neutral-25:  #f8fbfb;
+  --neutral-50:  #f1f6f6;
+  --neutral-100: #e8efef;
+  --neutral-150: #dee6e7;
+  --neutral-200: #d1dbdc;
+  --neutral-300: #bbc7c7;
+  --neutral-400: #94a2a2;
+  --neutral-500: #748484;
+  --neutral-600: #5d6e6f;
+  --neutral-700: #495b5b;
+  --neutral-800: #2f4445;
+  --neutral-900: #1b3234;
+  --neutral-950: #042126; /* ACENTRA INK [A1][A4][A5]: body text colour, logo wordmark, button text, hero bg; 242 CSS uses */
+
+  /* 1c. Other sampled Acentra colours, kept as primitives (used sparingly or not at all) */
+  --acentra-lime:      #b4ea54; /* [A1][A4] .hs-button:hover bg, symbol gradient end. NOT used in the app (too loud for UI). */
+  --acentra-mint:      #acf2e5; /* [A3] header bottom border, <hr>, slider dots (58 uses). Not used in the app. */
+  --acentra-teal-deep: #005f68; /* [A1] h2 colour. Used as chart-4 and the referral edge colour. */
+  --acentra-teal:      #11615b; /* [A2] used with alpha in shadows/filters. Used as the facility node stroke. */
+  --acentra-teal-pale: #e4f3f2; /* [A2] blog featured panel bg. Used as the facility node fill. */
+  --acentra-sand:      #f2ece4; /* [A2] search bar / form-section bg. Used as the owner node fill. */
+  --acentra-sand-2:    #e8e0d6; /* [A7] accordion/tab marker bars. */
+  --acentra-link-blue: #15497e; /* [A1] a, a:hover, footer links. Used as --color-link and --chart-focus. */
+
+  /* 1d. Risk primitives: ordered low → critical. Low is cool slate-blue (NOT green),
+         then amber → orange → deep red, with lightness dropping 0.65 → 0.54 → 0.42 (OKLCH)
+         across the warm steps so they still separate under deuteranopia/protanopia. */
+  --slate-50: #eef4fb;  --slate-400: #7089a4;  --slate-500: #597797;  --slate-800: #2f4a67;
+  --amber-50: #fef2d9;  --amber-450: #b37d24;  --amber-500: #bf8105;  --amber-800: #71440c;
+  --orange-50: #ffece0; --orange-500: #b85207; --orange-550: #b14c03; --orange-800: #883500;
+  --red-50: #fee9e8;    --red-600: #9e2225;    --red-700: #90101a;    --red-800: #7c1117;
+  --plum-50: #fdeaf4;   --plum-500: #9b3876;   --plum-600: #94296f;   --plum-800: #752257;
+  --danger-50: #feebe9; --danger-500: #b33832; --danger-600: #b02b27; --danger-700: #972622;
+  --info-50: #ebf5fd;   --info-400: #557ea8;
+
+  /* ---------------------------------------------------------------------------
+     2. SEMANTIC COLOUR ALIASES
+     --------------------------------------------------------------------------- */
+
+  /* Surfaces */
+  --color-bg:             var(--neutral-50);   /* app canvas behind cards */
+  --color-surface:        var(--neutral-0);    /* cards, tables, panels, graph canvas */
+  --color-surface-raised: var(--neutral-0);    /* menus, tooltips, drawers, modals (paired with --shadow-overlay) */
+  --color-surface-sunken: var(--neutral-100);  /* table header, inset metric strips, code/evidence blocks */
+  --color-surface-hover:  #f4f8f8;             /* row/list hover tint (neutral, OKLCH L .975) */
+  --color-overlay-scrim:  rgb(4 33 38 / 0.32); /* modal/drawer scrim, ink at 32% */
+
+  /* Borders */
+  --color-border:        var(--neutral-200);   /* 1px card/row dividers (decorative, 1.41:1) */
+  --color-border-subtle: var(--neutral-150);   /* inner dividers inside cards */
+  --color-border-strong: var(--neutral-500);   /* inputs, checkboxes, state-carrying borders: 3.91:1 on surface, 3.58:1 on bg */
+
+  /* Text */
+  --color-text:          var(--neutral-950);   /* 16.79:1 on surface, 15.39:1 on bg (Acentra body colour) */
+  --color-text-muted:    var(--neutral-700);   /* 7.17:1 surface, 6.57:1 bg, 6.15:1 sunken */
+  --color-text-subtle:   var(--neutral-600);   /* 5.35:1 surface, 4.90:1 bg, 4.59:1 sunken: captions, placeholders */
+  --color-text-disabled: var(--neutral-400);   /* disabled only (exempt from contrast) */
+  --color-text-inverse:  var(--neutral-0);
+  --color-text-on-brand: var(--neutral-950);   /* Acentra pairs ink on green [A1]: 6.66:1 on #2bbc2b. White would be 2.52:1 (fail). */
+
+  /* Brand: primary actions, active nav, focus, selection, brand bar. NOT a data or "safe" colour. */
+  --color-brand:         var(--green-500);     /* primary button fill, brand bar (decorative) */
+  --color-brand-hover:   var(--green-400);     /* lighter on hover, as Acentra does (#2bbc2b → #b4ea54) but calmer; ink 8.80:1 */
+  --color-brand-active:  var(--green-600);     /* pressed; ink 4.67:1 */
+  --color-brand-subtle:  var(--green-50);      /* selected row/card bg; text 15.76:1 */
+  --color-brand-strong:  var(--green-600);     /* state indicators: active-nav underline, selected-row bar (3.60:1 surface, 3.38:1 on brand-subtle) */
+  --color-brand-text:    var(--green-800);     /* green text (overline on page header, active nav label if tinted): 6.92:1 surface. green-700 failed on bg (4.20) */
+  --color-brand-bar:     var(--green-500);     /* 3px top strip of the app shell (decorative identity) */
+  --color-focus:         var(--green-700);     /* focus ring: 4.58:1 surface, 4.20:1 bg, 3.93:1 sunken (≥3:1) */
+  --color-link:          var(--acentra-link-blue); /* Acentra link colour [A1]: 9.19:1 surface */
+  --color-link-hover:    var(--neutral-950);
+
+  /* Status (system feedback, NOT case risk) */
+  --color-info-bg: var(--info-50);       --color-info-fg: var(--acentra-link-blue); --color-info-border: var(--info-400);       --color-info: var(--acentra-link-blue);
+  --color-success-bg: var(--green-50);   --color-success-fg: var(--green-800);      --color-success-border: var(--green-600);  --color-success: var(--green-700);
+  --color-warning-bg: var(--amber-50);   --color-warning-fg: var(--amber-800);      --color-warning-border: var(--amber-450);  --color-warning: var(--amber-500);
+  --color-danger-bg: var(--danger-50);   --color-danger-fg: var(--danger-700);      --color-danger-border: var(--danger-500);  --color-danger: var(--danger-600);
+
+  /* ---------------------------------------------------------------------------
+     3. RISK SCALE (financial / fraud likelihood): never colour alone
+        Each level: -bg (badge fill), -fg (badge text, ≥4.5:1 on -bg), -border (≥3:1 on -bg
+        and surface), -solid (rings, chart marks, ≥3:1 on surface), -glyph, -label.
+        Data mapping today: case.severity 1..4 → low, medium, high, critical.
+     --------------------------------------------------------------------------- */
+  --risk-low-bg: var(--slate-50);       --risk-low-fg: var(--slate-800);        --risk-low-border: var(--slate-400);       --risk-low-solid: var(--slate-500);
+  --risk-medium-bg: var(--amber-50);    --risk-medium-fg: var(--amber-800);     --risk-medium-border: var(--amber-450);    --risk-medium-solid: var(--amber-500);
+  --risk-high-bg: var(--orange-50);     --risk-high-fg: var(--orange-800);      --risk-high-border: var(--orange-500);     --risk-high-solid: var(--orange-550);
+  --risk-critical-bg: var(--red-50);    --risk-critical-fg: var(--red-800);     --risk-critical-border: var(--red-600);    --risk-critical-solid: var(--red-700);
+  /* glyphs: open circle → half → full → diamond (shape changes as well as fill) */
+  --risk-low-glyph: "○";  --risk-medium-glyph: "◐";  --risk-high-glyph: "●";  --risk-critical-glyph: "◆";
+  --risk-low-label: "Low"; --risk-medium-label: "Medium"; --risk-high-label: "High"; --risk-critical-label: "Critical";
+
+  /* ---------------------------------------------------------------------------
+     4. PATIENT HARM: a separate axis from risk (plum, cross glyph)
+        Shown when case.harm ≥ 3; "Harm 4" = harm-priority lane.
+     --------------------------------------------------------------------------- */
+  --harm-bg: var(--plum-50);       /* fg on bg 8.60:1 */
+  --harm-fg: var(--plum-800);
+  --harm-border: var(--plum-500);  /* 5.67:1 on bg */
+  --harm-solid: var(--plum-600);   /* graph notch, timeline marker: 7.48:1 on surface */
+  --harm-glyph: "✚";
+
+  /* ---------------------------------------------------------------------------
+     5. CHARTS
+     --------------------------------------------------------------------------- */
+  /* Categorical: Okabe-Ito-derived, harmonised to Acentra, every colour ≥3:1 on surface.
+     Min CIEDE2000 between any two of chart-1..5 under normal/deutan/protan/tritan
+     simulation (Machado 2009) = 10.2 (chart-1 vs chart-5, deutan); of chart-1..7 = 9.0; of all 8 = 7.6 (chart-1 vs chart-8, protan).
+     Rule: ≤5 series per chart; 6+ → small multiples. */
+  --chart-1: #209b47; /* Acentra dark green (= --green-600) */
+  --chart-2: #0072b2; /* Okabe-Ito blue (exact) */
+  --chart-3: #1d3b70; /* navy (dark partner to chart-2, separates by lightness) */
+  --chart-4: #005f68; /* Acentra deep teal (h2 colour) [A1] */
+  --chart-5: #8c5a2b; /* brown (Okabe-Ito orange family, darkened, kept clear of risk amber/orange) */
+  --chart-6: #2f8fd0; /* Okabe-Ito sky blue #56b4e9, darkened to 3.52:1 */
+  --chart-7: #b05a8a; /* Okabe-Ito reddish-purple #cc79a7, darkened toward rose (no violet) */
+  --chart-8: #b07a00; /* Okabe-Ito orange #e69f00, darkened; never place next to chart-1 */
+
+  --chart-focus: var(--acentra-link-blue);       /* the one highlighted series ("this provider"): 9.19:1 */
+  --chart-comparison: var(--neutral-400);        /* peer/baseline bars (context, always direct-labelled) */
+  --chart-comparison-line: var(--neutral-500);   /* peer/baseline lines: 3.91:1 */
+  --chart-band: var(--neutral-200);              /* IQR / confidence band fill (use with opacity) */
+  --chart-grid: var(--neutral-150);              /* horizontal gridlines, 1px solid */
+  --chart-axis: var(--neutral-500);              /* category-axis line + ticks */
+  --chart-baseline: var(--neutral-700);          /* zero line */
+  --chart-label: var(--color-text-muted);        /* tick labels */
+  --chart-reference: var(--neutral-500);         /* reference lines only (calibration y = x, capacity/target): the ONLY dashed chart lines */
+  --chart-reference-dash: 4 4;
+  --chart-area-opacity: 0.14;                    /* 12-16% */
+  --chart-band-opacity: 0.15;
+  --chart-bar-band: 0.65;                        /* bar thickness = 65% of band */
+  --chart-line-width: 2px;
+  --chart-tick-size: 4px;
+  --chart-font-size: 12px;
+
+  /* ---------------------------------------------------------------------------
+     6. PROVIDER NETWORK GRAPH (src/three/NetworkGraph.tsx, SVG)
+        Node TYPE = shape + glyph + quiet tint. Node RISK = outer ring. HARM = plum notch.
+     --------------------------------------------------------------------------- */
+  --graph-bg: var(--color-surface);
+  --graph-node-stroke-width: 1.5px;
+  --graph-node-provider-fill: var(--neutral-100);        --graph-node-provider-stroke: var(--neutral-700);
+  --graph-node-owner-fill: var(--acentra-sand);          --graph-node-owner-stroke: #71604a;   /* darker sand, 5.15:1 on fill */
+  --graph-node-facility-fill: var(--acentra-teal-pale);  --graph-node-facility-stroke: var(--acentra-teal);
+  --graph-node-address-fill: var(--neutral-25);          --graph-node-address-stroke: var(--neutral-600);
+  --graph-node-phone-fill: var(--neutral-25);            --graph-node-phone-stroke: var(--neutral-600);
+  --graph-node-bank-fill: var(--neutral-100);            --graph-node-bank-stroke: var(--neutral-800);
+  --graph-node-member-fill: var(--neutral-0);            --graph-node-member-stroke: var(--neutral-500);
+  --graph-node-glyph: var(--neutral-800);
+  --graph-subject-fill: var(--green-700);                /* white glyph on it = 4.58:1 (white on #2bbc2b would be 2.52) */
+  --graph-subject-glyph: var(--neutral-0);
+  --graph-subject-ring-fallback: var(--green-500);       /* when the subject has no risk value */
+  --graph-ring-width: 2.5px;
+  --graph-ring-gap: 2px;
+  --graph-subject-ring-width: 3px;
+  --graph-edge-claim: var(--neutral-300);                /* billed, rendered, at_facility */
+  --graph-edge-shared: var(--neutral-500);               /* shared_location, shared_contact, shared_tin */
+  --graph-edge-ownership: var(--neutral-800);            /* owns (arrow), shared_owner */
+  --graph-edge-referral: var(--acentra-teal-deep);       /* referral (arrow), the one muted hue */
+  --graph-edge-width-min: 1px;
+  --graph-edge-width-max: 3px;
+  --graph-edge-inferred-dash: 4 3;                       /* reserved: inferred/weak links only */
+  --graph-dim-opacity: 0.15;
+  --graph-label-size: 11px;
+  --graph-label-halo: var(--color-surface);
+
+  /* ---------------------------------------------------------------------------
+     7. TYPOGRAPHY
+        Inter = Acentra's body font (Google Fonts, OFL; loaded on acentra.com via
+        fonts.googleapis.com + an "'Inter_regular', sans-serif" @font-face alias) [A2][A6].
+        Roboto (Acentra headings) is intentionally not used for UI text: one UI family is calmer.
+        Loading: the repo self-hosts both via fontsource (commit e20263c):
+          @fontsource-variable/inter  -> family "Inter Variable"
+          @fontsource/roboto-mono     -> family "Roboto Mono" (IDs/NPIs/amounts; monospace digits)
+        IBM Plex Mono (index.html Google link) is kept only as a fallback.
+     --------------------------------------------------------------------------- */
+  --font-sans: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Roboto Mono", "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --font-features-data: "tnum" 1, "lnum" 1;   /* use with font-feature-settings where variant-numeric is unavailable (SVG) */
+
+  --font-size-12: 0.75rem;   /* 12px caption, chart ticks, table header, overline */
+  --font-size-13: 0.8125rem; /* 13px body-sm, table cells, panel titles in small multiples */
+  --font-size-14: 0.875rem;  /* 14px body (UI default) */
+  --font-size-16: 1rem;      /* 16px h4 / card title */
+  --font-size-18: 1.125rem;  /* 18px h3 */
+  --font-size-20: 1.25rem;   /* 20px h2 */
+  --font-size-24: 1.5rem;    /* 24px h1 (page title) */
+  --font-size-30: 1.875rem;  /* 30px numeric-lg (KPI value) */
+  --font-size-36: 2.25rem;   /* 36px display (rare: empty-state hero, login) */
+
+  --line-height-tight: 1.2;
+  --line-height-snug: 1.35;
+  --line-height-normal: 1.5;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --letter-spacing-tight: -0.011em;   /* ≥20px headings */
+  --letter-spacing-normal: 0;
+  --letter-spacing-wide: 0.06em;      /* overline (Acentra eyebrow uses 3px on 17px = 0.18em; toned down for UI) */
+
+  /* Role shorthands: use as  font: var(--type-body);  (pair numerics with .cs-num) */
+  --type-display:    var(--font-weight-semibold) var(--font-size-36)/2.75rem var(--font-sans);
+  --type-h1:         var(--font-weight-semibold) var(--font-size-24)/2rem    var(--font-sans);
+  --type-h2:         var(--font-weight-semibold) var(--font-size-20)/1.75rem var(--font-sans);
+  --type-h3:         var(--font-weight-semibold) var(--font-size-18)/1.5rem  var(--font-sans);
+  --type-h4:         var(--font-weight-semibold) var(--font-size-16)/1.5rem  var(--font-sans);
+  --type-body:       var(--font-weight-regular)  var(--font-size-14)/1.25rem var(--font-sans);
+  --type-body-sm:    var(--font-weight-regular)  var(--font-size-13)/1.125rem var(--font-sans);
+  --type-label:      var(--font-weight-medium)   var(--font-size-13)/1.125rem var(--font-sans);
+  --type-caption:    var(--font-weight-regular)  var(--font-size-12)/1rem    var(--font-sans);
+  --type-overline:   var(--font-weight-semibold) var(--font-size-12)/1rem    var(--font-sans); /* + uppercase + --letter-spacing-wide */
+  --type-numeric-lg: var(--font-weight-semibold) var(--font-size-30)/2.25rem var(--font-sans); /* + tabular-nums */
+  --type-mono:       var(--font-weight-regular)  var(--font-size-13)/1.125rem var(--font-mono);
+
+  /* ---------------------------------------------------------------------------
+     8. SPACING: 4px base. (Acentra's marketing site uses a 5px rhythm: 10/15/20/30px.
+        A 4px grid suits dense data UI better, so this deviation is deliberate.)
+     --------------------------------------------------------------------------- */
+  --space-0: 0;
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-1-5: 6px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ---------------------------------------------------------------------------
+     9. RADIUS, BORDERS, ELEVATION, Z-INDEX
+     --------------------------------------------------------------------------- */
+  --radius-0: 0;
+  --radius-xs: 2px;     /* bar tops, sparkline markers */
+  --radius-sm: 4px;     /* inputs, buttons, badges, cells. Matches Acentra cards/accordions (border-radius:4px) [A2] */
+  --radius-md: 6px;     /* cards, panels, popovers */
+  --radius-full: 999px; /* avatars and round dots only (Acentra's 40px pill buttons are NOT adopted) */
+
+  --border-width: 1px;
+  --border-width-strong: 2px;
+  --border-width-accent: 3px;  /* brand bar, selected-row bar, active-nav underline (Acentra tab: 3px solid #2bbc2b [A7]) */
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --focus-ring: 0 0 0 var(--focus-ring-offset) var(--color-surface), 0 0 0 calc(var(--focus-ring-offset) + var(--focus-ring-width)) var(--color-focus);
+
+  /* Shadows: overlays ONLY (menus, tooltips, popovers, drawers, modals). Cards use a border. */
+  --shadow-none: none;
+  --shadow-overlay: 0 1px 2px rgb(4 33 38 / 0.06), 0 4px 12px rgb(4 33 38 / 0.10);
+  --shadow-overlay-lg: 0 2px 4px rgb(4 33 38 / 0.06), 0 12px 32px rgb(4 33 38 / 0.14); /* drawers, modals */
+
+  --z-base: 0;
+  --z-sticky: 10;     /* sticky table headers, page header */
+  --z-shell: 20;      /* top bar */
+  --z-dropdown: 30;
+  --z-drawer: 40;
+  --z-modal: 50;
+  --z-popover: 60;
+  --z-tooltip: 70;
+  --z-toast: 80;
+
+  /* ---------------------------------------------------------------------------
+     10. MOTION
+     --------------------------------------------------------------------------- */
+  --duration-fast: 120ms;   /* hover, tooltip fade, focus */
+  --duration-base: 200ms;   /* menus, row expand, tab underline */
+  --duration-slow: 320ms;   /* drawers, modal */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 1, 1);
+
+  /* ---------------------------------------------------------------------------
+     11. LAYOUT / COMPONENT METRICS
+     --------------------------------------------------------------------------- */
+  --shell-topbar-height: 56px;
+  --page-max-width: 1440px;       /* app (Acentra marketing containers: 1210px [A1], 1500px computed [A6]) */
+  --page-gutter: var(--space-6);
+  --row-height: 40px;
+  --row-height-compact: 32px;
+  --control-height: 36px;
+  --control-height-sm: 28px;
+  --card-padding: var(--space-5);   /* 20px (16px in dense grids) */
+  --icon-size: 16px;
+}
+
+/* -----------------------------------------------------------------------------
+   DARK THEME (optional). Bg is the Acentra ink/hero colour. All pairs computed.
+   ----------------------------------------------------------------------------- */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #042126;              /* Acentra ink / hero bg [A1][A5] */
+  --color-surface: #132b2e;
+  --color-surface-raised: #1d3538;
+  --color-surface-sunken: #031a1e;
+  --color-surface-hover: #1a3337;
+  --color-overlay-scrim: rgb(0 0 0 / 0.5);
+  --color-border: #2e4143;
+  --color-border-subtle: #243a3c;
+  --color-border-strong: #6d7e7f;   /* 3.50:1 on surface, 3.95:1 on bg */
+  --color-text: var(--neutral-100); /* 12.76:1 on surface, 14.41:1 on bg */
+  --color-text-muted: var(--neutral-300);
+  --color-text-subtle: #a0aeaf;
+  --color-text-disabled: var(--neutral-600);
+  --color-text-on-brand: var(--neutral-950);
+  --color-brand-subtle: #1f3a25;
+  --color-brand-strong: var(--green-500);
+  --color-brand-text: var(--green-300);
+  --color-focus: var(--green-400);
+  --color-link: #97c2f0;
+  --color-link-hover: var(--neutral-0);
+  --risk-low-bg: #1e2f41;      --risk-low-fg: #badbfe;      --risk-low-border: #619dda;      --risk-low-solid: #619dda;
+  --risk-medium-bg: #3a2b16;   --risk-medium-fg: #f3d2a4;   --risk-medium-border: #c08e43;   --risk-medium-solid: #c08e43;
+  --risk-high-bg: #3e281b;     --risk-high-fg: #fecbaf;     --risk-high-border: #cf8358;     --risk-high-solid: #cf8358;
+  --risk-critical-bg: #402624; --risk-critical-fg: #fec8c3; --risk-critical-border: #d47c76; --risk-critical-solid: #d47c76;
+  --harm-bg: #3c2632;          --harm-fg: #fac6e2;          --harm-border: #c87ca8;          --harm-solid: #c87ca8;
+  --chart-grid: #243a3c;
+  --chart-axis: #6d7e7f;
+  --chart-baseline: var(--neutral-300);
+  --chart-comparison: #5a6b6c;
+  --chart-comparison-line: #7f8f90;
+  --chart-focus: #97c2f0;
+  --graph-node-provider-fill: #1d3538; --graph-node-provider-stroke: var(--neutral-300);
+  --graph-node-glyph: var(--neutral-200);
+  --graph-edge-claim: #3a4f51;
+  --graph-edge-shared: #6d7e7f;
+  --graph-edge-ownership: var(--neutral-200);
+  --shadow-overlay: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 12px rgb(0 0 0 / 0.4);
+  --shadow-overlay-lg: 0 2px 4px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.5);
+}
+
+/* -----------------------------------------------------------------------------
+   GLOBAL RULES (kept to the minimum)
+   ----------------------------------------------------------------------------- */
+
+/* Reduced motion: collapse durations; components read the tokens, so nothing else is needed. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+  }
+}
+
+/* Tabular numerals wherever numbers appear (tables, KPI tiles, chart labels, badges with counts). */
+.cs-num,
+.mono,
+td.num,
+th.num,
+[data-numeric] {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: var(--font-features-data);
+}

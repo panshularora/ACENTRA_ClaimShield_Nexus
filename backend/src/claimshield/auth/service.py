@@ -89,9 +89,7 @@ def seed_demo_users(session: Session, now: datetime | None = None) -> None:
 def seed_system_user(session: Session, now: datetime | None = None) -> User:
     """Machine actor for S3 ingest. Password is random and discarded; login is not used."""
     instant = now or datetime.now(UTC)
-    existing = session.execute(
-        select(User).where(User.email == SYSTEM_USER_EMAIL)
-    ).scalar_one_or_none()
+    existing = session.execute(select(User).where(User.email == SYSTEM_USER_EMAIL)).scalar_one_or_none()
     if existing:
         return existing
     user = User(
@@ -121,7 +119,18 @@ def authenticate(
     login_limiter.check(f"{ip}:{email.lower()}", now=instant)
     user = session.execute(select(User).where(User.email == email.lower())).scalar_one_or_none()
     if user is None or not user.is_active or not verify_password(password, user.password_hash):
-        raise Unauthorized("invalid email or password")
+        reason = "unknown_user" if user is None else ("inactive" if not user.is_active else "bad_password")
+        append_event(
+            session,
+            actor_id=user.id if user else None,
+            role=user.role if user else "anonymous",
+            action="auth.login_failed",
+            object_type="user",
+            object_id=user.id if user else email.lower()[:64],
+            payload={"email": email.lower()[:254], "ip": ip, "reason": reason},
+            ts=instant,
+        )
+        raise Unauthorized("invalid email or password", persist_changes=True)
     refresh = new_refresh_token()
     auth_session = AuthSession(
         id=new_id("SID"),
@@ -164,21 +173,25 @@ def rotate_refresh(
 ) -> tuple[User, AuthSession, str, str]:
     instant = now or datetime.now(UTC)
     digest = hash_refresh_token(refresh_token)
-    reuse = session.execute(
-        select(AuthSession).where(AuthSession.previous_refresh_hash == digest)
-    ).scalar_one_or_none()
+    reuse = session.execute(select(AuthSession).where(AuthSession.previous_refresh_hash == digest)).scalar_one_or_none()
     if reuse is not None:
         reuse.revoked_at = instant
-        session.flush()
-        raise Unauthorized("refresh token reuse detected; session revoked")
+        owner = session.get(User, reuse.user_id)
+        append_event(
+            session,
+            actor_id=reuse.user_id,
+            role=owner.role if owner else "unknown",
+            action="auth.refresh_reuse",
+            object_type="session",
+            object_id=reuse.id,
+            payload={"revoked": True},
+            ts=instant,
+        )
+        raise Unauthorized("refresh token reuse detected; session revoked", persist_changes=True)
     auth_session = session.execute(
         select(AuthSession).where(AuthSession.refresh_token_hash == digest)
     ).scalar_one_or_none()
-    if (
-        auth_session is None
-        or auth_session.revoked_at is not None
-        or as_utc(auth_session.expires_at) <= instant
-    ):
+    if auth_session is None or auth_session.revoked_at is not None or as_utc(auth_session.expires_at) <= instant:
         raise Unauthorized("invalid refresh token")
     user = session.get(User, auth_session.user_id)
     if user is None or not user.is_active:

@@ -8,6 +8,7 @@ import networkx as nx
 import pandas as pd
 
 from claimshield.graph.build import STRONG_EDGE_KINDS
+from claimshield.rules import leie
 from claimshield.rules.engine import AlertDraft
 
 
@@ -113,7 +114,7 @@ def _referral_concentration(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]
                 related_entity_ids=[top_ref],
                 evidence={
                     "kind": "referral_monopoly",
-                    "n_referrals": int(len(grp)),
+                    "n_referrals": len(grp),
                     "hhi": round(hhi, 3),
                     "top_share": round(top_share, 3),
                     "peer_ids": [top_ref],
@@ -124,28 +125,44 @@ def _referral_concentration(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]
     return out
 
 
+def _owner_addresses(tables: dict[str, pd.DataFrame], provider_ids: list[str]) -> list[str]:
+    """Practice addresses of the providers an owner holds (the owner table has no address)."""
+    locations = tables.get("location")
+    providers = tables["provider"]
+    if locations is None or locations.empty or "location_id" not in providers:
+        return []
+    loc_ids = set(providers[providers.provider_id.astype(str).isin(provider_ids)]["location_id"].astype(str))
+    matched = locations[locations.location_id.astype(str).isin(loc_ids)]
+    return [str(address) for address in matched["address_norm"]]
+
+
 def _excluded_owner(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
+    """An owner is an excluded person: name, date of birth and address must all agree."""
     owners = tables.get("owner")
     excl = tables.get("exclusion_record")
     links = tables.get("ownership_link")
     if owners is None or excl is None or links is None or owners.empty or excl.empty or links.empty:
         return []
-    excl = excl.copy()
-    excl["full"] = (
-        excl["firstname"].fillna("").astype(str).str.strip().str.lower()
-        + " "
-        + excl["lastname"].fillna("").astype(str).str.strip().str.lower()
-    ).str.strip()
-    names = set(excl["full"]) - {""}
+    records = excl.to_dict("records")
     out: list[AlertDraft] = []
     for owner in owners.itertuples(index=False):
-        name = str(owner.name or "").strip().lower()
-        if name not in names:
+        candidates = [r for r in records if leie.names_agree(owner.name, r)]
+        candidates = [r for r in candidates if leie.same_date(getattr(owner, "dob", None), r.get("dob"))]
+        if not candidates:
             continue
         pids = links[links.owner_id == owner.owner_id]["provider_id"].astype(str).tolist()
         if not pids:
             continue
+        addresses = _owner_addresses(tables, pids)
+        record = next(
+            (r for r in candidates if any(leie.addresses_agree(r.get("address"), a) for a in addresses)),
+            None,
+        )
+        if record is None:
+            continue
         hit = _lines_for_providers(tables, pids)
+        if not hit.empty:
+            hit = hit[leie.exclusion_window_mask(hit["dos_from"], record)]
         out.append(
             AlertDraft(
                 detector="graph",
@@ -161,6 +178,9 @@ def _excluded_owner(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
                     "owner_id": owner.owner_id,
                     "owner_name": owner.name,
                     "peer_ids": pids,
+                    "excl_id": record.get("excl_id"),
+                    "excl_date": leie.iso_date(record.get("excl_date")),
+                    "match": "name_dob_address",
                 },
             )
         )

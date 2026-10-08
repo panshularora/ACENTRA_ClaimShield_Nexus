@@ -2,9 +2,14 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+DEFAULT_JWT_SIGNING_KEY = "dev-only-change-me"
+PLACEHOLDER_JWT_KEYS = frozenset({DEFAULT_JWT_SIGNING_KEY, "change-me-in-compose"})
+MIN_JWT_KEY_BYTES = 32
 
 
 class Settings(BaseSettings):
@@ -15,17 +20,16 @@ class Settings(BaseSettings):
     )
 
     database_url: str = "sqlite+pysqlite:///./claimshield.db"
-    jwt_signing_key: str = Field(default="dev-only-change-me")
+    jwt_signing_key: str = Field(default=DEFAULT_JWT_SIGNING_KEY)
     jwt_access_minutes: int = 15
     refresh_hours: int = 8
     cookie_secure: bool = False
-    cookie_samesite: str = "strict"
+    cookie_samesite: Literal["lax", "strict", "none"] = "strict"
     demo_mode: bool = True
     data_profile: str = "tiny"
     evidence_strength_min: float = 0.4
     harm_capacity_share: float = 0.35
     harm_override_level: int = 4
-    harm_lambda: float = 250.0
     screening_days: int = 45
     max_queue_slots: int = 20
     default_member_weight: float = 1.0
@@ -45,6 +49,21 @@ class Settings(BaseSettings):
     s3_results_prefix: str = "results/"
     s3_local_dir: Path | None = None
     ingest_max_bytes: int = 52_428_800
+
+    def startup_problems(self) -> list[str]:
+        """Configuration that is only acceptable for a local demo."""
+        problems: list[str] = []
+        if self.jwt_signing_key in PLACEHOLDER_JWT_KEYS:
+            problems.append("CLAIMSHIELD_JWT_SIGNING_KEY is a placeholder value")
+        elif len(self.jwt_signing_key.encode()) < MIN_JWT_KEY_BYTES:
+            problems.append(f"CLAIMSHIELD_JWT_SIGNING_KEY must be at least {MIN_JWT_KEY_BYTES} bytes")
+        return problems
+
+    def assert_safe_to_start(self) -> None:
+        """Refuse to serve outside demo mode with a guessable signing key."""
+        problems = self.startup_problems()
+        if problems and not self.demo_mode:
+            raise RuntimeError("refusing to start outside demo mode: " + "; ".join(problems))
 
     @property
     def access_cookie_name(self) -> str:

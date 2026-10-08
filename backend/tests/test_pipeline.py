@@ -96,9 +96,7 @@ def test_reload_same_seed_skips_existing_members(tmp_path) -> None:
         assert second_run.run_id != first_run.run_id
         assert second_run.status == "completed"
         assert second_run.summary["capacity_hours"] == 20
-        skipped_members = next(
-            row for row in second.load_report["tables"] if row["name"] == "member"
-        )
+        skipped_members = next(row for row in second.load_report["tables"] if row["name"] == "member")
         assert skipped_members["loaded"] == 0
         assert skipped_members["skipped"] == n_members
         assert session.query(Member).count() == n_members
@@ -155,7 +153,6 @@ def test_persisted_audit_chain_detects_tamper(tmp_path) -> None:
     settings = Settings(database_url=url)
     engine = create_engine(settings)
     Base.metadata.create_all(bind=engine)
-    factory = session_factory(engine)
     with Session(engine) as session:
         append_event(
             session,

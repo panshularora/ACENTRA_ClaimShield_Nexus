@@ -48,9 +48,7 @@ def heuristic_summary() -> dict[str, Any]:
     }
 
 
-def top_factors(
-    contrib: pd.Series, values: pd.Series, k: int = TOP_FACTORS
-) -> list[dict[str, Any]]:
+def top_factors(contrib: pd.Series, values: pd.Series, k: int = TOP_FACTORS) -> list[dict[str, Any]]:
     order = contrib.abs().sort_values(ascending=False, kind="mergesort").index[:k]
     out = []
     for name in order:
@@ -90,21 +88,15 @@ def score_cases(
     asof = cutoff or data_cutoff(tables)
     snap = as_of(tables, asof)
     prov = provider_features(snap, detectors.alerts, detectors.graph, detectors.strong, asof)
-    curves = pd.DataFrame(
-        artifact.hazard.cumulative(prov), index=prov.index, columns=[f"f{h}" for h in HORIZONS]
-    )
+    curves = pd.DataFrame(artifact.hazard.cumulative(prov), index=prov.index, columns=[f"f{h}" for h in HORIZONS])
     hazards = artifact.hazard.hazards(prov)
     hazard_contrib = artifact.hazard.contributions(prov)
     cf = case_features(cases)
     p_confirm = artifact.confirm.predict(cf)
-    confirm_contrib = pd.DataFrame(
-        artifact.confirm.contributions(cf), columns=artifact.confirm.features
-    )
+    confirm_contrib = pd.DataFrame(artifact.confirm.contributions(cf), columns=artifact.confirm.features)
     info = artifact.summary()
     for i, case in enumerate(cases):
-        subjects = [
-            e for e in (case.get("entity_ids") or [case["primary_entity_id"]]) if e in curves.index
-        ]
+        subjects = [e for e in (case.get("entity_ids") or [case["primary_entity_id"]]) if e in curves.index]
         case["p_confirm"] = shown(p_confirm[i])
         block: dict[str, Any] = {
             "score_kind": "trained_model",
@@ -116,9 +108,7 @@ def score_cases(
         if subjects:
             lead = max(subjects, key=lambda pid: (float(curves.at[pid, "f90"]), pid))
             row = int(np.flatnonzero(prov.index == lead)[0])
-            case["f30"], case["f60"], case["f90"] = (
-                shown(curves.at[lead, f"f{h}"]) for h in HORIZONS
-            )
+            case["f30"], case["f60"], case["f90"] = (shown(curves.at[lead, f"f{h}"]) for h in HORIZONS)
             block["risk_subject"] = lead
             block["monthly_hazards"] = [round(float(h), 4) for h in hazards[row]]
             block["risk_factors"] = top_factors(hazard_contrib.loc[lead], prov.loc[lead])
