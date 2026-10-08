@@ -13,6 +13,8 @@ from pydantic import BaseModel, Field
 
 NodeType = Literal["provider", "member", "facility", "owner", "address"]
 EdgeKind = Literal[
+    "prescribed",
+    "dispensed",
     "rendered",
     "billed",
     "at_facility",

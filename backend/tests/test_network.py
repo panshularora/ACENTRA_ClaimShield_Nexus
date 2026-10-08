@@ -209,3 +209,19 @@ def test_hops_one_is_smaller(loaded: tuple[TestClient, list[dict[str, Any]]]) ->
     two = _network(client, case["case_id"], hops=2)
     assert len(one["nodes"]) <= len(two["nodes"])
     assert all(n["hop"] <= 1 for n in one["nodes"])
+
+
+def test_member_level_case_network(loaded: tuple[TestClient, list[dict[str, Any]]]) -> None:
+    client, queue = loaded
+    details = [client.get(f"/api/v1/cases/{row['case_id']}").json() for row in queue]
+    case = next(d for d in details if d["primary_entity_type"] == "member")
+    assert "lock-in" in client.get(f"/api/v1/cases/{case['case_id']}/brief").json()["action"]
+    net = _network(client, case["case_id"])
+    nodes = {n["id"]: n for n in net["nodes"]}
+    subject = nodes[case["primary_entity_id"]]
+    assert subject["type"] == "member" and subject["primary"] and subject["is_subject"] and subject["hop"] == 0
+    assert subject["masked"] is True
+    rx_edges = [e for e in net["edges"] if e["kind"] in {"prescribed", "dispensed"}]
+    assert {e["kind"] for e in rx_edges} == {"prescribed", "dispensed"}
+    assert all(e["target"] == subject["id"] and e["directed"] for e in rx_edges)
+    assert all(nodes[e["source"]]["type"] == "provider" and not nodes[e["source"]]["is_subject"] for e in rx_edges)

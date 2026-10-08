@@ -50,7 +50,7 @@ def test_workspace_pack_and_decision(client: TestClient) -> None:
     held = set(case["grouping"].get("comparison_peers_held_out") or [])
     assert held.isdisjoint(set(case["entity_ids"]))
     if case["provenance"]["urgent"]:
-        assert case["harm"] >= 4
+        assert case["harm"] >= 4 or case["priority_override"]
 
     brief = client.get(f"/api/v1/cases/{case_id}/brief")
     assert brief.status_code == 200

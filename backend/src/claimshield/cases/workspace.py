@@ -66,12 +66,29 @@ GAP_BY_KIND = {
     "after_death": "Date-of-death source and eligibility span overlapping the date of service.",
     "excluded_party": "LEIE match packet (NPI, name, exclusion type and effective date).",
     "duplicate": "Original vs resubmitted claim images for the duplicate member/provider/code/DOS set.",
-    "ptp_pair": "Medical records supporting a PTP exception (modifier indicator is 0 in the synthetic table).",
+    "ptp_pair": (
+        "Indicator 0: the column-two code is not separately payable with the column-one code under any "
+        "modifier. Request the claim images to confirm the pair was paid together and the amount to recover. "
+        "(For indicator-1 pairs, request records supporting a distinct-procedural-service modifier.)"
+    ),
     "unit_cap": "Documentation of units billed against the synthetic MUE cap.",
     "inpatient_overlap": "Inpatient census for the overlapping stay.",
-    "clone_billing": "Source documentation for cloned paid amounts on the same day.",
+    "clone_billing": (
+        "Visit notes for a sample of the same-day services, to check volume against staffing and for "
+        "cloned documentation."
+    ),
+    "ambulance_overlap": (
+        "Trip sheets with vehicle, crew, pickup and drop-off times; the extract cannot test overlap."
+    ),
+    "sex_implausible": (
+        "Coding check only: confirm the member's sex on file and whether a KX modifier or condition code 45 "
+        "was omitted. Not evidence of FWA."
+    ),
     "daily_minutes_cap": "Clinician time log for the day that exceeds 960 billed minutes.",
-    "doctor_shopping": "PDMP-equivalent fill history across the listed prescribers and pharmacies.",
+    "doctor_shopping": (
+        "PDMP-equivalent fill history across the listed prescribers and pharmacies; consider pharmacy "
+        "lock-in or care-coordination review for the member."
+    ),
 }
 
 
@@ -298,6 +315,61 @@ def evidence_item(session: Session, case: Case, item_id: str, user: User) -> dic
     raise NotFound("evidence item not found")
 
 
+BRIEF_LIMITATIONS = [
+    "Template generator; LLM brief is not enabled on this run.",
+    "Generated from synthetic data; no medical records were reviewed.",
+    "Scores are heuristic and uncalibrated.",
+    "Signals have common legitimate explanations; see the evidence gaps.",
+    "This brief is not a determination of improper payment or fraud; a human investigator decides.",
+]
+CITABLE_METRICS = frozenset({"harm", "timeline", "p_confirm", "severity", "flagged_dollars", "evidence_strength"})
+
+
+def validate_citations(
+    sections: list[dict[str, Any]], *, alert_ids: set[str], precedents: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Drop sentences whose citations do not resolve to this case's alerts, metrics or precedents.
+
+    Mutates ``sections`` in place. It checks citation ids only; numbers inside sentences are not
+    re-derived from the evidence pack.
+    """
+    known_precedents = {str(p.get("citation")) for p in precedents}
+    checked = dropped = cited = 0
+    reasons: list[str] = []
+    for section in sections:
+        kept = []
+        for sentence in section["sentences"]:
+            checked += 1
+            bad = [c["id"] for c in sentence["cites"] if not _cite_resolves(c["id"], alert_ids, known_precedents)]
+            if not sentence["cites"] or bad:
+                dropped += 1
+                reasons.append(f"{section['title']}: {'unresolved ' + ', '.join(bad) if bad else 'no citation'}")
+                continue
+            cited += 1
+            kept.append(sentence)
+        section["sentences"] = kept
+    sections[:] = [s for s in sections if s["sentences"]]
+    return {
+        "checked": checked,
+        "dropped": dropped,
+        "cited": cited,
+        "dropped_reasons": reasons[:20],
+        "method": "Each citation id must resolve to this case's alerts, metrics or matched precedents; "
+        "numbers in sentences are not re-checked.",
+    }
+
+
+def _cite_resolves(item_id: str, alert_ids: set[str], precedents: set[str]) -> bool:
+    kind, _, rest = item_id.partition(":")
+    if kind == "alert":
+        return rest in alert_ids
+    if kind == "metric":
+        return rest in CITABLE_METRICS
+    if kind == "prec":
+        return item_id in precedents
+    return False
+
+
 def _cite(item_id: str, kind: str, label: str) -> dict[str, str]:
     return {"id": item_id, "kind": kind, "label": label}
 
@@ -326,7 +398,12 @@ def template_brief(session: Session, case: Case, user: User) -> dict[str, Any]:
             )
         )
     )
-    if case.harm >= 4 or case.override_kinds:
+    if case.primary_entity_type == "member":
+        action = (
+            "Refer this member-level pattern for pharmacy lock-in or care-coordination review; "
+            "prescribers and pharmacies are context, not subjects."
+        )
+    elif case.harm >= 4 or case.override_kinds:
         action = "Escalate for human review of a potential FWA pattern requiring investigation."
     elif case.evidence_strength < 0.4:
         action = "Needs more evidence before a screening recommendation can be made."
@@ -461,21 +538,17 @@ def template_brief(session: Session, case: Case, user: User) -> dict[str, Any]:
                 ],
             },
         )
-    n_sents = sum(len(s["sentences"]) for s in sections)
-    n_cited = sum(1 for s in sections for sent in s["sentences"] if sent["cites"])
+    validator = validate_citations(sections, alert_ids={a["alert_id"] for a in serialized}, precedents=precedents)
     return {
         "case_id": case.case_id,
         "generator": "template",
         "confidence": case.p_confirm,
-        "limitations": [
-            "Template generator; LLM brief is not enabled on this run.",
-            "Does not conclude fraud, waste, or abuse.",
-        ],
+        "limitations": BRIEF_LIMITATIONS,
         "action": action,
         "evidence_gaps": evidence_gaps(alerts, case),
         "precedents": precedents,
         "sections": sections,
-        "validator": {"checked": n_sents, "dropped": 0, "cited": n_cited},
+        "validator": validator,
     }
 
 

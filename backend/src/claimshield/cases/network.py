@@ -71,12 +71,16 @@ MAX_MEMBERS = 25
 EVIDENCE_ID_CAP = 50
 ADDRESS_PREFIX = "addr:"
 
-DIRECTED_KINDS: frozenset[str] = frozenset({"rendered", "billed", "at_facility", "owns", "referral", "located_at"})
+DIRECTED_KINDS: frozenset[str] = frozenset(
+    {"rendered", "billed", "at_facility", "owns", "referral", "located_at", "prescribed", "dispensed"}
+)
 # Links inferred from a shared identifier rather than a recorded relationship.
 INFERRED_KINDS: frozenset[str] = frozenset({"shared_tin", "shared_contact"})
 # Ring alerts list the strong link kinds they rely on; map network edge kinds onto them.
 RING_EDGE_KIND: dict[str, str] = {"owns": "shared_owner", "shared_tin": "shared_tin", "shared_contact": "shared_contact"}
 EDGE_LABELS: dict[str, str] = {
+    "prescribed": "prescribed high-MME opioid",
+    "dispensed": "dispensed high-MME opioid",
     "rendered": "rendered flagged service",
     "billed": "billed flagged service",
     "at_facility": "service at facility",
@@ -86,6 +90,7 @@ EDGE_LABELS: dict[str, str] = {
     "shared_tin": "shared TIN",
     "shared_contact": "shared contact",
 }
+RX_EDGES: tuple[tuple[str, EdgeKind], ...] = (("prescriber_id", "prescribed"), ("pharmacy_id", "dispensed"))
 CONTACT_LABELS: dict[str, str] = {"phone": "phone", "email": "email", "bank_token": "bank account"}
 
 
@@ -123,7 +128,13 @@ class _NetworkBuilder:
         self.referral_top_n = max(1, int(referral_top_n))
         self.reveal = reveal
         self.alerts: list[Alert] = alerts_for(session, case.case_id)
-        self.subjects: list[str] = list(dict.fromkeys([case.primary_entity_id, *(case.entity_ids or [])]))
+        all_subjects = list(dict.fromkeys([case.primary_entity_id, *(case.entity_ids or [])]))
+        # A member-level case (e.g. a multiple-prescriber opioid pattern) has a member subject;
+        # provider expansion starts from provider subjects only.
+        self.member_subjects: set[str] = {case.primary_entity_id} if case.primary_entity_type == "member" else set()
+        self.subject_ids: list[str] = all_subjects
+        self.subjects: list[str] = [s for s in all_subjects if s not in self.member_subjects]
+        self.rx_providers: dict[str, int] = {}
         self.nodes: dict[str, NetworkNode] = {}
         self.drafts: dict[tuple[str, str, str], _EdgeDraft] = {}
         self.provider_rows: dict[str, Provider] = {}
@@ -145,6 +156,7 @@ class _NetworkBuilder:
         self._expand_providers()
         self._add_provider_nodes()
         self._add_claim_context()
+        self._add_rx_context()
         self._add_owners()
         self._add_addresses()
         self._add_shared_tins()
@@ -158,7 +170,7 @@ class _NetworkBuilder:
             case_id=self.case.case_id,
             hops=self.hops,
             primary_entity_id=self.case.primary_entity_id,
-            subject_ids=self.subjects,
+            subject_ids=self.subject_ids,
             masked=not self.reveal,
             nodes=sorted(self.nodes.values(), key=lambda n: (n.hop, n.type, n.id)),
             edges=edges,
@@ -265,6 +277,12 @@ class _NetworkBuilder:
         weak: set[str] = set()
         for pid in self._claim_providers():
             hop.setdefault(pid, 1)
+        for alert in self.alerts:
+            evidence = alert.evidence or {}
+            if evidence.get("kind") == "doctor_shopping":
+                for pid in [*(evidence.get("prescriber_ids") or []), *(evidence.get("pharmacy_ids") or [])]:
+                    self.rx_providers[str(pid)] = 1
+                    hop.setdefault(str(pid), 1)
         frontier = set(self.subjects)
         for level in range(1, self.hops + 1):
             reached = self._identity_neighbours(frontier, include_address=level == 1)
@@ -325,7 +343,7 @@ class _NetworkBuilder:
                 hop,
                 specialty=row.specialty if row else None,
                 is_subject=pid in subjects,
-                in_case=pid in subjects or pid in claim_providers,
+                in_case=pid in subjects or pid in claim_providers or pid in self.rx_providers,
             )
             if pid in subjects:
                 node.harm = self.case.harm
@@ -346,9 +364,22 @@ class _NetworkBuilder:
         if keep_members:
             stmt = select(Member).where(Member.member_id.in_(keep_members))
             names = {m.member_id: m.name for m in self.session.execute(stmt).scalars()}
+        keep_members |= self.member_subjects
+        if keep_members - names.keys():
+            stmt = select(Member).where(Member.member_id.in_(keep_members - names.keys()))
+            names |= {m.member_id: m.name for m in self.session.execute(stmt).scalars()}
         for mid in sorted(keep_members):
             disp = member_display(mid, self.reveal, names.get(mid))
-            self._node(mid, "member", disp["display"], 1, masked=disp["masked"], in_case=True)
+            subject = mid in self.member_subjects
+            node = self._node(
+                mid, "member", disp["display"], 0 if subject else 1, masked=disp["masked"], in_case=True
+            )
+            if subject:
+                node.is_subject = True
+                node.primary = mid == self.case.primary_entity_id
+                node.risk = self.case.p_confirm if node.primary else None
+                node.harm = self.case.harm
+                node.severity = self.case.severity
         facility_ids = {c.facility_id for c in self.claims.values() if c.facility_id}
         if facility_ids:
             stmt_f = select(Facility).where(Facility.facility_id.in_(facility_ids))
@@ -375,6 +406,23 @@ class _NetworkBuilder:
                 draft.alert_ids |= self.alerts_by_line.get(ln.line_id, set())
                 draft.paid += float(ln.paid or 0.0)
                 draft.dates.append(iso(ln.dos_from) or "")
+
+    def _add_rx_context(self) -> None:
+        """Prescriber → member and pharmacy → member edges for member-level opioid patterns."""
+        for alert in self.alerts:
+            evidence = alert.evidence or {}
+            member = str(evidence.get("member_id") or "")
+            if evidence.get("kind") != "doctor_shopping" or member not in self.nodes:
+                continue
+            for fill in evidence.get("fills") or []:
+                for key, kind in RX_EDGES:
+                    source = str(fill.get(key) or "")
+                    if source not in self.nodes:
+                        continue
+                    draft = self._edge(source, member, kind)
+                    draft.count += 1
+                    draft.alert_ids.add(alert.alert_id)
+                    draft.dates.append(str(fill.get("fill_date") or ""))
 
     def _add_owners(self) -> None:
         pids = set(self.provider_hop)

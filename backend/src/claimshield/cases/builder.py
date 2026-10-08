@@ -17,7 +17,6 @@ STRONG_KINDS = frozenset(
         "ptp_pair",
         "unit_cap",
         "inpatient_overlap",
-        "sex_implausible",
         "stay_compression",
         "identity_ring",
     }
@@ -89,7 +88,7 @@ def build_cases(
             {
                 "case_id": new_id("CASE"),
                 "primary_entity_id": primary,
-                "primary_entity_type": "provider",
+                "primary_entity_type": group[0].entity_type,
                 "entity_ids": entity_ids,
                 "alert_count": len(group),
                 "line_ids": line_ids,
