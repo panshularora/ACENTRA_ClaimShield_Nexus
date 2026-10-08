@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Local secrets and databases
+.env
+*.db
+backend/claimshield.db
+
+# Frontend (not in this repo snapshot)
+frontend/
+node_modules/
+dist/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
