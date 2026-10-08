@@ -36,7 +36,7 @@ rules:
     policy_ref: CURES-EVV
   - rule_id: R-LEIE-001
     kind: excluded_party
-    title: Billing NPI matches synthetic LEIE
+    title: Provider matches synthetic LEIE (NPI and name agree, DOS after exclusion)
     severity: 4
     policy_ref: LEIE
   - rule_id: R-RX-001
@@ -86,6 +86,6 @@ rules:
     policy_ref: OIG-SFA-TELEFRAUD
   - rule_id: G-OWN-001
     kind: excluded_owner
-    title: Owner name matches synthetic LEIE record
+    title: Owner matches synthetic LEIE record (name, DOB and address agree)
     severity: 4
     policy_ref: LEIE

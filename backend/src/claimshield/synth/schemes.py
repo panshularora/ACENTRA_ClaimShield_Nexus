@@ -350,9 +350,10 @@ def plant_all_schemes(
     ds.tables["provider"].loc[
         ds.tables["provider"].provider_id == target.provider_id, "npi_syn"
     ] = npi
-    ds.tables["exclusion_record"].loc[
-        ds.tables["exclusion_record"].excl_id == excl.excl_id, "npi"
-    ] = npi
+    # The LEIE row describes the same party as the provider record: NPI and name agree.
+    is_row = ds.tables["exclusion_record"].excl_id == excl.excl_id
+    ds.tables["exclusion_record"].loc[is_row, "npi"] = npi
+    ds.tables["exclusion_record"].loc[is_row, ["firstname", "lastname", "busname"]] = _leie_name(target["name"])
     l = _append_line(ds, rng, provider_id=target.provider_id, member_id=pick_member(),
                      dos=pick_dos(), code="EM-EST-3", paid=130)
     gt.append(_gt_row(scheme_id="S11", scheme_type="excluded_party", variant="A",
@@ -664,6 +665,13 @@ def _plant_ring(
     )
 
 
+def _leie_name(name: str) -> list[str]:
+    """Split a provider name into LEIE first/last/business fields (no RNG draw)."""
+    parts = str(name).split()
+    is_person = len(parts) == 2 and not any(p.rstrip(",").lower() in {"inc", "llc", "group", "and"} for p in parts)
+    return [parts[0], parts[1], ""] if is_person else ["", "", str(name)]
+
+
 def _plant_shell(
     ds: "Dataset",
     rng: np.random.Generator,
@@ -673,8 +681,13 @@ def _plant_shell(
     dates: list[date],
     spread: bool,
 ) -> dict[str, Any]:
-    loc_id = ds.tables["location"].iloc[1 % len(ds.tables["location"])].location_id
+    location = ds.tables["location"].iloc[1 % len(ds.tables["location"])]
+    loc_id = location.location_id
     excl = ds.tables["exclusion_record"].iloc[min(1, len(ds.tables["exclusion_record"]) - 1)]
+    # The excluded owner's address on the LEIE row is the shell suite: name, DOB and address agree.
+    ds.tables["exclusion_record"].loc[
+        ds.tables["exclusion_record"].excl_id == excl.excl_id, "address"
+    ] = location.address_norm
     owner_id = _rid(rng, "OWN")
     ds.tables["owner"] = pd.concat(
         [

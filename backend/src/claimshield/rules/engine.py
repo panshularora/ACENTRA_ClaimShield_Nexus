@@ -5,6 +5,7 @@ from typing import Any
 
 import pandas as pd
 
+from claimshield.rules import leie
 from claimshield.synth.codes import PTP_PAIRS, UNIT_CAPS
 
 
@@ -284,19 +285,27 @@ def _evv_missing(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
 
 
 def _excluded(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
+    """Billing or rendering provider is on the exclusion list (NPI and name agree, DOS in window)."""
     excl = tables["exclusion_record"]
-    npis = set(excl["npi"].dropna().astype(str))
-    if not npis:
+    if excl.empty or "npi" not in excl:
+        return []
+    by_npi = {str(r["npi"]): r for r in excl.to_dict("records") if r.get("npi") and pd.notna(r["npi"])}
+    if not by_npi:
         return []
     providers = tables["provider"]
-    flagged = providers[providers.npi_syn.astype(str).isin(npis)]
-    if flagged.empty:
-        return []
     claims = tables["claim"]
     lines = tables["claim_line"].merge(claims[["claim_id", "billing_provider_id"]], on="claim_id")
     out = []
-    for _, prov in flagged.iterrows():
-        hit = lines[lines.billing_provider_id == prov.provider_id]
+    for prov in providers[providers.npi_syn.astype(str).isin(by_npi)].itertuples(index=False):
+        record = by_npi[str(prov.npi_syn)]
+        score = leie.name_score(prov.name, record)
+        if score < leie.NAME_MATCH_MIN:
+            # NPI collision with a different name: a data-quality lead, not an excluded party.
+            continue
+        party = lines.billing_provider_id == prov.provider_id
+        if "rendering_provider_id" in lines:
+            party |= lines.rendering_provider_id == prov.provider_id
+        hit = lines[party & leie.exclusion_window_mask(lines["dos_from"], record)]
         if hit.empty:
             continue
         out.append(
@@ -308,7 +317,15 @@ def _excluded(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
                 entity_type="provider",
                 line_ids=hit["line_id"].tolist()[:25],
                 score=1.0,
-                evidence={"kind": "excluded_party", "npi": prov.npi_syn},
+                evidence={
+                    "kind": "excluded_party",
+                    "npi": prov.npi_syn,
+                    "excl_id": record.get("excl_id"),
+                    "excl_date": leie.iso_date(record.get("excl_date")),
+                    "match": "npi_and_name",
+                    "name_score": round(score, 1),
+                    "n_lines_after_exclusion": len(hit),
+                },
             )
         )
     return out

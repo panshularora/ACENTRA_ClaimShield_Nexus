@@ -17,7 +17,7 @@ TABLE_ROLES: dict[str, str] = {
     "evv_visit": "Electronic visit verification timestamps for home-health lines",
     "inpatient_stay": "Admit and discharge used for overlap and stay-compression rules",
     "rx_fill": "Pharmacy fills used for doctor-shopping patterns",
-    "exclusion_record": "Exclusion list matched to rendering NPI or owner name",
+    "exclusion_record": "Exclusion list matched on NPI plus name, or on name, DOB and address",
     "referral": "Referring-to-receiving links for concentration",
     "ownership_link": "Owner-to-NPI shares used for identity rings and excluded owners",
     "owner": "Owner names matched to the exclusion list",

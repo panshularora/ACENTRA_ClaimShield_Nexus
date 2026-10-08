@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
@@ -550,7 +551,7 @@ def _exclusions(
                 "lastname": fake.last_name(),
                 "firstname": fake.first_name(),
                 "busname": "",
-                "dob": date(1965, 3, 12),
+                "dob": None,  # filled from excl_id below so the RNG stream is unchanged
                 "address": fake.street_address(),
                 "npi": None if rng.random() < 0.7 else random_npi(rng),
                 "excl_type": str(rng.choice(["1128a1", "1128b4", "1128a2"])),
@@ -558,7 +559,15 @@ def _exclusions(
                 "rein_date": None,
             }
         )
+    for row in rows:
+        row["dob"] = _stable_dob(str(row["excl_id"]))
     return pd.DataFrame(rows)
+
+
+def _stable_dob(key: str) -> date:
+    """A date of birth between 1945 and 1984 derived from the record id (no RNG draw)."""
+    offset = int.from_bytes(hashlib.sha256(key.encode()).digest()[:4], "big") % (40 * 365)
+    return date(1945, 1, 1) + timedelta(days=offset)
 
 
 def _investigations(ds: Dataset, rng: np.random.Generator, start: date, end: date, spec: Profile) -> None:
