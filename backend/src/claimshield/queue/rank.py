@@ -28,9 +28,11 @@ RECOMMEND_EVIDENCE = "gather_evidence"
 RECOMMEND_BACKLOG = "tracked_backlog"
 
 RANKING_NOTE = (
-    "The model recommends today's queue from combined factors inside investigator "
-    "capacity. It does not rank on dollars or evidence alone. Investigators decide "
-    "what to work. Cases outside today's slots stay open on a tracked backlog."
+    "Today's queue is a fixed-weight policy over exposure, member impact, evidence "
+    "and urgency, filled inside investigator capacity. P(confirm) and 30/60/90-day "
+    "risk come from models trained and backtested on synthetic data. It does not rank "
+    "on dollars or evidence alone. Investigators decide what to work. Cases outside "
+    "today's slots stay open on a tracked backlog."
 )
 
 

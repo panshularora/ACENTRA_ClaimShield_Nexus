@@ -14,6 +14,7 @@ This repository contains the backend, auth, product docs, and the SIU frontend (
 | [IDEATION_AND_IMPROVEMENTS.md](IDEATION_AND_IMPROVEMENTS.md) | Ideation notes |
 | [data/reference/PAPERS.md](data/reference/PAPERS.md) | Research map for detectors and schemes |
 | [backend/README.md](backend/README.md) | Backend runbook |
+| [docs/MODEL_CARD.md](docs/MODEL_CARD.md) | Risk models: labels, backtest, calibration, limits |
 
 ## Backend
 
@@ -30,6 +31,14 @@ Generate the tiny extract (CSV + data card; ground truth kept separate):
 ```
 uv run python -m claimshield generate --profile tiny --seed 7
 ```
+
+Train the risk models (P(confirm) and the 30/60/90-day hazard) on 24 seeded `panel` worlds and write `data/models/risk_model.json` (about 1–2 minutes on CPU; `make train` does the same):
+
+```
+uv run python -m claimshield train --profile panel --seed 7
+```
+
+The pipeline loads that artifact on every run. Without it, scores fall back to a labelled "uncalibrated heuristic". Artifact summary and backtest metrics: `GET /api/v1/models/risk` (roles with `model:read`). Method, numbers and limits: [docs/MODEL_CARD.md](docs/MODEL_CARD.md).
 
 Docker: `docker compose up` from the repo root (Postgres + API).
 
@@ -66,4 +75,4 @@ Investigation workspace: `/investigator/workspace/:caseId`. APIs: `GET /api/v1/c
 
 ## Dataset notes
 
-Planted schemes S01–S21, rings G1–G3, camouflage C1, hard negatives HN1–HN2. S06 ambulance is held out of model training (still visible to rules). No CPT. Synthetic NPIs pass Luhn. Ground truth is labels only and is not a feature table.
+Planted schemes S01–S21, rings G1–G3, camouflage C1, hard negatives HN1–HN2. S06 ambulance providers are excluded from risk-model training and scored as an unseen scheme in the backtest (still visible to rules; see [docs/MODEL_CARD.md](docs/MODEL_CARD.md)). No CPT. Synthetic NPIs pass Luhn. Ground truth is labels only and is not a feature table.
