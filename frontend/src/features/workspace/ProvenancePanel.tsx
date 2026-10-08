@@ -4,15 +4,12 @@ export function CaseLineage({ provenance }: { provenance: CaseProvenance }) {
   const grouping = provenance.grouping;
   return (
     <section className="lineage" aria-labelledby="lineage-title">
-      <header className="ws-panel-head">
-        <div>
-          <p className="kicker">How this case was built</p>
-          <h2 id="lineage-title">Evidence trail</h2>
-        </div>
-      </header>
+      <h3 id="lineage-title">How this case was built</h3>
       {provenance.urgent.length > 0 && (
-        <div className="urgent-strip" role="status">
-          <p className="kicker">Urgent signals still visible inside this group</p>
+        <div className="banner warn">
+          <p>
+            <strong>Urgent signals still visible inside this group</strong>
+          </p>
           <ul>
             {provenance.urgent.map((item) => (
               <li key={item.alert_id}>
@@ -39,7 +36,7 @@ export function CaseLineage({ provenance }: { provenance: CaseProvenance }) {
           </li>
         ))}
       </ol>
-      <h3>Source tables</h3>
+      <h4>Source tables</h4>
       <ul className="source-list">
         {provenance.data_sources.map((src) => (
           <li key={src.table}>
@@ -58,7 +55,6 @@ export function CaseLineage({ provenance }: { provenance: CaseProvenance }) {
 export function AlertLineageBlock({ lineage }: { lineage: AlertLineage }) {
   return (
     <div className="alert-lineage">
-      <p className="kicker">Where this result came from</p>
       <p>{lineage.method}</p>
       {lineage.how ? <p>{lineage.how}</p> : null}
       {lineage.tables.length > 0 ? (
@@ -71,7 +67,7 @@ export function AlertLineageBlock({ lineage }: { lineage: AlertLineage }) {
           ))}
         </ul>
       ) : (
-        <p className="muted">Tables: claim, claim_line</p>
+        <p className="muted">Source tables were not recorded for this alert.</p>
       )}
       {lineage.line_ids && lineage.line_ids.length ? (
         <p className="muted">

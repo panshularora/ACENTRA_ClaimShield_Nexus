@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { CaseAlert, DecisionResult, WikiProposal } from "../../api/types";
 import { ProposalCard } from "../wiki/ProposalCard";
 
@@ -96,9 +96,10 @@ export function DecisionBar({
   const proposal = result?.proposal ?? existingProposal ?? null;
   const ladderOptions = LADDER_BY_ACTION[action];
 
-  useEffect(() => {
-    setLadder(DEFAULT_LADDER[action]);
-  }, [action]);
+  function chooseAction(next: (typeof ACTIONS)[number]["id"]) {
+    setAction(next);
+    setLadder(DEFAULT_LADDER[next]);
+  }
 
   function toggleGroup(groupRefs: string[]) {
     setRefs((prev) => {
@@ -109,20 +110,10 @@ export function DecisionBar({
   }
 
   return (
-    <section className="ws-panel ws-decide" aria-labelledby="decide-title">
-      <header className="ws-panel-head">
-        <div>
-          <p className="kicker">Disposition · human only</p>
-          <h2 id="decide-title">Record the next step</h2>
-        </div>
-        <p className="muted">
-          An alert is suspicion, not a confirmed finding of fraud. Cite the evidence you inspected
-          and write a reason another reviewer can follow.
-        </p>
-      </header>
+    <div className="decision">
       <div className="decide-grid">
         <fieldset className="decide-actions">
-          <legend className="sr">Action</legend>
+          <legend className="field">Action</legend>
           {ACTIONS.map((item) => (
             <label key={item.id} className={action === item.id ? "on" : ""}>
               <input
@@ -131,15 +122,17 @@ export function DecisionBar({
                 value={item.id}
                 checked={action === item.id}
                 disabled={disabled || pending}
-                onChange={() => setAction(item.id)}
+                onChange={() => chooseAction(item.id)}
               />
-              <strong>{item.label}</strong>
-              <span>{item.hint}</span>
+              <span className="decide-option">
+                <strong>{item.label}</strong>
+                <span>{item.hint}</span>
+              </span>
             </label>
           ))}
         </fieldset>
-        <div>
-          <p className="kicker">Supporting evidence reviewed</p>
+        <div className="decide-evidence">
+          <p className="field">Supporting evidence reviewed</p>
           {alerts.length === 0 ? (
             <p className="muted">No findings to attach.</p>
           ) : (
@@ -162,8 +155,8 @@ export function DecisionBar({
               })}
             </ul>
           )}
-          <label className="decide-reason">
-            Notes and override rationale
+          <label className="field decide-reason">
+            Notes and rationale (at least 20 characters)
             <textarea
               rows={3}
               value={reason}
@@ -171,13 +164,13 @@ export function DecisionBar({
               onChange={(e) => setReason(e.target.value)}
               placeholder="What you verified, what remains uncertain, and why this next step…"
             />
-            <span className="muted mono">{reason.trim().length}/20</span>
+            <span className="field-hint">{reason.trim().length}/20 characters</span>
           </label>
         </div>
         <div className="decide-side">
           {action === "needs_evidence" && gaps.length > 0 && (
             <div>
-              <p className="kicker">Evidence still needed</p>
+              <p className="field">Evidence still needed</p>
               <ul className="gap-list">
                 {gaps.map((g) => (
                   <li key={g}>{g}</li>
@@ -186,7 +179,7 @@ export function DecisionBar({
             </div>
           )}
           {ladderOptions.length > 0 && (
-            <label className="ladder-select">
+            <label className="field ladder-select">
               Program-integrity next step
               <select
                 value={ladder ?? ""}
@@ -199,7 +192,7 @@ export function DecisionBar({
                   </option>
                 ))}
               </select>
-              <span className="muted">
+              <span className="field-hint">
                 42 CFR 455.23 payment suspension is a recommendation. The state decides.
               </span>
             </label>
@@ -214,10 +207,16 @@ export function DecisionBar({
           </button>
         </div>
       </div>
-      {error && <p className="error-text">{error}</p>}
+      {error && (
+        <p className="error-text" role="alert">
+          {error}
+        </p>
+      )}
       {result && (
         <div className="banner ok decide-receipt" role="status">
-          <p className="kicker">Audit confirmation</p>
+          <p>
+            <strong>Audit confirmation</strong>
+          </p>
           <p>
             {result.action} recorded
             {result.ladder_label ? ` · ${result.ladder_label}` : ""}. {result.note}
@@ -232,6 +231,6 @@ export function DecisionBar({
           <ProposalCard proposal={proposal} compact={proposal.status !== "pending"} />
         </div>
       )}
-    </section>
+    </div>
   );
 }
