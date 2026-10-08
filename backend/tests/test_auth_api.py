@@ -48,10 +48,15 @@ def test_refresh_rotation_and_reuse(client: TestClient) -> None:
     assert second
     assert second != first_refresh
 
-    # replay of the old refresh token must revoke
+    # replay of the old refresh token must revoke, and the revocation must survive the 401
     client.cookies.set("cs_refresh", first_refresh)
     replay = client.post("/api/v1/auth/refresh")
     assert replay.status_code == 401
+    client.cookies.clear()
+    client.cookies.set("cs_refresh", second)
+    after_reuse = client.post("/api/v1/auth/refresh")
+    assert after_reuse.status_code == 401
+    assert after_reuse.json()["detail"] == "invalid refresh token"
 
 
 def test_investigator_cannot_load_batch(client: TestClient) -> None:
@@ -61,3 +66,35 @@ def test_investigator_cannot_load_batch(client: TestClient) -> None:
     )
     res = client.post("/api/v1/batches", json={"profile": "tiny", "seed": 7, "run_now": False})
     assert res.status_code == 403
+
+
+def _login(client: TestClient, email: str, password: str):
+    return client.post("/api/v1/auth/login", json={"email": email, "password": password})
+
+
+def test_csrf_header_required_for_cookie_writes(client: TestClient) -> None:
+    assert _login(client, "investigator@demo.claimshield", "demo-investigator").status_code == 200
+    csrf = client.cookies.get("cs_csrf")
+    client.event_hooks["request"] = []  # stop echoing the CSRF cookie like the web client does
+    missing = client.post("/api/v1/auth/logout")
+    assert missing.status_code == 401
+    assert missing.json()["detail"] == "csrf check failed"
+    wrong = client.post("/api/v1/auth/logout", headers={"X-CSRF-Token": "not-the-cookie"})
+    assert wrong.status_code == 401
+    ok = client.post("/api/v1/auth/logout", headers={"X-CSRF-Token": csrf})
+    assert ok.status_code == 200
+
+
+def test_failed_login_is_audited(client: TestClient) -> None:
+    assert _login(client, "investigator@demo.claimshield", "wrong-password").status_code == 401
+    assert _login(client, "nobody@demo.claimshield", "whatever").status_code == 401
+    assert _login(client, "auditor@demo.claimshield", "demo-auditor").status_code == 200
+    events = client.get("/api/v1/audit", params={"action": "auth.login_failed"}).json()["events"]
+    reasons = {e["payload"]["reason"] for e in events}
+    assert {"bad_password", "unknown_user"} <= reasons
+    assert all("wrong-password" not in str(e["payload"]) for e in events)
+    assert client.get("/api/v1/audit/verify").json()["intact"] is True
+
+
+def test_overlong_password_is_rejected(client: TestClient) -> None:
+    assert _login(client, "investigator@demo.claimshield", "x" * 257).status_code == 422

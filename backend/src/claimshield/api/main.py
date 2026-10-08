@@ -26,12 +26,15 @@ from claimshield.db.base import Base
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     settings = get_settings()
+    settings.assert_safe_to_start()
     factory = configure_engine(settings)
     engine = get_engine()
     assert engine is not None
     Base.metadata.create_all(bind=engine)
     with factory() as session:
-        seed_demo_users(session)
+        if settings.demo_mode:
+            # Demo accounts have published passwords; never create them in a real deployment.
+            seed_demo_users(session)
         seed_system_user(session)
         session.commit()
     yield

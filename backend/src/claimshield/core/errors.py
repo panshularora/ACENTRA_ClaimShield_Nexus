@@ -8,10 +8,14 @@ class ClaimShieldError(Exception):
     type_uri: str = "about:blank"
     title: str = "Internal error"
 
-    def __init__(self, detail: str, *, case_id: str | None = None) -> None:
+    def __init__(self, detail: str, *, case_id: str | None = None, persist_changes: bool = False) -> None:
         super().__init__(detail)
         self.detail = detail
         self.case_id = case_id
+        # Security side effects (audit of a failed login, revoking a session after refresh-token
+        # reuse) must survive the error response, so the request session commits instead of
+        # rolling back when this is set.
+        self.persist_changes = persist_changes
 
     def to_problem(self) -> dict[str, str | int | None]:
         body: dict[str, str | int | None] = {

@@ -18,7 +18,7 @@ TOKEN = "test-internal-token-do-not-commit"
 def aws_client(tmp_path, monkeypatch) -> Generator[TestClient, None, None]:
     db = tmp_path / "claimshield.db"
     monkeypatch.setenv("CLAIMSHIELD_DATABASE_URL", f"sqlite+pysqlite:///{db.as_posix()}")
-    monkeypatch.setenv("CLAIMSHIELD_JWT_SIGNING_KEY", "test-signing-key-32-bytes-min!!")
+    monkeypatch.setenv("CLAIMSHIELD_JWT_SIGNING_KEY", "test-signing-key-at-least-32-bytes-long")
     monkeypatch.setenv("CLAIMSHIELD_COOKIE_SECURE", "false")
     monkeypatch.setenv("CLAIMSHIELD_DEMO_MODE", "true")
     monkeypatch.setenv("CLAIMSHIELD_INTERNAL_TOKEN", TOKEN)

@@ -121,7 +121,18 @@ def authenticate(
     login_limiter.check(f"{ip}:{email.lower()}", now=instant)
     user = session.execute(select(User).where(User.email == email.lower())).scalar_one_or_none()
     if user is None or not user.is_active or not verify_password(password, user.password_hash):
-        raise Unauthorized("invalid email or password")
+        reason = "unknown_user" if user is None else ("inactive" if not user.is_active else "bad_password")
+        append_event(
+            session,
+            actor_id=user.id if user else None,
+            role=user.role if user else "anonymous",
+            action="auth.login_failed",
+            object_type="user",
+            object_id=user.id if user else email.lower()[:64],
+            payload={"email": email.lower()[:254], "ip": ip, "reason": reason},
+            ts=instant,
+        )
+        raise Unauthorized("invalid email or password", persist_changes=True)
     refresh = new_refresh_token()
     auth_session = AuthSession(
         id=new_id("SID"),
@@ -169,8 +180,18 @@ def rotate_refresh(
     ).scalar_one_or_none()
     if reuse is not None:
         reuse.revoked_at = instant
-        session.flush()
-        raise Unauthorized("refresh token reuse detected; session revoked")
+        owner = session.get(User, reuse.user_id)
+        append_event(
+            session,
+            actor_id=reuse.user_id,
+            role=owner.role if owner else "unknown",
+            action="auth.refresh_reuse",
+            object_type="session",
+            object_id=reuse.id,
+            payload={"revoked": True},
+            ts=instant,
+        )
+        raise Unauthorized("refresh token reuse detected; session revoked", persist_changes=True)
     auth_session = session.execute(
         select(AuthSession).where(AuthSession.refresh_token_hash == digest)
     ).scalar_one_or_none()

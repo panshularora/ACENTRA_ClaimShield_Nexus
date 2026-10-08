@@ -23,11 +23,11 @@ router = APIRouter(prefix="/api/v1", tags=["batches"])
 
 
 class LoadBatchBody(BaseModel):
-    adapter: str = "synthetic"
-    profile: str = "tiny"
+    adapter: str = Field(default="synthetic", max_length=32)
+    profile: str = Field(default="tiny", max_length=32)
     seed: int = 7
-    horizon_days: int = 60
-    capacity_hours: float = Field(default=40.0, gt=0)
+    horizon_days: int = Field(default=60, ge=1, le=365)
+    capacity_hours: float = Field(default=40.0, gt=0, le=10_000)
     max_slots: int = Field(default=20, ge=1, le=200)
     member_weight: float = Field(default=1.0, ge=0.25, le=3.0)
     run_now: bool = True
@@ -44,9 +44,9 @@ class BatchOut(BaseModel):
 
 
 class RecomputeBody(BaseModel):
-    batch_id: str | None = None
-    horizon_days: int = 60
-    capacity_hours: float = Field(default=40.0, gt=0)
+    batch_id: str | None = Field(default=None, max_length=32)
+    horizon_days: int = Field(default=60, ge=1, le=365)
+    capacity_hours: float = Field(default=40.0, gt=0, le=10_000)
     max_slots: int = Field(default=20, ge=1, le=200)
     member_weight: float = Field(default=1.0, ge=0.25, le=3.0)
     harm_lambda: float | None = Field(default=None, gt=0)

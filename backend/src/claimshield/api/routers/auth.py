@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 class LoginBody(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=4)
+    password: str = Field(min_length=4, max_length=256)
 
 
 class UserOut(BaseModel):
