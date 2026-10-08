@@ -1,0 +1,132 @@
+html:has(.login-screen),
+body:has(.login-screen) {
+  background: #06141b;
+}
+
+.login-screen {
+  min-height: 100vh;
+  color: #e8f4ec;
+  position: relative;
+}
+
+.login-stage {
+  position: fixed;
+  inset: 0;
+}
+
+.login-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(6, 20, 27, 0.88) 0%, rgba(6, 20, 27, 0.55) 48%, rgba(6, 20, 27, 0.2) 100%);
+  pointer-events: none;
+}
+
+.login-top {
+  position: relative;
+  z-index: 2;
+  padding: 1.2rem 6vw;
+}
+
+.login-top a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.login-panel {
+  position: relative;
+  z-index: 2;
+  max-width: 32rem;
+  margin: 6vh 8vw 8vh;
+  padding: 1.6rem 1.7rem 1.8rem;
+  background: rgba(8, 28, 36, 0.72);
+  border: 1px solid rgba(158, 230, 184, 0.22);
+  backdrop-filter: blur(16px);
+  border-radius: 18px;
+}
+
+.login-panel h1 {
+  font-family: "Fraunces", Georgia, serif;
+  font-size: clamp(1.8rem, 3vw, 2.5rem);
+  letter-spacing: -0.03em;
+  margin: 0.15rem 0 0.7rem;
+}
+
+.login-panel .lede {
+  color: #c5ddd0;
+  margin-bottom: 1.2rem;
+}
+
+.login-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.login-form label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  color: #9ee6b8;
+}
+
+.login-form input {
+  background: rgba(6, 20, 27, 0.7);
+  border: 1px solid #2a4a3a;
+  color: #e8f4ec;
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+}
+
+.login-panel .btn.solid {
+  margin-top: 0.3rem;
+  background: #1fbf5a;
+  color: #06141b;
+  border-color: #1fbf5a;
+  border-radius: 999px;
+  font-weight: 650;
+}
+
+.demo-switch {
+  margin-top: 1.3rem;
+}
+
+.demo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
+
+.demo-chip {
+  text-align: left;
+  background: rgba(6, 20, 27, 0.55);
+  border: 1px solid #2a4a3a;
+  color: #e8f4ec;
+  border-radius: 10px;
+  padding: 0.45rem 0.55rem;
+  cursor: pointer;
+}
+
+.demo-chip strong {
+  display: block;
+  text-transform: capitalize;
+  font-size: 0.82rem;
+}
+
+.demo-chip span {
+  font-size: 0.68rem;
+  color: #8fb59d;
+}
+
+.demo-chip.is-on {
+  border-color: #1fbf5a;
+  box-shadow: 0 0 0 1px #1fbf5a inset;
+}
+
+@media (max-width: 720px) {
+  .login-panel {
+    margin: 4vh 1rem 2rem;
+  }
+  .demo-grid {
+    grid-template-columns: 1fr;
+  }
+}

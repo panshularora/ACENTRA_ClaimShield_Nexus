@@ -1,9 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError } from "../../api/client";
 import { useAuth } from "../../auth/AuthProvider";
 import type { SessionUser } from "../../api/types";
+import { StoryScene } from "../../three/StoryScene";
+import { usePrefersReducedMotion } from "../../three/useScrollProgress";
+import "./login.css";
 
 function homeFor(user: SessionUser): string {
   if (user.role === "auditor") return "/audit";
@@ -22,6 +25,7 @@ function homeFor(user: SessionUser): string {
 export function LoginPage() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
+  const reduced = usePrefersReducedMotion();
   const [email, setEmail] = useState("manager@demo.claimshield");
   const [password, setPassword] = useState("demo-manager");
   const [error, setError] = useState<string | null>(null);
@@ -48,13 +52,25 @@ export function LoginPage() {
   }
 
   return (
-    <main className="login" id="main">
-      <section className="login-panel">
-        <p className="kicker">Medicaid SIU · post-adjudication</p>
-        <h1>ClaimShield Nexus</h1>
+    <div className="login-screen">
+      <div className="login-stage" aria-hidden="true">
+        <StoryScene progress={0.46} reduced={reduced} />
+      </div>
+      <header className="login-top">
+        <Link to="/" className="brand-lockup">
+          <span className="brand-mark" aria-hidden="true" />
+          <div>
+            <strong>ClaimShield Nexus</strong>
+            <em>Acentra Health SIU</em>
+          </div>
+        </Link>
+      </header>
+      <main className="login-panel" id="main">
+        <p className="kicker">Recommend only · humans decide</p>
+        <h1>Enter the special investigations unit.</h1>
         <p className="lede">
-          Rank investigation hours against harm, dollars, and evidence. Humans decide. Models do
-          not label fraud.
+          Live FastAPI session. Cookie JWT, role-based routes. The model does not print fraud on a
+          provider.
         </p>
         <form onSubmit={(e) => void onSubmit(e)} className="login-form">
           <label>
@@ -88,13 +104,13 @@ export function LoginPage() {
         </form>
         {meta.data?.demo_mode && meta.data.demo_users && (
           <div className="demo-switch">
-            <p className="kicker">Demo roles</p>
+            <p className="kicker">Demo roles for the walkthrough</p>
             <div className="demo-grid">
               {meta.data.demo_users.map((demo) => (
                 <button
                   key={demo.email}
                   type="button"
-                  className="demo-chip"
+                  className={`demo-chip ${email === demo.email ? "is-on" : ""}`}
                   onClick={() => {
                     setEmail(demo.email);
                     setPassword(demo.password);
@@ -107,7 +123,12 @@ export function LoginPage() {
             </div>
           </div>
         )}
-      </section>
-    </main>
+        {meta.isError && (
+          <p className="error-text" role="status">
+            API is not reachable. Start the backend on :8000, then sign in.
+          </p>
+        )}
+      </main>
+    </div>
   );
 }

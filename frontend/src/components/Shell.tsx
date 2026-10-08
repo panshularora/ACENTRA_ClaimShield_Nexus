@@ -7,25 +7,23 @@ export function Shell() {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
+  useEffect(() => {
+    if (!loading && !user) {
+      void navigate({ to: "/login" });
+    }
+  }, [loading, user, pathname, navigate]);
+
   if (loading) {
     return (
       <div className="boot">
+        <span className="brand-mark" aria-hidden="true" />
         <p>ClaimShield Nexus</p>
         <p className="muted">Checking session…</p>
       </div>
     );
   }
 
-  useEffect(() => {
-    if (!loading && !user && pathname !== "/login") {
-      void navigate({ to: "/login" });
-    }
-  }, [loading, user, pathname, navigate]);
-
-  if (!user) {
-    if (pathname !== "/login") return null;
-    return <Outlet />;
-  }
+  if (!user) return null;
 
   const showQueue = allowed("queue:read");
   const showCases = allowed("case:read");
@@ -38,13 +36,13 @@ export function Shell() {
         Skip to content
       </a>
       <header className="mast">
-        <div className="mast-brand">
-          <span className="mark">CS</span>
+        <Link to="/" className="mast-brand">
+          <span className="brand-mark" aria-hidden="true" />
           <div>
             <strong>ClaimShield Nexus</strong>
-            <p>SIU case ranking · post-adjudication</p>
+            <p>SIU · post-adjudication · Acentra Health</p>
           </div>
-        </div>
+        </Link>
         <nav className="mast-nav" aria-label="Primary">
           {showQueue && (
             <Link to="/manager/queue" className={pathname.startsWith("/manager/queue") ? "active" : ""}>
@@ -56,7 +54,7 @@ export function Shell() {
               to="/investigator/cases"
               className={pathname.startsWith("/investigator/") ? "active" : ""}
             >
-              My cases
+              Cases
             </Link>
           )}
           {showWiki && (

@@ -1,25 +1,26 @@
 :root {
-  --ink: #161c22;
-  --ink-2: #3a4550;
-  --paper: #efe8d6;
-  --paper-2: #f7f2e6;
-  --rule: #cfc6b2;
-  --mast: #18232e;
-  --mast-ink: #efe8d6;
-  --harm: #9b2f24;
-  --harm-bg: #f3d6d0;
-  --selected: #1c5a4c;
-  --selected-bg: #d5e6df;
+  --ink: #0c2430;
+  --ink-2: #3d5a63;
+  --paper: #f3f7f4;
+  --paper-2: #ffffff;
+  --rule: #d5e4da;
+  --mast: #06141b;
+  --mast-ink: #e8f4ec;
+  --harm: #c4472c;
+  --harm-bg: #f8dcd4;
+  --selected: #1fbf5a;
+  --selected-bg: #d7f3e2;
   --evidence: #3e5368;
-  --monitor: #6d5a32;
+  --monitor: #8a6d2e;
   --monitor-bg: #eadcc0;
   --need: #4a4e62;
   --need-bg: #d9dce8;
-  --ok: #215c3a;
-  --focus: #0b3d8c;
+  --ok: #0d7a38;
+  --focus: #1fbf5a;
   --err: #8f1d1d;
-  --sans: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --sans: "Outfit", "IBM Plex Sans", "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --green: #1fbf5a;
 }
 
 * { box-sizing: border-box; }
@@ -90,28 +91,43 @@ a { color: inherit; }
   color: var(--mast-ink);
   padding: 0.7rem 1.2rem;
 }
-.mast-brand { display: flex; gap: 0.7rem; align-items: center; }
-.mast-brand p { margin: 0; font-size: 0.75rem; color: #c9c1ae; }
-.mark {
-  width: 2.1rem; height: 2.1rem;
-  display: grid; place-items: center;
-  background: #c45c32;
-  color: #fff;
-  font-weight: 700;
-  font-family: var(--mono);
-  font-size: 0.8rem;
+.mast-brand {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+  text-decoration: none;
+  color: inherit;
+}
+.mast-brand p { margin: 0; font-size: 0.75rem; color: #8fb59d; }
+.brand-mark {
+  width: 1.7rem;
+  height: 1.7rem;
+  display: block;
+  background: conic-gradient(from 210deg, #1fbf5a, #9ee6b8, #0d7a38);
+  clip-path: polygon(50% 0%, 100% 78%, 78% 100%, 50% 72%, 22% 100%, 0 78%);
+  flex-shrink: 0;
 }
 .mast-nav { display: flex; gap: 0.4rem; flex: 1; }
 .mast-nav a {
   text-decoration: none;
   padding: 0.35rem 0.7rem;
   border-bottom: 2px solid transparent;
-  color: #d9d1bf;
+  color: #c5ddd0;
 }
-.mast-nav a.active, .mast-nav a:hover { color: #fff; border-color: #c45c32; }
+.mast-nav a.active, .mast-nav a:hover { color: #fff; border-color: var(--green); }
 .mast-user { display: flex; align-items: center; gap: 0.8rem; font-size: 0.9rem; }
-.mast-user em { display: block; font-style: normal; color: #c9c1ae; font-size: 0.75rem; }
+.mast-user em { display: block; font-style: normal; color: #8fb59d; font-size: 0.75rem; text-transform: capitalize; }
 .mast-user .btn.ghost { color: var(--mast-ink); border-color: #3c4a58; }
+.boot {
+  min-height: 100vh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.4rem;
+  background: #06141b;
+  color: #e8f4ec;
+}
+.boot .brand-mark { width: 2.2rem; height: 2.2rem; }
 
 .page { padding: 1.1rem 1.3rem 3rem; max-width: 1400px; }
 .page-head {
