@@ -177,17 +177,7 @@ export function ManagerQueuePage() {
     });
   }
 
-  if (!user) return null;
-  if (!canQueue) {
-    return (
-      <main id="main" className="page">
-        <h1>Queue</h1>
-        <p className="error-text">Your role cannot read the SIU queue.</p>
-      </main>
-    );
-  }
-
-  const rows = queueQuery.data ?? [];
+  const rows = useMemo(() => queueQuery.data ?? [], [queueQuery.data]);
   const nAlerts = runQuery.data?.n_alerts ?? runQuery.data?.summary.n_alerts ?? 0;
   const nCases = rows.length || runQuery.data?.n_cases || 0;
   const nSelected =
@@ -256,6 +246,16 @@ export function ManagerQueuePage() {
     (currentErr && currentErr.status !== 404 ? currentErr : undefined);
 
   const compared = rows.filter((row) => compareIds.includes(row.case_id));
+
+  if (!user) return null;
+  if (!canQueue) {
+    return (
+      <main id="main" className="page">
+        <h1>Queue</h1>
+        <p className="error-text">Your role cannot read the SIU queue.</p>
+      </main>
+    );
+  }
 
   return (
     <main id="main" className="page queue-page">
