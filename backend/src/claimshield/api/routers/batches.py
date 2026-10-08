@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from claimshield.api.deps import check_csrf, get_db, require
 from claimshield.core.config import Settings, get_settings
 from claimshield.core.errors import NotFound
-from claimshield.db.models import Alert, Batch, Case, PipelineRun, QueueOverride, User
+from claimshield.db.models import Alert, Batch, Case, CaseRisk, PipelineRun, QueueOverride, User
 from claimshield.pipeline.service import (
     latest_batch,
     latest_run,
@@ -17,6 +17,7 @@ from claimshield.pipeline.service import (
 )
 from claimshield.queue.explain import run_payload, screening_days_left, why_rank
 from claimshield.queue.rank import rank_pack_for_case, recommendation_for
+from claimshield.risk.present import risk_fields
 
 router = APIRouter(prefix="/api/v1", tags=["batches"])
 
@@ -229,6 +230,10 @@ def get_queue(
             select(Alert.case_id, func.count()).where(Alert.run_id == run_id).group_by(Alert.case_id)
         ).all()
     )
+    risks = {
+        r.case_id: r
+        for r in session.execute(select(CaseRisk).where(CaseRisk.run_id == run_id)).scalars()
+    }
     return [
         _case_brief(
             c,
@@ -236,6 +241,7 @@ def get_queue(
             queue_rank=ranks.get(c.case_id),
             override=latest_override.get(c.case_id),
             n_alerts=int(alert_counts.get(c.case_id) or 0),
+            risk=risks.get(c.case_id),
         )
         for c in cases
     ]
@@ -248,6 +254,7 @@ def _case_brief(
     queue_rank: int | None = None,
     override: QueueOverride | None = None,
     n_alerts: int = 0,
+    risk: CaseRisk | None = None,
 ) -> dict:
     pack = factors or {}
     shown = override if override and override.action != "release" else None
@@ -270,6 +277,7 @@ def _case_brief(
         "f30": case.f30,
         "f60": case.f60,
         "f90": case.f90,
+        **risk_fields(case, risk),
         "sla_due": case.sla_due.isoformat() if case.sla_due else None,
         "screening_days_left": screening_days_left(case),
         "rank_factors": pack,
