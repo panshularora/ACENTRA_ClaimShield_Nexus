@@ -80,9 +80,7 @@ def build_world(profile: str, seed: int) -> Panel:
         rows["event_interval"] = [interval_of(first.get(p), cutoff) for p in rows["provider_id"]]
         any_interval = [interval_of(first_any.get(p), cutoff) for p in rows["provider_id"]]
         labels = pd.DataFrame([horizon_labels(i, cutoff, end) for i in rows["event_interval"]])
-        held = pd.DataFrame([horizon_labels(i, cutoff, end) for i in any_interval]).add_prefix(
-            "all_"
-        )
+        held = pd.DataFrame([horizon_labels(i, cutoff, end) for i in any_interval]).add_prefix("all_")
         rows = pd.concat([rows, labels, held], axis=1)
         rows["censor_interval"] = min(3, max(0, (end - cutoff).days // INTERVAL_DAYS))
         rows["held_out_provider"] = rows["provider_id"].isin(gt.held_out_providers)
@@ -123,11 +121,7 @@ def build_panel(profile: str, seeds: list[int], *, workers: int | None = None) -
 
 def _rules_count(alerts: list[AlertDraft], provider_id: str) -> float:
     return float(
-        sum(
-            1
-            for a in alerts
-            if a.detector == "rules" and provider_id in {a.entity_id, *a.related_entity_ids}
-        )
+        sum(1 for a in alerts if a.detector == "rules" and provider_id in {a.entity_id, *a.related_entity_ids})
     )
 
 
@@ -138,9 +132,7 @@ def _case_rules_score(case: dict[str, Any]) -> float:
     return float(len(kinds)) + 0.01 * top
 
 
-def _heuristic_provider(
-    cases: list[dict[str, Any]], provider_id: str
-) -> tuple[float, float, float]:
+def _heuristic_provider(cases: list[dict[str, Any]], provider_id: str) -> tuple[float, float, float]:
     """Old formula as a provider score: worst case containing the provider, else p=0, harm=0."""
     best = heuristic_hazard(0.0, 0)
     for case in cases:

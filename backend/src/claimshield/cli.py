@@ -16,17 +16,13 @@ def main() -> None:
     gen.add_argument("--seed", type=int, default=7)
     gen.add_argument("--out", type=Path, default=None)
 
-    trn = sub.add_parser(
-        "train", help="Train, backtest and register the P(confirm) and 30/60/90 hazard models"
-    )
+    trn = sub.add_parser("train", help="Train, backtest and register the P(confirm) and 30/60/90 hazard models")
     trn.add_argument("--profile", default="panel", choices=["panel"])
     trn.add_argument("--seed", type=int, default=7)
     trn.add_argument("--worlds", type=int, default=24, help="synthetic worlds (generator seeds)")
     trn.add_argument("--capacity-hours", type=float, default=40.0)
     trn.add_argument("--workers", type=int, default=None)
-    trn.add_argument(
-        "--no-challenger", action="store_true", help="skip the gradient-boosting challenger"
-    )
+    trn.add_argument("--no-challenger", action="store_true", help="skip the gradient-boosting challenger")
     trn.add_argument("--out", type=Path, default=None)
 
     args = parser.parse_args()

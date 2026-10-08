@@ -165,7 +165,5 @@ def test_suspension_recommendation_reject_and_follow_up(client: TestClient) -> N
     _as(client, INVESTIGATOR)
     assert _decide(client, other_id, "monitor").status_code == 403
     assert client.post(f"/api/v1/cases/{other_id}/assign", json={}).status_code == 403
-    too_long = client.post(
-        f"/api/v1/cases/{other_id}/decisions", json={"action": "monitor", "reason": "x" * 4001}
-    )
+    too_long = client.post(f"/api/v1/cases/{other_id}/decisions", json={"action": "monitor", "reason": "x" * 4001})
     assert too_long.status_code == 422

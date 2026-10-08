@@ -276,9 +276,7 @@ class InvestigationSubject(Base):
     __tablename__ = "investigation_subject"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    investigation_id: Mapped[str] = mapped_column(
-        ForeignKey("investigation.investigation_id"), index=True
-    )
+    investigation_id: Mapped[str] = mapped_column(ForeignKey("investigation.investigation_id"), index=True)
     provider_id: Mapped[str] = mapped_column(String(32), index=True)
 
 

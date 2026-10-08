@@ -27,8 +27,5 @@ def meta(settings: Settings = Depends(get_settings)) -> dict[str, Any]:
         "data_profile": settings.data_profile,
     }
     if settings.demo_mode:
-        body["demo_users"] = [
-            {"email": u["email"], "role": u["role"], "password": u["password"]}
-            for u in DEMO_USERS
-        ]
+        body["demo_users"] = [{"email": u["email"], "role": u["role"], "password": u["password"]} for u in DEMO_USERS]
     return body

@@ -123,9 +123,7 @@ def attach_rank_factors(
     today: date | None = None,
 ) -> None:
     dollar_scale = _p90([float(c.get("flagged_dollars") or 0.0) for c in cases])
-    member_scale = _p90(
-        [int(c.get("harm") or 0) * max(1, int(c.get("members_affected") or 0)) for c in cases]
-    )
+    member_scale = _p90([int(c.get("harm") or 0) * max(1, int(c.get("members_affected") or 0)) for c in cases])
     for case in cases:
         scores = factor_scores(
             case,
@@ -172,12 +170,11 @@ def rank_pack_for_case(
     peers: list[Any],
     member_weight: float = 1.0,
 ) -> dict[str, Any]:
-    dollar_scale = _p90([float(_get(c, "flagged_dollars") or 0.0) for c in peers] or [float(_get(case, "flagged_dollars") or 0.0)])
+    dollar_scale = _p90(
+        [float(_get(c, "flagged_dollars") or 0.0) for c in peers] or [float(_get(case, "flagged_dollars") or 0.0)]
+    )
     member_scale = _p90(
-        [
-            int(_get(c, "harm") or 0) * max(1, int(_get(c, "members_affected") or 0))
-            for c in peers
-        ]
+        [int(_get(c, "harm") or 0) * max(1, int(_get(c, "members_affected") or 0)) for c in peers]
         or [int(_get(case, "harm") or 0) * max(1, int(_get(case, "members_affected") or 0))]
     )
     scores = factor_scores(

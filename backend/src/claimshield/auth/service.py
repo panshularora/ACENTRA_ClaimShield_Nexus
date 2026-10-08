@@ -89,9 +89,7 @@ def seed_demo_users(session: Session, now: datetime | None = None) -> None:
 def seed_system_user(session: Session, now: datetime | None = None) -> User:
     """Machine actor for S3 ingest. Password is random and discarded; login is not used."""
     instant = now or datetime.now(UTC)
-    existing = session.execute(
-        select(User).where(User.email == SYSTEM_USER_EMAIL)
-    ).scalar_one_or_none()
+    existing = session.execute(select(User).where(User.email == SYSTEM_USER_EMAIL)).scalar_one_or_none()
     if existing:
         return existing
     user = User(
@@ -175,9 +173,7 @@ def rotate_refresh(
 ) -> tuple[User, AuthSession, str, str]:
     instant = now or datetime.now(UTC)
     digest = hash_refresh_token(refresh_token)
-    reuse = session.execute(
-        select(AuthSession).where(AuthSession.previous_refresh_hash == digest)
-    ).scalar_one_or_none()
+    reuse = session.execute(select(AuthSession).where(AuthSession.previous_refresh_hash == digest)).scalar_one_or_none()
     if reuse is not None:
         reuse.revoked_at = instant
         owner = session.get(User, reuse.user_id)
@@ -195,11 +191,7 @@ def rotate_refresh(
     auth_session = session.execute(
         select(AuthSession).where(AuthSession.refresh_token_hash == digest)
     ).scalar_one_or_none()
-    if (
-        auth_session is None
-        or auth_session.revoked_at is not None
-        or as_utc(auth_session.expires_at) <= instant
-    ):
+    if auth_session is None or auth_session.revoked_at is not None or as_utc(auth_session.expires_at) <= instant:
         raise Unauthorized("invalid refresh token")
     user = session.get(User, auth_session.user_id)
     if user is None or not user.is_active:

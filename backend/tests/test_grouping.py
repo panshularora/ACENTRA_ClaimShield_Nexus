@@ -43,9 +43,7 @@ def test_same_provider_alerts_share_a_case() -> None:
         evidence={"kind": "em_upcode_z", "peer_ids": ["PRV-PEER-1", "PRV-PEER-2"]},
     )
     tables = {
-        "claim": pd.DataFrame(
-            [{"claim_id": "CLM-1", "member_id": "MBR-1", "billing_provider_id": "PRV-A"}]
-        ),
+        "claim": pd.DataFrame([{"claim_id": "CLM-1", "member_id": "MBR-1", "billing_provider_id": "PRV-A"}]),
         "claim_line": pd.DataFrame(
             [
                 {"line_id": "LN-1", "claim_id": "CLM-1", "paid": 10.0},
@@ -74,10 +72,6 @@ def test_ring_link_still_groups_providers(tiny_dataset) -> None:
     )
     g1 = tiny_dataset.ground_truth[tiny_dataset.ground_truth.scheme_id == "G1"].iloc[0]
     ring_ids = {str(x) for x in g1.entity_ids if str(x).startswith("PRV")}
-    multi = [
-        {str(e) for e in case["entity_ids"]}
-        for case in result["cases"]
-        if len(case["entity_ids"]) >= 2
-    ]
+    multi = [{str(e) for e in case["entity_ids"]} for case in result["cases"] if len(case["entity_ids"]) >= 2]
     assert strong
     assert any(len(ring_ids & ents) >= 2 for ents in multi)

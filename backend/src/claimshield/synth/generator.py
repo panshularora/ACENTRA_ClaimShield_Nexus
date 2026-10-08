@@ -79,9 +79,7 @@ def generate(profile: str = "tiny", seed: int = 7) -> Dataset:
     providers = _providers(rng, fake, spec, locations, start)
     owners, ownership, contacts = _ownership(rng, fake, spec, providers, start)
     facilities = _facilities(rng, locations)
-    claims, lines, stays = _legitimate_claims(
-        rng, spec, members, providers, facilities, start, end
-    )
+    claims, lines, stays = _legitimate_claims(rng, spec, members, providers, facilities, start, end)
     referrals = _referrals(rng, spec, members, providers, start, end)
     evv = pd.DataFrame(
         columns=[
@@ -357,10 +355,7 @@ def _legitimate_claims(
     living_ids = members.loc[members["date_of_death"].isna(), "member_id"].astype(str).tolist()
     if not living_ids:
         living_ids = [str(m) for m in member_ids]
-    prov_by_line = {
-        line: providers[providers.service_line == line]["provider_id"].tolist()
-        for line in SERVICE_LINES
-    }
+    prov_by_line = {line: providers[providers.service_line == line]["provider_id"].tolist() for line in SERVICE_LINES}
     fac_ids = facilities["facility_id"].tolist() or [None]
     for _ in range(n):
         line_type = str(rng.choice(SERVICE_LINES, p=[0.28, 0.1, 0.08, 0.08, 0.08, 0.14, 0.16, 0.08]))
@@ -465,17 +460,13 @@ def _referrals(
     return pd.DataFrame(rows)
 
 
-def _attach_home_health_evv(
-    ds: Dataset, rng: np.random.Generator, *, skip_line_ids: set[str]
-) -> None:
+def _attach_home_health_evv(ds: Dataset, rng: np.random.Generator, *, skip_line_ids: set[str]) -> None:
     """Write an EVV row for every home-health claim line except planted S09 misses."""
     claims = ds.tables["claim"]
     hh = claims[claims.claim_type == "home_health"]
     if hh.empty:
         return
-    lines = ds.tables["claim_line"].merge(
-        hh[["claim_id", "member_id", "billing_provider_id"]], on="claim_id"
-    )
+    lines = ds.tables["claim_line"].merge(hh[["claim_id", "member_id", "billing_provider_id"]], on="claim_id")
     members = ds.tables["member"].set_index("member_id")
     locations = ds.tables["location"].set_index("location_id")
     rows: list[dict[str, Any]] = []
@@ -516,12 +507,12 @@ def _rx(
     start: date,
     end: date,
 ) -> pd.DataFrame:
-    prescribers = providers[providers.service_line == "professional"]["provider_id"].tolist() or providers[
-        "provider_id"
-    ].tolist()
-    pharmacies = providers[providers.service_line == "pharmacy"]["provider_id"].tolist() or providers[
-        "provider_id"
-    ].tolist()
+    prescribers = (
+        providers[providers.service_line == "professional"]["provider_id"].tolist() or providers["provider_id"].tolist()
+    )
+    pharmacies = (
+        providers[providers.service_line == "pharmacy"]["provider_id"].tolist() or providers["provider_id"].tolist()
+    )
     span = max(1, (end - start).days)
     rows = []
     for _ in range(spec.n_rx):
@@ -540,9 +531,7 @@ def _rx(
     return pd.DataFrame(rows)
 
 
-def _exclusions(
-    rng: np.random.Generator, fake: Faker, providers: pd.DataFrame, start: date
-) -> pd.DataFrame:
+def _exclusions(rng: np.random.Generator, fake: Faker, providers: pd.DataFrame, start: date) -> pd.DataFrame:
     rows = []
     for _ in range(max(4, len(providers) // 80)):
         rows.append(
@@ -586,8 +575,10 @@ def _investigations(ds: Dataset, rng: np.random.Generator, start: date, end: dat
         closed = _add_days(opened, int(rng.integers(10, 80)))
         true_bad = True
         noisy_unsub = true_bad and rng.random() < 0.15
-        outcome = "unsubstantiated" if noisy_unsub else str(
-            rng.choice(["substantiated", "education", "referred"], p=[0.5, 0.3, 0.2])
+        outcome = (
+            "unsubstantiated"
+            if noisy_unsub
+            else str(rng.choice(["substantiated", "education", "referred"], p=[0.5, 0.3, 0.2]))
         )
         inv_rows.append(
             {

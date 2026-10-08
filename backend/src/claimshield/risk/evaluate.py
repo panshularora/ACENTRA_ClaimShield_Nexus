@@ -45,9 +45,7 @@ def reliability(y: np.ndarray, p: np.ndarray, bins: int = 10) -> list[dict[str, 
 BAND_EDGES = (0.0, 0.25, 0.5, 0.75, 0.9, 0.99, 1.0)
 
 
-def bands(
-    y: np.ndarray, p: np.ndarray, edges: tuple[float, ...] = BAND_EDGES
-) -> list[dict[str, Any]]:
+def bands(y: np.ndarray, p: np.ndarray, edges: tuple[float, ...] = BAND_EDGES) -> list[dict[str, Any]]:
     """Fixed probability bands [lo, hi): count, mean predicted and observed rate.
 
     Used to judge display cut-offs (for example the queue's 25/50/75% placeholders)

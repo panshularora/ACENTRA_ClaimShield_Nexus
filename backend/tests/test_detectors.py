@@ -37,10 +37,26 @@ def test_identical_fee_schedule_amounts_alone_do_not_fire_clone_billing() -> Non
     rows = []
     for p in range(30):
         for m in range(3):  # three members a day at the same fee everywhere
-            rows.append({"line_id": f"L{p}-{m}", "claim_id": f"C{p}-{m}", "member_id": f"M{m}", "provider": f"P{p}", "code": "EM-EST-3", "paid": 75.0})
+            rows.append(
+                {
+                    "line_id": f"L{p}-{m}",
+                    "claim_id": f"C{p}-{m}",
+                    "member_id": f"M{m}",
+                    "provider": f"P{p}",
+                    "code": "EM-EST-3",
+                    "paid": 75.0,
+                }
+            )
     assert _clone_billing(_claims(rows)) == []
     rows += [
-        {"line_id": f"X{m}", "claim_id": f"CX{m}", "member_id": f"MX{m}", "provider": "P-MILL", "code": "EM-EST-3", "paid": 75.0}
+        {
+            "line_id": f"X{m}",
+            "claim_id": f"CX{m}",
+            "member_id": f"MX{m}",
+            "provider": "P-MILL",
+            "code": "EM-EST-3",
+            "paid": 75.0,
+        }
         for m in range(14)
     ]
     alerts = _clone_billing(_claims(rows))
@@ -68,7 +84,14 @@ def test_ambulance_base_plus_mileage_is_one_trip() -> None:
 
 def test_sex_conflict_respects_kx_and_condition_code_45() -> None:
     rows = [
-        {"line_id": "L1", "claim_id": "C1", "member_id": "F1", "provider": "P1", "code": "PROC-MALE-01", "modifiers": ["KX"]},
+        {
+            "line_id": "L1",
+            "claim_id": "C1",
+            "member_id": "F1",
+            "provider": "P1",
+            "code": "PROC-MALE-01",
+            "modifiers": ["KX"],
+        },
         {"line_id": "L2", "claim_id": "C2", "member_id": "F2", "provider": "P1", "code": "PROC-MALE-01"},
         {"line_id": "L3", "claim_id": "C3", "member_id": "F3", "provider": "P1", "code": "PROC-MALE-01"},
     ]
@@ -93,8 +116,16 @@ def test_doctor_shopping_is_member_level_and_windowed(tiny_dataset) -> None:
         assert alert.evidence["fills"]
     spread_out = pd.DataFrame(
         [
-            {"member_id": "M9", "prescriber_id": f"PR{i}", "pharmacy_id": f"PH{i}", "drug_class_syn": "opioid",
-             "days_supply": 30, "qty": 90, "mme": 140, "fill_date": date(2023, 1, 1) + pd.Timedelta(days=200 * i)}
+            {
+                "member_id": "M9",
+                "prescriber_id": f"PR{i}",
+                "pharmacy_id": f"PH{i}",
+                "drug_class_syn": "opioid",
+                "days_supply": 30,
+                "qty": 90,
+                "mme": 140,
+                "fill_date": date(2023, 1, 1) + pd.Timedelta(days=200 * i),
+            }
             for i in range(5)
         ]
     )
@@ -114,7 +145,13 @@ def test_member_level_cases_do_not_merge_into_provider_cases(tiny_dataset) -> No
 
 def test_brief_validator_drops_unresolved_citations() -> None:
     sections = [
-        {"title": "A", "sentences": [{"text": "ok", "cites": [{"id": "alert:ALRT-1"}]}, {"text": "bad", "cites": [{"id": "alert:ALRT-9"}]}]},
+        {
+            "title": "A",
+            "sentences": [
+                {"text": "ok", "cites": [{"id": "alert:ALRT-1"}]},
+                {"text": "bad", "cites": [{"id": "alert:ALRT-9"}]},
+            ],
+        },
         {"title": "B", "sentences": [{"text": "none", "cites": []}]},
         {"title": "C", "sentences": [{"text": "metric", "cites": [{"id": "metric:harm"}]}]},
     ]

@@ -130,7 +130,9 @@ def serialize_alert(alert: Alert) -> dict[str, Any]:
         "kind": kind,
         "label": KIND_LABELS.get(kind, kind.replace("_", " ") if kind else "Signal"),
         "review_reason": evidence.get("review_reason")
-        or catalog_title(alert.rule_id, RULE_TITLES.get(alert.rule_id or "", "Review the supporting claims and fields.")),
+        or catalog_title(
+            alert.rule_id, RULE_TITLES.get(alert.rule_id or "", "Review the supporting claims and fields.")
+        ),
         "lineage": alert_lineage(alert),
     }
 
@@ -185,13 +187,11 @@ def serialize_lines(
     by_line = signals or {}
     claim_ids = {ln.claim_id for ln in lines}
     claims = {
-        c.claim_id: c
-        for c in session.execute(select(Claim).where(Claim.claim_id.in_(claim_ids))).scalars().all()
+        c.claim_id: c for c in session.execute(select(Claim).where(Claim.claim_id.in_(claim_ids))).scalars().all()
     }
     member_ids = {c.member_id for c in claims.values()}
     members = {
-        m.member_id: m
-        for m in session.execute(select(Member).where(Member.member_id.in_(member_ids))).scalars().all()
+        m.member_id: m for m in session.execute(select(Member).where(Member.member_id.in_(member_ids))).scalars().all()
     }
     rows = []
     for ln in lines:

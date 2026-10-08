@@ -176,11 +176,7 @@ def test_decision_proposal_approval_and_brief_citation(client: TestClient) -> No
     source = queue[0]["case_id"]
     source_rules = _rules_for(client, source)
     other = next(
-        (
-            row["case_id"]
-            for row in queue[1:]
-            if _rules_for(client, row["case_id"]) & source_rules
-        ),
+        (row["case_id"] for row in queue[1:] if _rules_for(client, row["case_id"]) & source_rules),
         queue[1]["case_id"],
     )
 

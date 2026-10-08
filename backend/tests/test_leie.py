@@ -44,12 +44,29 @@ def _tables(*, excl_name=("Lauren", "Long"), npi="1234567893", dob=date(1971, 5,
         ),
         "claim_line": pd.DataFrame(
             [
-                {"line_id": "L-before", "claim_id": "C1", "rendering_provider_id": "PRV-A", "dos_from": date(2024, 1, 5)},
-                {"line_id": "L-after", "claim_id": "C2", "rendering_provider_id": "PRV-A", "dos_from": date(2024, 4, 5)},
-                {"line_id": "L-shell", "claim_id": "C3", "rendering_provider_id": "PRV-B", "dos_from": date(2024, 5, 1)},
+                {
+                    "line_id": "L-before",
+                    "claim_id": "C1",
+                    "rendering_provider_id": "PRV-A",
+                    "dos_from": date(2024, 1, 5),
+                },
+                {
+                    "line_id": "L-after",
+                    "claim_id": "C2",
+                    "rendering_provider_id": "PRV-A",
+                    "dos_from": date(2024, 4, 5),
+                },
+                {
+                    "line_id": "L-shell",
+                    "claim_id": "C3",
+                    "rendering_provider_id": "PRV-B",
+                    "dos_from": date(2024, 5, 1),
+                },
             ]
         ),
-        "owner": pd.DataFrame([{"owner_id": "OWN-1", "kind": "person", "name": "Lauren Long", "dob": date(1971, 5, 2)}]),
+        "owner": pd.DataFrame(
+            [{"owner_id": "OWN-1", "kind": "person", "name": "Lauren Long", "dob": date(1971, 5, 2)}]
+        ),
         "ownership_link": pd.DataFrame([{"owner_id": "OWN-1", "provider_id": "PRV-B", "pct": 100}]),
     }
 

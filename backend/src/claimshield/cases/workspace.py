@@ -114,9 +114,9 @@ def serialize_case(session: Session, case: Case, user: User) -> dict[str, Any]:
     alerts = alerts_for(session, case.case_id)
     provider = session.get(Provider, case.primary_entity_id)
     decisions = list(
-        session.execute(
-            select(Decision).where(Decision.case_id == case.case_id).order_by(Decision.created_at.desc())
-        ).scalars().all()
+        session.execute(select(Decision).where(Decision.case_id == case.case_id).order_by(Decision.created_at.desc()))
+        .scalars()
+        .all()
     )
     latest = decisions[0] if decisions else None
     pending = pending_decision(session, case.case_id)
@@ -127,9 +127,7 @@ def serialize_case(session: Session, case: Case, user: User) -> dict[str, Any]:
     factors = rank_pack_for_case(case, horizon_days=horizon, peers=peers, member_weight=member_weight)
     override = (
         session.execute(
-            select(QueueOverride)
-            .where(QueueOverride.case_id == case.case_id)
-            .order_by(QueueOverride.created_at.desc())
+            select(QueueOverride).where(QueueOverride.case_id == case.case_id).order_by(QueueOverride.created_at.desc())
         )
         .scalars()
         .first()
@@ -246,8 +244,10 @@ def claims_pack(
     audit: bool = True,
 ) -> dict[str, Any]:
     alerts = alerts_for(session, case.case_id)
-    reveal = audit_unmask(session, user=user, case=case, surface="claims", unmask=unmask) if audit else (
-        unmask and can_unmask(user)
+    reveal = (
+        audit_unmask(session, user=user, case=case, surface="claims", unmask=unmask)
+        if audit
+        else (unmask and can_unmask(user))
     )
     return {"case_id": case.case_id, "masked": not reveal, "rows": claim_rows(session, alerts, reveal=reveal)}
 
@@ -379,11 +379,10 @@ def template_brief(session: Session, case: Case, user: User) -> dict[str, Any]:
     serialized = [serialize_alert(a) for a in alerts]
     provider = session.get(Provider, case.primary_entity_id)
     name = provider.name if provider else case.primary_entity_id
-    signal_cites = [
-        _cite(f"alert:{a['alert_id']}", "alert", a["rule_id"] or a["detector"]) for a in serialized
-    ]
+    signal_cites = [_cite(f"alert:{a['alert_id']}", "alert", a["rule_id"] or a["detector"]) for a in serialized]
     metric_cite = [_cite("metric:harm", "metric", "case metrics")]
     top_kind = serialized[0]["label"] if serialized else "detector output"
+    approaches = ", ".join(sorted({str(a.get("approach") or a["detector"]) for a in serialized}))
     n_lines = len(line_ids_for(alerts))
     why_lane = (
         override_text(case)
@@ -392,7 +391,8 @@ def template_brief(session: Session, case: Case, user: User) -> dict[str, Any]:
             "Evidence strength is below the 0.40 floor, so the knapsack left this case in needs-evidence."
             if case.lane == "needs_evidence"
             else (
-                "The case is on the tracked backlog because it fell outside remaining investigator hours after knapsack fill."
+                "The case is on the tracked backlog because it fell outside remaining investigator hours "
+                "after knapsack fill."
                 if case.lane == "overflow"
                 else "The capacity knapsack selected this case on its combined rank score within remaining hours."
             )
@@ -458,7 +458,7 @@ def template_brief(session: Session, case: Case, user: User) -> dict[str, Any]:
                 {
                     "text": (
                         f"Primary signal family: {top_kind}. "
-                        f"Approaches used: {', '.join(sorted({str(a.get('approach') or a['detector']) for a in serialized})) or 'none'}. "
+                        f"Approaches used: {approaches or 'none'}. "
                         "A flag is a reason to review evidence, not a finding of fraud."
                     ),
                     "cites": signal_cites[:4] or metric_cite,
@@ -494,11 +494,16 @@ def template_brief(session: Session, case: Case, user: User) -> dict[str, Any]:
             "title": "Limitations",
             "sentences": [
                 {
-                    "text": "This brief is a template assembled only from stored case metrics and detector evidence. It does not use ground-truth labels as features.",
+                    "text": (
+                        "This brief is a template assembled only from stored case metrics and detector evidence. "
+                        "It does not use ground-truth labels as features."
+                    ),
                     "cites": metric_cite,
                 },
                 {
-                    "text": "Member identifiers are masked unless an investigator with member:unmask requests unmasking.",
+                    "text": (
+                        "Member identifiers are masked unless an investigator with member:unmask requests unmasking."
+                    ),
                     "cites": metric_cite,
                 },
             ],
@@ -560,16 +565,16 @@ def timeline_pack(session: Session, case: Case, user: User, *, unmask: bool) -> 
 
     lines = list(session.execute(select(ClaimLine).where(ClaimLine.line_id.in_(lids))).scalars().all()) if lids else []
     claim_ids = {ln.claim_id for ln in lines}
-    claims = {
-        c.claim_id: c
-        for c in session.execute(select(Claim).where(Claim.claim_id.in_(claim_ids))).scalars().all()
-    } if claim_ids else {}
+    claims = (
+        {c.claim_id: c for c in session.execute(select(Claim).where(Claim.claim_id.in_(claim_ids))).scalars().all()}
+        if claim_ids
+        else {}
+    )
     members = {}
     if claims:
         mids = {c.member_id for c in claims.values()}
         members = {
-            m.member_id: m
-            for m in session.execute(select(Member).where(Member.member_id.in_(mids))).scalars().all()
+            m.member_id: m for m in session.execute(select(Member).where(Member.member_id.in_(mids))).scalars().all()
         }
     line_signals: dict[str, list[str]] = {}
     for a in alerts:
@@ -604,7 +609,9 @@ def timeline_pack(session: Session, case: Case, user: User, *, unmask: bool) -> 
             select(Referral).where(
                 (Referral.referring_id.in_(provider_ids)) | (Referral.receiving_id.in_(provider_ids))
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     for ref in refs:
         events.append(
@@ -620,9 +627,9 @@ def timeline_pack(session: Session, case: Case, user: User, *, unmask: bool) -> 
         )
 
     subjects = list(
-        session.execute(
-            select(InvestigationSubject).where(InvestigationSubject.provider_id.in_(provider_ids))
-        ).scalars().all()
+        session.execute(select(InvestigationSubject).where(InvestigationSubject.provider_id.in_(provider_ids)))
+        .scalars()
+        .all()
     )
     inv_ids = {s.investigation_id for s in subjects}
     investigations = (

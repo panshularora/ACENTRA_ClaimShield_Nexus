@@ -18,7 +18,26 @@ from rapidfuzz import fuzz
 
 NAME_MATCH_MIN = 90.0
 _SUFFIXES = frozenset(
-    {"md", "do", "np", "pa", "rn", "dds", "phd", "jr", "sr", "ii", "iii", "inc", "llc", "pc", "pllc", "corp", "co", "ltd"}
+    {
+        "md",
+        "do",
+        "np",
+        "pa",
+        "rn",
+        "dds",
+        "phd",
+        "jr",
+        "sr",
+        "ii",
+        "iii",
+        "inc",
+        "llc",
+        "pc",
+        "pllc",
+        "corp",
+        "co",
+        "ltd",
+    }
 )
 _DROPPED = re.compile(r"['.`]")  # O'Neil -> oneil, M.D. -> md
 _NON_ALNUM = re.compile(r"[^a-z0-9 ]+")

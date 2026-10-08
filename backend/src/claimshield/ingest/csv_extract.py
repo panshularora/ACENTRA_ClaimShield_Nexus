@@ -43,9 +43,7 @@ TABLE_ALIASES: dict[str, str] = {
 REQUIRED_TABLES: tuple[str, ...] = ("member", "provider", "claim", "claim_line")
 
 REQUIRED_COLUMNS: dict[str, frozenset[str]] = {
-    "claim": frozenset(
-        {"claim_id", "member_id", "billing_provider_id", "received_date", "adjudicated_date"}
-    ),
+    "claim": frozenset({"claim_id", "member_id", "billing_provider_id", "received_date", "adjudicated_date"}),
     "claim_line": frozenset(
         {
             "line_id",
@@ -60,9 +58,7 @@ REQUIRED_COLUMNS: dict[str, frozenset[str]] = {
         }
     ),
     "member": frozenset({"member_id", "name", "dob", "sex", "location_id"}),
-    "provider": frozenset(
-        {"provider_id", "name", "kind", "specialty", "service_line", "location_id"}
-    ),
+    "provider": frozenset({"provider_id", "name", "kind", "specialty", "service_line", "location_id"}),
 }
 
 SKIP_FILES = frozenset({"ground_truth", "data_card", "readme"})

@@ -400,9 +400,13 @@ def latest_batch(session: Session) -> Batch | None:
 
 
 def latest_run(session: Session) -> PipelineRun | None:
-    return session.execute(
-        select(PipelineRun).where(PipelineRun.status == "completed").order_by(PipelineRun.created_at.desc())
-    ).scalars().first()
+    return (
+        session.execute(
+            select(PipelineRun).where(PipelineRun.status == "completed").order_by(PipelineRun.created_at.desc())
+        )
+        .scalars()
+        .first()
+    )
 
 
 def tables_for_batch(session: Session, batch: Batch) -> dict[str, pd.DataFrame]:

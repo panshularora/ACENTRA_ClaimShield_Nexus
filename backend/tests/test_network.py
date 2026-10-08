@@ -84,7 +84,11 @@ def test_every_network_is_scoped_and_consistent(loaded: tuple[TestClient, list[d
         referrals = [e for e in net["edges"] if e["kind"] == "referral"]
         assert all(e["directed"] and e["count"] >= 1 for e in referrals)
         for subject in net["subject_ids"]:
-            partners = {e["target"] if e["source"] == subject else e["source"] for e in referrals if subject in (e["source"], e["target"])}
+            partners = {
+                e["target"] if e["source"] == subject else e["source"]
+                for e in referrals
+                if subject in (e["source"], e["target"])
+            }
             assert len(partners - set(net["subject_ids"])) <= net["limits"]["referral_top_n"]
 
 
@@ -146,7 +150,10 @@ def test_node_click_through(loaded: tuple[TestClient, list[dict[str, Any]]]) -> 
     assert detail["node"]["id"] == primary["id"]
     assert {a["alert_id"] for a in detail["alerts"]} == set(primary["alert_ids"])
     assert detail["claim_lines"]
-    assert all(primary["id"] in {r["billing_provider_id"], r["rendering_provider_id"], r["ordering_provider_id"]} for r in detail["claim_lines"])
+    assert all(
+        primary["id"] in {r["billing_provider_id"], r["rendering_provider_id"], r["ordering_provider_id"]}
+        for r in detail["claim_lines"]
+    )
     assert detail["connections"]
     assert detail["profile"]["provider_id"] == primary["id"]
 
@@ -189,7 +196,8 @@ def test_entity_summary_covers_context_nodes(loaded: tuple[TestClient, list[dict
         assert body["claims"]["n_lines"] >= 1
         assert all(r["member"]["masked"] for r in body["claims"]["sample"])
         involved = [
-            r for r in body["claims"]["sample"]
+            r
+            for r in body["claims"]["sample"]
             if node["id"] in {r["billing_provider_id"], r["rendering_provider_id"], r["ordering_provider_id"]}
         ]
         assert len(involved) == len(body["claims"]["sample"])

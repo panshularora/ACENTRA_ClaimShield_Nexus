@@ -236,8 +236,7 @@ def _home_health_iqr(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
                     "fence": round(float(fence), 2),
                     "robust_z": round(z, 3),
                     "review_reason": (
-                        "Visit volume sits above the peer IQR fence for the same specialty/type/"
-                        "geography cell."
+                        "Visit volume sits above the peer IQR fence for the same specialty/type/geography cell."
                     ),
                     **stats,
                     "peer_group": group,

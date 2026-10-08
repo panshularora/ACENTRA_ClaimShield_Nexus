@@ -117,9 +117,7 @@ def ingest_s3_object(
             obj = store.get(bucket, table_key)
             if table_key == key:
                 trigger = obj
-            tables[table] = parse_csv_bytes(
-                obj.body, table=table, max_bytes=settings.ingest_max_bytes
-            )
+            tables[table] = parse_csv_bytes(obj.body, table=table, max_bytes=settings.ingest_max_bytes)
         if trigger is None:
             trigger = store.get(bucket, key)
         dataset = dataset_from_tables(tables, source=f"s3://{bucket}/{prefix}")
@@ -162,8 +160,7 @@ def ingest_s3_object(
             payload=payload,
         )
         log.info(
-            "PROCESSING_COMPLETED batch_id=%s run_id=%s claims_processed=%s "
-            "alerts_generated=%s cases_generated=%s",
+            "PROCESSING_COMPLETED batch_id=%s run_id=%s claims_processed=%s alerts_generated=%s cases_generated=%s",
             batch.batch_id,
             run.run_id if run else None,
             claims_processed,
@@ -215,9 +212,7 @@ def _write_artifacts(
     filename = key.rsplit("/", 1)[-1]
     processed_key = f"{settings.s3_processed_prefix.rstrip('/')}/{batch_id}/{filename}"
     results_key = f"{settings.s3_results_prefix.rstrip('/')}/{batch_id}.json"
-    if processed_key.startswith(settings.s3_incoming_prefix) or results_key.startswith(
-        settings.s3_incoming_prefix
-    ):
+    if processed_key.startswith(settings.s3_incoming_prefix) or results_key.startswith(settings.s3_incoming_prefix):
         return
     body = json.dumps(
         {

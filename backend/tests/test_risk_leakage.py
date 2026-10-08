@@ -56,12 +56,8 @@ def test_fit_ignores_rows_after_the_purge_and_test_worlds(panel_small, small_con
 
     rng = np.random.default_rng(0)
     providers = panel_small.providers.copy()
-    late = (providers["origin_month"] > hazard_fit_months(month)) | providers["world"].isin(
-        split.test
-    )
-    providers.loc[late, list(PROVIDER_FEATURES)] = rng.normal(
-        size=(int(late.sum()), len(PROVIDER_FEATURES))
-    )
+    late = (providers["origin_month"] > hazard_fit_months(month)) | providers["world"].isin(split.test)
+    providers.loc[late, list(PROVIDER_FEATURES)] = rng.normal(size=(int(late.sum()), len(PROVIDER_FEATURES)))
     providers.loc[late, "event_interval"] = 1
     cases = panel_small.cases.copy()
     late_c = (cases["origin_month"] > case_fit_months(month)) | cases["world"].isin(split.test)
@@ -88,12 +84,8 @@ def test_snapshot_requires_service_and_received_dates(tiny_dataset) -> None:
     ts = pd.Timestamp(CUTOFF)
     assert (pd.to_datetime(snap["claim_line"]["dos_from"]) <= ts).all()
     assert (pd.to_datetime(snap["claim"]["received_date"]) <= ts).all()
-    merged = tables["claim_line"].merge(
-        tables["claim"][["claim_id", "received_date"]], on="claim_id"
-    )
-    late = merged[
-        (pd.to_datetime(merged["dos_from"]) <= ts) & (pd.to_datetime(merged["received_date"]) > ts)
-    ]
+    merged = tables["claim_line"].merge(tables["claim"][["claim_id", "received_date"]], on="claim_id")
+    late = merged[(pd.to_datetime(merged["dos_from"]) <= ts) & (pd.to_datetime(merged["received_date"]) > ts)]
     assert not late.empty, "fixture should contain service-before / received-after lines"
     assert not set(late["line_id"]) & set(snap["claim_line"]["line_id"])
 
@@ -104,9 +96,7 @@ def test_features_ignore_everything_after_the_cutoff(tiny_dataset) -> None:
     claims, lines = tables["claim"], tables["claim_line"]
     future_claim = pd.to_datetime(claims["received_date"]) > pd.Timestamp(CUTOFF)
     future_line = pd.to_datetime(lines["dos_from"]) > pd.Timestamp(CUTOFF)
-    lines.loc[
-        future_line | lines["claim_id"].isin(claims.loc[future_claim, "claim_id"]), "paid"
-    ] *= 25
+    lines.loc[future_line | lines["claim_id"].isin(claims.loc[future_claim, "claim_id"]), "paid"] *= 25
     extra = lines[future_line].copy()
     extra["line_id"] = extra["line_id"] + "-X"
     tables["claim_line"] = pd.concat([lines, extra], ignore_index=True)

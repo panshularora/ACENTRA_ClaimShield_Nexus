@@ -66,9 +66,7 @@ def build_cases(
         dollars = float(sum(paid_by_line.get(lid, 0.0) for lid in line_ids))
         members: set[str] = set()
         if line_ids:
-            hit = lines[lines.line_id.isin(line_ids)].merge(
-                claims[["claim_id", "member_id"]], on="claim_id"
-            )
+            hit = lines[lines.line_id.isin(line_ids)].merge(claims[["claim_id", "member_id"]], on="claim_id")
             members = set(hit["member_id"].astype(str).tolist())
         kinds = {str(a.evidence.get("kind")) for a in group}
         detectors = {a.detector for a in group}

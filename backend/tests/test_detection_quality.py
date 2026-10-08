@@ -34,11 +34,7 @@ def test_after_death_does_not_flag_duplicate_scheme(tiny_dataset) -> None:
     s01_providers = set(s01["provider_id"].dropna().astype(str))
     s05 = tiny_dataset.ground_truth[tiny_dataset.ground_truth.scheme_id == "S05"]
     s05_providers = set(s05["provider_id"].dropna().astype(str))
-    death = [
-        a
-        for a in evaluate_rules(tiny_dataset.tables)
-        if a.evidence.get("kind") == "after_death"
-    ]
+    death = [a for a in evaluate_rules(tiny_dataset.tables) if a.evidence.get("kind") == "after_death"]
     death_entities = {a.entity_id for a in death}
     assert death_entities <= s05_providers
     assert not (death_entities & s01_providers)

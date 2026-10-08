@@ -81,6 +81,7 @@ def strong_component_map(graph: nx.Graph) -> dict[str, str]:
     """Components linked by owner, TIN, or shared contact — not shared location."""
     if graph.number_of_edges() == 0:
         return {}
+
     def edge_kinds(data: dict[str, Any]) -> set[str]:
         kinds = data.get("kinds")
         if isinstance(kinds, set):
@@ -88,11 +89,7 @@ def strong_component_map(graph: nx.Graph) -> dict[str, str]:
         kind = data.get("kind")
         return {kind} if kind else set()
 
-    strong_edges = [
-        (u, v)
-        for u, v, data in graph.edges(data=True)
-        if edge_kinds(data) & STRONG_EDGE_KINDS
-    ]
+    strong_edges = [(u, v) for u, v, data in graph.edges(data=True) if edge_kinds(data) & STRONG_EDGE_KINDS]
     if not strong_edges:
         return {}
     sub = graph.edge_subgraph(strong_edges).copy()

@@ -14,7 +14,9 @@ def expected_value(case: dict[str, Any], *, horizon_days: int, recovery: float) 
     return float(case["p_confirm"] * recovery * dollars)
 
 
-def knapsack_select(cases: list[dict[str, Any]], *, capacity_hours: float, value_key: str = "ev") -> list[dict[str, Any]]:
+def knapsack_select(
+    cases: list[dict[str, Any]], *, capacity_hours: float, value_key: str = "ev"
+) -> list[dict[str, Any]]:
     if capacity_hours < 0.5 or not cases:
         return []
     units = round(capacity_hours * 2)  # half hours

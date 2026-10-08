@@ -46,9 +46,7 @@ def _duplicates(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
     lines = tables["claim_line"].copy()
     claims = tables["claim"][["claim_id", "member_id", "billing_provider_id"]]
     merged = lines.merge(claims, on="claim_id")
-    grouped = merged.groupby(
-        ["member_id", "billing_provider_id", "code", "dos_from"], dropna=False
-    )
+    grouped = merged.groupby(["member_id", "billing_provider_id", "code", "dos_from"], dropna=False)
     out: list[AlertDraft] = []
     for key, grp in grouped:
         if len(grp) < 2:
@@ -244,15 +242,12 @@ def _evv_missing(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
     else:
         evv = evv.copy()
         evv["day"] = pd.to_datetime(evv["start_ts"]).dt.date
-        covered = set(
-            zip(evv["member_id"].astype(str), evv["provider_id"].astype(str), evv["day"], strict=False)
-        )
+        covered = set(zip(evv["member_id"].astype(str), evv["provider_id"].astype(str), evv["day"], strict=False))
     lines["dos_from"] = pd.to_datetime(lines["dos_from"]).dt.date
     lines["member_id"] = lines["member_id"].astype(str)
     lines["billing_provider_id"] = lines["billing_provider_id"].astype(str)
     miss_mask = [
-        (row.member_id, row.billing_provider_id, row.dos_from) not in covered
-        for row in lines.itertuples(index=False)
+        (row.member_id, row.billing_provider_id, row.dos_from) not in covered for row in lines.itertuples(index=False)
     ]
     missed = lines[miss_mask]
     if missed.empty:
@@ -409,7 +404,10 @@ def _rx_window(fills: pd.DataFrame) -> pd.DataFrame | None:
     days = fills["fill_day"]
     for first in days.dropna().unique():
         window = fills[(days >= first) & (days < first + pd.Timedelta(days=RX_WINDOW_DAYS))]
-        if window["prescriber_id"].nunique() >= RX_MIN_PRESCRIBERS and window["pharmacy_id"].nunique() >= RX_MIN_PHARMACIES:
+        if (
+            window["prescriber_id"].nunique() >= RX_MIN_PRESCRIBERS
+            and window["pharmacy_id"].nunique() >= RX_MIN_PHARMACIES
+        ):
             return window
     return None
 
@@ -468,9 +466,7 @@ def _codes(value: Any) -> list[str]:
 
 
 def _pos_mismatch(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
-    lines = tables["claim_line"].merge(
-        tables["claim"][["claim_id", "billing_provider_id"]], on="claim_id"
-    )
+    lines = tables["claim_line"].merge(tables["claim"][["claim_id", "billing_provider_id"]], on="claim_id")
     office_codes = {f"EM-EST-{i}" for i in range(1, 6)}
     hit = lines[lines.code.isin(office_codes) & lines.pos.isin(["21", "23", "41"])]
     out: list[AlertDraft] = []
@@ -600,11 +596,7 @@ def _stay_compression(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
     stays = tables.get("inpatient_stay")
     claims = tables["claim"]
     if stays is None or stays.empty:
-        same = claims[
-            (claims.claim_type == "facility")
-            & claims["admit"].notna()
-            & claims["discharge"].notna()
-        ].copy()
+        same = claims[(claims.claim_type == "facility") & claims["admit"].notna() & claims["discharge"].notna()].copy()
         if same.empty:
             return []
         same["admit"] = pd.to_datetime(same["admit"]).dt.date
@@ -652,9 +644,7 @@ def _stay_compression(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
 
 def _mileage_padding(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
     providers = tables["provider"][["provider_id", "rural"]]
-    lines = tables["claim_line"].merge(
-        tables["claim"][["claim_id", "billing_provider_id"]], on="claim_id"
-    )
+    lines = tables["claim_line"].merge(tables["claim"][["claim_id", "billing_provider_id"]], on="claim_id")
     lines = lines.merge(providers, left_on="billing_provider_id", right_on="provider_id", how="left")
     hit = lines[(lines.code == "A0425") & (lines.units > 80) & (lines.rural != True)]  # noqa: E712
     if hit.empty:

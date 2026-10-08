@@ -115,10 +115,7 @@ def draft_precedent(
         "pattern_status": "observed",
         "decision_context": f"{decision.action} — reason: {decision.reason[:280]}",
         "scheme_tags": tags,
-        "rules": [
-            {"rule_id": r, "title": RULE_TITLES.get(r, r)}
-            for r in rules
-        ],
+        "rules": [{"rule_id": r, "title": RULE_TITLES.get(r, r)} for r in rules],
         "key_evidence": [
             {
                 "alert_id": a["alert_id"],

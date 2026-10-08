@@ -99,10 +99,7 @@ def test_invalid_csv_rejected(aws_client: TestClient, tmp_path) -> None:
     incoming.mkdir()
     files = {
         "member.csv": "member_id,name,dob,sex,location_id\nMBR-1,A,2020-01-01,F,LOC-1\n",
-        "provider.csv": (
-            "provider_id,name,kind,specialty,service_line,location_id\n"
-            "PRV-1,P,md,pcp,pcp,LOC-1\n"
-        ),
+        "provider.csv": ("provider_id,name,kind,specialty,service_line,location_id\nPRV-1,P,md,pcp,pcp,LOC-1\n"),
         "claim.csv": "not,a,claim\n1,2,3\n",
         "claim_line.csv": (
             "line_id,claim_id,rendering_provider_id,dos_from,dos_to,code,charge,allowed,paid\n"

@@ -160,9 +160,7 @@ def get_batch(
         raise NotFound("batch not found")
     runs = (
         session.execute(
-            select(PipelineRun)
-            .where(PipelineRun.batch_id == batch_id)
-            .order_by(PipelineRun.created_at.desc())
+            select(PipelineRun).where(PipelineRun.batch_id == batch_id).order_by(PipelineRun.created_at.desc())
         )
         .scalars()
         .all()
@@ -205,9 +203,7 @@ def get_queue(
     member_weight = float((run.summary or {}).get("member_weight") or 1.0)
     horizon = int(run.horizon_days or 60)
     packs = {
-        case.case_id: rank_pack_for_case(
-            case, horizon_days=horizon, peers=cases, member_weight=member_weight
-        )
+        case.case_id: rank_pack_for_case(case, horizon_days=horizon, peers=cases, member_weight=member_weight)
         for case in cases
     }
     today = [c for c in cases if c.lane in {"harm_priority", "selected"}]
@@ -215,9 +211,7 @@ def get_queue(
     ranks = {c.case_id: i + 1 for i, c in enumerate(today)}
     latest_override: dict[str, QueueOverride] = {}
     for row in session.execute(
-        select(QueueOverride)
-        .where(QueueOverride.run_id == run_id)
-        .order_by(QueueOverride.created_at.desc())
+        select(QueueOverride).where(QueueOverride.run_id == run_id).order_by(QueueOverride.created_at.desc())
     ).scalars():
         latest_override.setdefault(row.case_id, row)
     order = {"harm_priority": 0, "selected": 1, "needs_evidence": 2, "overflow": 3}
@@ -226,14 +220,9 @@ def get_queue(
         key=lambda c: (order.get(c.lane, 9), -packs[c.case_id]["composite"]),
     )
     alert_counts = dict(
-        session.execute(
-            select(Alert.case_id, func.count()).where(Alert.run_id == run_id).group_by(Alert.case_id)
-        ).all()
+        session.execute(select(Alert.case_id, func.count()).where(Alert.run_id == run_id).group_by(Alert.case_id)).all()
     )
-    risks = {
-        r.case_id: r
-        for r in session.execute(select(CaseRisk).where(CaseRisk.run_id == run_id)).scalars()
-    }
+    risks = {r.case_id: r for r in session.execute(select(CaseRisk).where(CaseRisk.run_id == run_id)).scalars()}
     return [
         _case_brief(
             c,

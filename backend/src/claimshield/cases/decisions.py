@@ -42,7 +42,9 @@ ACTION_STEPS: dict[str, tuple[str, ...]] = {
     "escalate": ("state_pi_referral", "prepayment_review", "payment_suspension_recommend"),
     "dismiss": (),
 }
-DEFAULT_LADDER: dict[str, str | None] = {action: (steps[0] if steps else None) for action, steps in ACTION_STEPS.items()}
+DEFAULT_LADDER: dict[str, str | None] = {
+    action: (steps[0] if steps else None) for action, steps in ACTION_STEPS.items()
+}
 LADDER_LABELS = {
     "education_letter": "Provider education letter",
     "medical_records_request": "Medical records request",

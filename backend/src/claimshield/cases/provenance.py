@@ -50,10 +50,7 @@ KIND_TABLES: dict[str, tuple[str, ...]] = {
 }
 
 DETECTOR_METHOD: dict[str, str] = {
-    "rules": (
-        "Deterministic catalog rule on claim lines. "
-        "A hit is a suspicion to verify, not a finding of fraud."
-    ),
+    "rules": ("Deterministic catalog rule on claim lines. A hit is a suspicion to verify, not a finding of fraud."),
     "anomaly": (
         "Like-with-like peer comparison (specialty, type, rural). "
         "Peers are a baseline for the score; they are not co-subjects of this case."
@@ -88,15 +85,10 @@ def grouping_from_alerts(alerts: list[Alert], entity_ids: list[str]) -> dict[str
         )
     elif "excluded_owner" in kinds and len(entity_ids) > 1:
         rule = "excluded_owner"
-        text = (
-            "These NPIs share an excluded owner. That ownership link is why they sit in one case."
-        )
+        text = "These NPIs share an excluded owner. That ownership link is why they sit in one case."
     elif "referral_monopoly" in kinds and len(entity_ids) > 1:
         rule = "referral_link"
-        text = (
-            "A concentrated referral link joins these NPIs. "
-            "Peer specialty groups stay outside the case."
-        )
+        text = "A concentrated referral link joins these NPIs. Peer specialty groups stay outside the case."
     else:
         rule = "same_provider"
         text = (
@@ -158,8 +150,7 @@ def alert_lineage(alert: Alert) -> dict[str, Any]:
     ]
     return {
         "detector": alert.detector,
-        "approach": evidence.get("approach")
-        or APPROACH_BY_DETECTOR.get(alert.detector, alert.detector),
+        "approach": evidence.get("approach") or APPROACH_BY_DETECTOR.get(alert.detector, alert.detector),
         "method": DETECTOR_METHOD.get(alert.detector, alert.detector),
         "kind": kind,
         "how": how,
@@ -167,9 +158,7 @@ def alert_lineage(alert: Alert) -> dict[str, Any]:
         "fields_used": fields,
         "line_ids": alert.line_ids or [],
         "comparison_peers_held_out": (
-            []
-            if kind in LINK_KINDS
-            else [str(x) for x in (evidence.get("peer_ids") or [])][:8]
+            [] if kind in LINK_KINDS else [str(x) for x in (evidence.get("peer_ids") or [])][:8]
         ),
     }
 
@@ -222,10 +211,7 @@ def case_provenance(
         {
             "step": 4,
             "name": "Network",
-            "detail": (
-                f"{by_detector.get('graph', 0)} graph alert(s) "
-                "on owner, TIN, contact, or referral links."
-            ),
+            "detail": (f"{by_detector.get('graph', 0)} graph alert(s) on owner, TIN, contact, or referral links."),
         },
         {
             "step": 5,
@@ -235,8 +221,7 @@ def case_provenance(
         {
             "step": 6,
             "name": "Rank",
-            "detail": why_rank_text
-            or "Composite of severity, exposure, member impact, evidence, and urgency.",
+            "detail": why_rank_text or "Composite of severity, exposure, member impact, evidence, and urgency.",
         },
     ]
     if run is not None:

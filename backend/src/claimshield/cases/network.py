@@ -77,7 +77,11 @@ DIRECTED_KINDS: frozenset[str] = frozenset(
 # Links inferred from a shared identifier rather than a recorded relationship.
 INFERRED_KINDS: frozenset[str] = frozenset({"shared_tin", "shared_contact"})
 # Ring alerts list the strong link kinds they rely on; map network edge kinds onto them.
-RING_EDGE_KIND: dict[str, str] = {"owns": "shared_owner", "shared_tin": "shared_tin", "shared_contact": "shared_contact"}
+RING_EDGE_KIND: dict[str, str] = {
+    "owns": "shared_owner",
+    "shared_tin": "shared_tin",
+    "shared_contact": "shared_contact",
+}
 EDGE_LABELS: dict[str, str] = {
     "prescribed": "prescribed high-MME opioid",
     "dispensed": "dispensed high-MME opioid",
@@ -371,9 +375,7 @@ class _NetworkBuilder:
         for mid in sorted(keep_members):
             disp = member_display(mid, self.reveal, names.get(mid))
             subject = mid in self.member_subjects
-            node = self._node(
-                mid, "member", disp["display"], 0 if subject else 1, masked=disp["masked"], in_case=True
-            )
+            node = self._node(mid, "member", disp["display"], 0 if subject else 1, masked=disp["masked"], in_case=True)
             if subject:
                 node.is_subject = True
                 node.primary = mid == self.case.primary_entity_id
@@ -576,7 +578,9 @@ class _NetworkBuilder:
                     ends = {draft.source, draft.target}
                     if (draft.kind == "owns" and draft.target in ring) or ends <= ring:
                         draft.alert_ids.add(alert.alert_id)
-                elif (kind == "excluded_owner" and draft.kind == "owns" and draft.source == evidence.get("owner_id")) or (
+                elif (
+                    kind == "excluded_owner" and draft.kind == "owns" and draft.source == evidence.get("owner_id")
+                ) or (
                     kind == "referral_monopoly"
                     and draft.kind == "referral"
                     and draft.target == alert.entity_id

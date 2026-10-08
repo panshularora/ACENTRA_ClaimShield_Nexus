@@ -117,9 +117,7 @@ def case_fit_months(test_month: int) -> int:
     return test_month - CASE_LABEL_LAG_DAYS // INTERVAL_DAYS
 
 
-def _rows(
-    frame: pd.DataFrame, worlds: list[int], *, max_month: int, min_month: int = 0
-) -> pd.DataFrame:
+def _rows(frame: pd.DataFrame, worlds: list[int], *, max_month: int, min_month: int = 0) -> pd.DataFrame:
     keep = frame["world"].isin(worlds) & frame["origin_month"].between(min_month, max_month)
     return frame[keep]
 
@@ -137,9 +135,7 @@ def fit_hazard(
     X, y = person_period(fit_rows, list(PROVIDER_FEATURES))
     assert_clean(X.columns)
     scorer = fit_logistic(X, y, C=cfg.C)
-    cal_rows = _rows(
-        usable, split.calibration, max_month=last, min_month=last - cfg.calibration_months + 1
-    )
+    cal_rows = _rows(usable, split.calibration, max_month=last, min_month=last - cfg.calibration_months + 1)
     Xc, yc = person_period(cal_rows, list(PROVIDER_FEATURES))
     calibrate(scorer, Xc, yc)
     return HazardModel(scorer=scorer)
@@ -158,9 +154,7 @@ def fit_confirm(
     X = fit_rows[list(CASE_FEATURES)]
     assert_clean(X.columns)
     scorer = fit_logistic(X, fit_rows["y_confirm"].to_numpy(), C=cfg.C)
-    cal_rows = _rows(
-        usable, split.calibration, max_month=last, min_month=last - cfg.calibration_months + 1
-    )
+    cal_rows = _rows(usable, split.calibration, max_month=last, min_month=last - cfg.calibration_months + 1)
     return calibrate(scorer, cal_rows[list(CASE_FEATURES)], cal_rows["y_confirm"].to_numpy())
 
 
@@ -187,9 +181,7 @@ def _challenger_hazard(
     X, y = person_period(_rows(usable, split.train, max_month=last), list(PROVIDER_FEATURES))
     model = _hgb(X, y, cfg.seed)
     Xc, yc = person_period(
-        _rows(
-            usable, split.calibration, max_month=last, min_month=last - cfg.calibration_months + 1
-        ),
+        _rows(usable, split.calibration, max_month=last, min_month=last - cfg.calibration_months + 1),
         list(PROVIDER_FEATURES),
     )
     a, b = fit_platt(_hgb_logit(model, Xc), yc) or (1.0, 0.0)
@@ -209,9 +201,7 @@ def _challenger_confirm(
     usable = cases[~cases["held_out_case"]]
     fit_rows = _rows(usable, split.train, max_month=last)
     model = _hgb(fit_rows[list(CASE_FEATURES)], fit_rows["y_confirm"].to_numpy(), cfg.seed)
-    cal = _rows(
-        usable, split.calibration, max_month=last, min_month=last - cfg.calibration_months + 1
-    )
+    cal = _rows(usable, split.calibration, max_month=last, min_month=last - cfg.calibration_months + 1)
     a, b = fit_platt(_hgb_logit(model, cal[list(CASE_FEATURES)]), cal["y_confirm"].to_numpy()) or (
         1.0,
         0.0,
@@ -314,14 +304,10 @@ def _hazard_report(prov: pd.DataFrame, cfg: TrainConfig) -> dict[str, Any]:
                 name: _score_block(obs, f"y_{h}", col, cfg, "review_hours", prob)
                 for name, (col, prob) in scorers.items()
             },
-            "reliability_model": reliability(
-                obs[f"y_{h}"].to_numpy(int), obs[f"model_f{h}"].to_numpy()
-            ),
+            "reliability_model": reliability(obs[f"y_{h}"].to_numpy(int), obs[f"model_f{h}"].to_numpy()),
             "bands_model": bands(obs[f"y_{h}"].to_numpy(int), obs[f"model_f{h}"].to_numpy()),
         }
-    mono = (prov["model_f30"] <= prov["model_f60"] + 1e-12) & (
-        prov["model_f60"] <= prov["model_f90"] + 1e-12
-    )
+    mono = (prov["model_f30"] <= prov["model_f60"] + 1e-12) & (prov["model_f60"] <= prov["model_f90"] + 1e-12)
     report["monotone_violations"] = int((~mono).sum())
     return report
 
@@ -337,13 +323,8 @@ def _confirm_report(cases: pd.DataFrame, cfg: TrainConfig) -> dict[str, Any]:
     return {
         "n": len(cases),
         "base_rate": round(float(cases["y_confirm"].mean()), 4),
-        **{
-            name: _score_block(cases, "y_confirm", col, cfg, "hours", prob)
-            for name, (col, prob) in scorers.items()
-        },
-        "reliability_model": reliability(
-            cases["y_confirm"].to_numpy(int), cases["model_p"].to_numpy()
-        ),
+        **{name: _score_block(cases, "y_confirm", col, cfg, "hours", prob) for name, (col, prob) in scorers.items()},
+        "reliability_model": reliability(cases["y_confirm"].to_numpy(int), cases["model_p"].to_numpy()),
         "bands_model": bands(cases["y_confirm"].to_numpy(int), cases["model_p"].to_numpy()),
     }
 
@@ -377,21 +358,15 @@ def _held_out_report(prov: pd.DataFrame, cases: pd.DataFrame, cfg: TrainConfig) 
         "provider_recall_at_capacity_90d": round(hits / n, 4) if n else None,
         "provider_mean_percentile_90d": round(float(np.mean(pct)), 4) if pct else None,
         "cases": len(held_cases),
-        "case_recall_at_capacity": round(case_hits / len(held_cases), 4)
-        if len(held_cases)
-        else None,
-        "case_mean_p_confirm": round(float(held_cases["model_p"].mean()), 4)
-        if len(held_cases)
-        else None,
+        "case_recall_at_capacity": round(case_hits / len(held_cases), 4) if len(held_cases) else None,
+        "case_mean_p_confirm": round(float(held_cases["model_p"].mean()), 4) if len(held_cases) else None,
     }
 
 
 def data_hash(panel: Panel) -> str:
     digest = hashlib.sha256()
     for frame in (panel.providers, panel.cases):
-        ordered = frame.sort_values(["world", "origin_month"], kind="mergesort").reset_index(
-            drop=True
-        )
+        ordered = frame.sort_values(["world", "origin_month"], kind="mergesort").reset_index(drop=True)
         digest.update(pd.util.hash_pandas_object(ordered, index=False).to_numpy().tobytes())
     return digest.hexdigest()[:16]
 
@@ -413,14 +388,8 @@ def train(cfg: TrainConfig, out: Path | None = None) -> dict[str, Any]:
     models, split = fit_final(panel, cfg)
     finished = time.perf_counter()
     dhash = data_hash(panel)
-    config = {
-        k: (list(v) if isinstance(v, tuple) else v)
-        for k, v in asdict(cfg).items()
-        if k != "workers"
-    }
-    version_src = json.dumps(
-        {"data": dhash, "config": config, "schema": ARTIFACT_SCHEMA}, sort_keys=True
-    )
+    config = {k: (list(v) if isinstance(v, tuple) else v) for k, v in asdict(cfg).items() if k != "workers"}
+    version_src = json.dumps({"data": dhash, "config": config, "schema": ARTIFACT_SCHEMA}, sort_keys=True)
     artifact: dict[str, Any] = {
         "schema": ARTIFACT_SCHEMA,
         "model_version": "risk-" + hashlib.sha256(version_src.encode()).hexdigest()[:12],
