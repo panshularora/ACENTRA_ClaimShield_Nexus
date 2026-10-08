@@ -58,7 +58,7 @@ export function InvestigatorCasesPage() {
   if (!canCases) {
     return (
       <main id="main" className="page">
-        <h1>My cases</h1>
+        <h1>Investigation worklist</h1>
         <p className="error-text">Your role cannot read cases.</p>
       </main>
     );
@@ -86,8 +86,8 @@ export function InvestigatorCasesPage() {
     <main id="main" className="page cases-page">
       <header className="page-head">
         <div>
-          <p className="kicker">Investigator desk</p>
-          <h1>My cases</h1>
+          <p className="kicker">Investigator desk · recommend only</p>
+          <h1>Worklist</h1>
         </div>
         {canQueue && (
           <button type="button" className="btn ghost" onClick={() => void navigate({ to: "/manager/queue" })}>

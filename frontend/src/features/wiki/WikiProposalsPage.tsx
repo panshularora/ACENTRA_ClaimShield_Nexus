@@ -31,11 +31,11 @@ export function WikiProposalsPage() {
     <main id="main" className="page">
       <header className="page-head">
         <div>
-          <p className="kicker">Knowledge loop</p>
+          <p className="kicker">Navigator-style knowledge loop</p>
           <h1>Precedent proposals</h1>
           <p className="lede">
-            Investigator decisions draft a pending precedent. A manager or analyst must approve
-            before it can be cited on later cases.
+            A human decision drafts a pending precedent. Manager or analyst approval publishes it
+            so later briefs can cite it. The model never writes policy by itself.
           </p>
         </div>
         <label>

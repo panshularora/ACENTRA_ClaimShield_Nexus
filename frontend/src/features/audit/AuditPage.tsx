@@ -35,10 +35,11 @@ export function AuditPage() {
     <main id="main" className="page">
       <header className="page-head">
         <div>
-          <p className="kicker">Auditor</p>
-          <h1>Audit log</h1>
+          <p className="kicker">Auditor · 42 CFR 455 due process</p>
+          <h1>Hash-chained audit log</h1>
           <p className="lede">
-            Hash-chained events. Payloads are redacted. This view never shows secrets.
+            Every load, run, unmask, and decision appends to an intact chain. Payloads are
+            redacted. This view never shows secrets.
           </p>
         </div>
         {verification && (

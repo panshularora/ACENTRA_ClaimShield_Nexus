@@ -41,7 +41,7 @@ npm install
 npm run dev
 ```
 
-Vite proxies `/api` to `http://127.0.0.1:8000`. Routes: `/login`, `/manager/queue`, `/investigator/cases`, `/investigator/workspace/:caseId`.
+Vite proxies `/api` to `http://127.0.0.1:8000`. Landing `/` is a scroll-driven Three.js story. Product routes: `/login`, `/manager/queue`, `/investigator/cases`, `/investigator/workspace/:caseId`, `/wiki/proposals`, `/audit`.
 
 ## Auth
 
