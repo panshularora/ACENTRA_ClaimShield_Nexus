@@ -37,6 +37,8 @@ MEDIUM_KINDS = frozenset(
 )
 HARM4_KINDS = frozenset({"after_death", "excluded_party", "excluded_owner"})
 HARM3_KINDS = frozenset({"inpatient_overlap", "doctor_shopping", "daily_minutes_cap"})
+# Merge NPIs into one case only for a specific visible link. Statistical peers stay out.
+LINK_KINDS = frozenset({"identity_ring", "excluded_owner", "referral_monopoly"})
 
 
 def build_cases(
@@ -44,7 +46,8 @@ def build_cases(
     tables: dict[str, pd.DataFrame],
     communities: dict[str, str] | dict[str, int],
 ) -> list[dict]:
-    groups = _group_alerts(alerts, communities)
+    _ = communities
+    groups = _group_alerts(alerts)
     claims = tables["claim"]
     lines = tables["claim_line"]
     paid_by_line = lines.set_index("line_id")["paid"].to_dict()
@@ -95,15 +98,13 @@ def build_cases(
                 "group_key": key,
                 "detectors": sorted(detectors),
                 "kinds": sorted(kinds),
+                "grouping": _grouping_for(group, entity_ids),
             }
         )
     return cases
 
 
-def _group_alerts(
-    alerts: list[AlertDraft],
-    communities: dict[str, str] | dict[str, int],
-) -> dict[str, list[AlertDraft]]:
+def _group_alerts(alerts: list[AlertDraft]) -> dict[str, list[AlertDraft]]:
     parent: dict[str, str] = {}
 
     def find(x: str) -> str:
@@ -120,16 +121,7 @@ def _group_alerts(
 
     keys_for: dict[int, list[str]] = {}
     for alert in alerts:
-        ids = [str(alert.entity_id)]
-        kind = str(alert.evidence.get("kind") or "")
-        if kind in {"identity_ring", "excluded_owner"}:
-            ids.extend(str(x) for x in alert.related_entity_ids if x)
-            ids.extend(str(x) for x in alert.evidence.get("peer_ids", []) if x)
-        ids = [i for i in ids if i]
-        for eid in ids:
-            comm = communities.get(eid)
-            if comm is not None:
-                union(eid, f"comm:{comm}")
+        ids = _link_ids(alert)
         for extra in ids[1:]:
             union(ids[0], extra)
         keys_for[id(alert)] = ids
@@ -142,14 +134,60 @@ def _group_alerts(
     return groups
 
 
+def _link_ids(alert: AlertDraft) -> list[str]:
+    ids = [str(alert.entity_id)]
+    kind = str(alert.evidence.get("kind") or "")
+    if kind in LINK_KINDS:
+        ids.extend(str(x) for x in alert.related_entity_ids if x)
+    return [i for i in ids if i]
+
+
 def _entity_ids_for(group: list[AlertDraft]) -> list[str]:
     seen: list[str] = []
     for alert in group:
-        for eid in [alert.entity_id, *alert.related_entity_ids, *alert.evidence.get("peer_ids", [])]:
-            sid = str(eid)
-            if sid and sid not in seen:
-                seen.append(sid)
+        for eid in _link_ids(alert):
+            if eid not in seen:
+                seen.append(eid)
     return seen
+
+
+def _grouping_for(group: list[AlertDraft], entity_ids: list[str]) -> dict:
+    kinds = {str(a.evidence.get("kind") or "") for a in group}
+    held_out: list[str] = []
+    subjects = set(entity_ids)
+    for alert in group:
+        kind = str(alert.evidence.get("kind") or "")
+        if kind in LINK_KINDS:
+            continue
+        for eid in alert.evidence.get("peer_ids") or []:
+            sid = str(eid)
+            if sid and sid not in subjects and sid not in held_out:
+                held_out.append(sid)
+    if "identity_ring" in kinds and len(entity_ids) > 1:
+        rule = "identity_ring"
+        text = (
+            "These NPIs share owner, TIN, or contact links. They are one investigation. "
+            "Providers used only as a like-with-like peer baseline are not parties to this case."
+        )
+    elif "excluded_owner" in kinds and len(entity_ids) > 1:
+        rule = "excluded_owner"
+        text = "These NPIs share an excluded owner. That ownership link is why they sit in one case."
+    elif "referral_monopoly" in kinds and len(entity_ids) > 1:
+        rule = "referral_link"
+        text = "A concentrated referral link joins these NPIs. Peer specialty groups stay outside the case."
+    else:
+        rule = "same_provider"
+        text = (
+            "Alerts on this billing provider were grouped so the investigator reviews the pattern "
+            "together. The portal is the queue; there is no separate notice per alert."
+        )
+    return {
+        "rule": rule,
+        "text": text,
+        "entity_ids": entity_ids,
+        "alert_count": len(group),
+        "comparison_peers_held_out": held_out[:12],
+    }
 
 
 def _harm(kinds: set[str]) -> int:
