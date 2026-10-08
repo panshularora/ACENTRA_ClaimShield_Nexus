@@ -1,0 +1,13 @@
+investigation_id,opened,closed,lead_source,scheme_tag,outcome,amount_identified,amount_recovered,closed_reason
+INV-3LREY3AQXV,2024-05-13,2024-06-13,data_analysis,S21,substantiated,30830.43583501054,7233.094580080444,synthetic historical outcome
+INV-ZSPVNYMP6P,2024-02-17,2024-03-24,data_analysis,S13,education,15983.585955312294,10753.688152538389,synthetic historical outcome
+INV-SRXTXDZPHS,2024-05-08,2024-07-09,data_analysis,S09,unsubstantiated,25612.383882092618,10084.421125464183,synthetic historical outcome
+INV-42Y493D7M2,2024-06-24,2024-08-05,data_analysis,G1,education,17759.7228561134,2274.1054408610144,synthetic historical outcome
+INV-P9ZK3GFJ6Q,2024-05-05,2024-05-25,data_analysis,S17,referred,20287.209245556114,1901.6905219760401,synthetic historical outcome
+INV-4TCNY77HL6,2024-05-27,2024-06-26,data_analysis,S03,education,14129.862748432975,1025.698866642517,synthetic historical outcome
+INV-93SCBNNQV6,2024-05-15,2024-07-21,data_analysis,S04,substantiated,37988.95055218984,3518.3154929668717,synthetic historical outcome
+INV-ZKJ6URDAHJ,2024-03-28,2024-06-06,data_analysis,S06,substantiated,17681.86048384651,3727.7763776801594,synthetic historical outcome
+INV-PAARUF7W9V,2024-01-27,2024-02-17,data_analysis,S02,education,6421.552462681385,9019.690482382928,synthetic historical outcome
+INV-BNN3RZUKHM,2024-04-17,2024-05-07,data_analysis,HN1,referred,10529.22619550062,6095.396717316298,synthetic historical outcome
+INV-K5PPC9QXLR,2024-04-07,2024-06-12,data_analysis,S14,education,15630.48715105024,6594.027401877969,synthetic historical outcome
+INV-CZCQ67VQLM,2024-02-11,2024-03-14,data_analysis,S19,substantiated,31874.772078682836,62.636470090615234,synthetic historical outcome

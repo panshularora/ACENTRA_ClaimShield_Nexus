@@ -1,0 +1,48 @@
+provider_id,npi_syn,name,kind,specialty,service_line,location_id,enroll_date,term_date,tin_token,rural,sole_community
+PRV-52P4GQD2DS,3941955696,Suzanne Briggs,organization,orthopedics,professional,LOC-R38SCZHHGG,2022-10-02,,TIN-7FXB986L,False,False
+PRV-GZWKQRABYX,2476485046,Jennifer Watson,individual,outpatient_hospital,facility,LOC-R8V68UJEUG,2022-03-28,,TIN-QCPRPHGD,True,True
+PRV-P8SZX5BYHL,9354121403,"Collins, Harris and Pope",organization,retail_pharmacy,pharmacy,LOC-7DP8DXZPCS,2023-03-09,,TIN-RTXTWKZ5,False,False
+PRV-DLK2K6289C,6801228195,Amy Garcia,organization,clinical_lab,laboratory,LOC-AU2Z3WE5P5,2023-03-04,,TIN-9WM5JL6G,False,False
+PRV-AEV55VW98C,5317565082,Joshua Fowler,individual,ground_ambulance,ambulance,LOC-NVLHEN4NNU,2022-11-04,,TIN-QDG58TQF,True,False
+PRV-9HWCXGYGRP,5333683018,Christopher Dominguez,individual,sud_clinic,behavioral_health,LOC-E3DQ4KLJZJ,2022-11-30,,TIN-Q6JVT6H7,True,False
+PRV-5AE63K9XH5,9768847809,Mcneil-Contreras,individual,personal_care,home_health,LOC-QWTX8ETQMH,2022-09-07,,TIN-LW2Z4JET,False,False
+PRV-FYQT8W8H8G,7068213003,Anthony Mcgee,organization,dme_supplier,dme,LOC-NH9ADG9Y6G,2023-10-02,,TIN-NLQLUZAA,False,False
+PRV-HC5CWNTSHD,8776581624,Gutierrez-Smith,organization,internal_medicine,professional,LOC-R8V68UJEUG,2023-10-16,,TIN-2P9QDKQN,False,False
+PRV-LEVZRZGE33,5442737481,Rebekah Newman,individual,acute_hospital,facility,LOC-7DP8DXZPCS,2022-05-26,,TIN-6FXYMJUJ,False,False
+PRV-NNZAMXRZ52,3106185071,Luna-Harris,individual,retail_pharmacy,pharmacy,LOC-DBQBES9Q37,2023-03-06,,TIN-FBT9MKW9,True,False
+PRV-TTYMZNZQCD,9657234655,Steven Henderson,organization,clinical_lab,laboratory,LOC-DBQBES9Q37,2023-05-12,,TIN-TMP2YPUB,False,False
+PRV-KGZA99WKKT,6340892980,Jennifer Andrade,organization,ground_ambulance,ambulance,LOC-DBQBES9Q37,2022-05-17,,TIN-F7XJ3P2Y,False,False
+PRV-YHCS7YKNYQ,5800828286,Mejia-Anderson,organization,sud_clinic,behavioral_health,LOC-MK85U9LEJC,2023-05-11,,TIN-PBWGEW49,True,False
+PRV-R6UGAZC4XJ,2035346424,Charles Drake,individual,home_health_agency,home_health,LOC-JX5M6SS237,2023-02-28,,TIN-REQBNYFE,True,False
+PRV-KB3DDTGVSY,3227385766,Kenneth Ho,individual,dme_supplier,dme,LOC-JX5M6SS237,2023-01-05,,TIN-YQXPRHW8,False,False
+PRV-CYX8UDJJ75,4853098715,"Gordon, Thomas and Campbell",individual,internal_medicine,professional,LOC-88GAXAKR5C,2021-12-05,,TIN-G6548HGB,False,False
+PRV-QJ8CAJLGGT,0943018366,"Jackson, Jones and Reyes",individual,outpatient_hospital,facility,LOC-NVLHEN4NNU,2022-03-29,,TIN-7LG577EV,True,False
+PRV-Z84M5CG5BX,8265731912,Turner Inc,organization,retail_pharmacy,pharmacy,LOC-RCHTZSV5XM,2023-06-17,,TIN-LL9FG2QR,False,False
+PRV-96KL4VD67A,8117545262,Edwards-Lawson,organization,clinical_lab,laboratory,LOC-E3DQ4KLJZJ,2023-05-31,,TIN-9KNFB6V6,True,False
+PRV-2RBJKMU8EL,2589522800,Angelica Joseph,individual,ground_ambulance,ambulance,LOC-TS933YVL9Q,2023-05-05,,TIN-4A9VYD9N,False,False
+PRV-EGMCSQWZE2,8079325224,Stephanie Bowman,individual,psychiatry,behavioral_health,LOC-JX5M6SS237,2022-04-06,,TIN-LEQ94ZMG,False,False
+PRV-GQ36BNJZ2W,7305066586,Lisa Mendez,individual,personal_care,home_health,LOC-E3DQ4KLJZJ,2023-11-30,,TIN-BG8WTDE5,False,False
+PRV-4TYA4STMB7,8864912475,John Cunningham,organization,dme_supplier,dme,LOC-4XETJ86FS8,2023-01-21,,TIN-4LRATHRL,False,False
+PRV-DVP5UVKXMG,7547574959,Todd Moore,organization,internal_medicine,professional,LOC-NH9ADG9Y6G,2022-10-29,,TIN-CXXCJ8FR,False,False
+PRV-HP4BWL7QC4,5075976265,Martinez-Wright,individual,outpatient_hospital,facility,LOC-DBQBES9Q37,2022-10-01,,TIN-L694HZ97,False,False
+PRV-E2KQR2ZK3Q,5820622487,"Ochoa, Lee and Henson",individual,retail_pharmacy,pharmacy,LOC-AU2Z3WE5P5,2023-11-04,,TIN-HDKXTEWV,True,False
+PRV-6LZYWNNT2J,8143911611,Megan Contreras,organization,clinical_lab,laboratory,LOC-7DP8DXZPCS,2022-09-08,,TIN-PRAED2JZ,False,False
+PRV-LJD3M755ZS,4364813420,Wilson-Greene,organization,ground_ambulance,ambulance,LOC-NH9ADG9Y6G,2022-05-04,,TIN-C3R5Y3WD,True,False
+PRV-F63QP3FKES,3985754732,Lori Torres,organization,sud_clinic,behavioral_health,LOC-4XETJ86FS8,2022-02-21,,TIN-H6FFJ78X,False,False
+PRV-ZU6YL2HNHH,4841705298,Kevin Simmons,individual,home_health_agency,home_health,LOC-QWTX8ETQMH,2023-01-01,,TIN-URSPYRWZ,False,False
+PRV-LVGM3QWE3V,0494309255,Jillian Gonzales,individual,dme_supplier,dme,LOC-TS933YVL9Q,2022-08-08,,TIN-JXDF6V4M,True,True
+PRV-EWJD2QDPA6,9436572326,Malik Burns,individual,cardiology,professional,LOC-FN69WUUBN9,2023-11-02,,TIN-94K96TPM,False,False
+PRV-H9LG5VAJ3J,6501087164,Griffin PLC,individual,acute_hospital,facility,LOC-4XETJ86FS8,2023-06-24,,TIN-APUDXWFC,False,False
+PRV-F2HS2XPZAV,3116913249,Copeland-Cochran,organization,retail_pharmacy,pharmacy,LOC-QWTX8ETQMH,2022-03-24,,TIN-W6ZXM5NH,True,False
+PRV-GG7BBL7G9L,2869189395,Austin Howard,individual,clinical_lab,laboratory,LOC-AU2Z3WE5P5,2023-09-11,,TIN-VRFAG5X2,False,False
+PRV-4GHMRGCDAW,4340868118,Zimmerman Group,organization,dme_supplier,dme,LOC-8WX6U24HBK,2024-01-11,,TIN-RING1,False,False
+PRV-ZVARQVCWQQ,8269190107,Brown and Sons,organization,dme_supplier,dme,LOC-8WX6U24HBK,2024-01-11,,TIN-RING1,False,False
+PRV-HUT9JJ4X7T,9450702429,"Casey, Morales and Baker",organization,dme_supplier,dme,LOC-8WX6U24HBK,2024-01-11,,TIN-RING1,False,False
+PRV-M7GH4K66H3,8398323926,Wheeler-Lane,organization,sud_clinic,behavioral_health,LOC-8WX6U24HBK,2024-01-11,,TIN-RING2,False,False
+PRV-BFHL3Y49ZW,9861384601,"Giles, Quinn and Wright",organization,sud_clinic,behavioral_health,LOC-8WX6U24HBK,2024-01-11,,TIN-RING2,False,False
+PRV-RC658LCB76,5106846289,Williams PLC,organization,sud_clinic,behavioral_health,LOC-8WX6U24HBK,2024-01-11,,TIN-RING2,False,False
+PRV-ETLZN7DU4U,4887767855,Sullivan and Sons,organization,home_health_agency,home_health,LOC-E3DQ4KLJZJ,2024-01-06,,TIN-SHELL,False,False
+PRV-ND2J7LZBRF,0600948046,Brown Inc,organization,home_health_agency,home_health,LOC-E3DQ4KLJZJ,2024-01-06,,TIN-SHELL,False,False
+PRV-ACK8NC3876,3791588563,Salazar Ltd,organization,home_health_agency,home_health,LOC-E3DQ4KLJZJ,2024-01-06,,TIN-SHELL,False,False
+PRV-6FDZ2H9Z97,2628854842,Thomas and Sons,organization,home_health_agency,home_health,LOC-E3DQ4KLJZJ,2024-01-06,,TIN-SHELL,False,False
+PRV-DTZPX9JP99,1110145164,"Franklin, Hunter and May",organization,home_health_agency,home_health,LOC-E3DQ4KLJZJ,2024-01-06,,TIN-SHELL,False,False
