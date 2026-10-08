@@ -11,8 +11,10 @@ import { BriefPanel } from "./BriefPanel";
 import { ClaimsTable } from "./ClaimsTable";
 import { DecisionBar } from "./DecisionBar";
 import { EvidenceDrawer } from "./EvidenceDrawer";
+import { FindingsPanel } from "./FindingsPanel";
 import { NetworkPanel } from "./NetworkPanel";
 import { TimelinePanel } from "./TimelinePanel";
+import "./workspace-siu.css";
 
 export function WorkspacePage() {
   const { caseId } = useParams({ from: "/investigator/workspace/$caseId" });
@@ -23,6 +25,7 @@ export function WorkspacePage() {
 
   const canRead = can(user, "case:read");
   const canDecide = can(user, "case:decide");
+  const canAssign = can(user, "case:assign");
 
   const caseQuery = useQuery({
     queryKey: ["case", caseId],
@@ -50,10 +53,19 @@ export function WorkspacePage() {
     enabled: canRead,
   });
 
+  const assignMut = useMutation({
+    mutationFn: () => api.assignCase(caseId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["case", caseId] });
+      void queryClient.invalidateQueries({ queryKey: ["queue"] });
+    },
+  });
+
   const decideMut = useMutation({
     mutationFn: (vars: {
       action: "escalate" | "monitor" | "dismiss" | "needs_evidence";
       reason: string;
+      evidence_refs?: string[];
     }) => api.decide(caseId, vars),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["case", caseId] });
@@ -93,7 +105,7 @@ export function WorkspacePage() {
       <section className="ws-panel ws-summary" aria-labelledby="sum-title">
         <header className="ws-panel-head">
           <div>
-            <p className="kicker">Panel 1 · Case summary</p>
+            <p className="kicker">Triage · suspicion only</p>
             <h1 id="sum-title" className="mono">
               {caseId}
             </h1>
@@ -189,6 +201,26 @@ export function WorkspacePage() {
                 </ul>
               )}
             </div>
+            <p className="banner">
+              This is a ranked suspicion for human review. It is not a confirmed finding of fraud.
+            </p>
+            <p className="muted">
+              Owner: <span className="mono">{data.assignee_id ?? "unassigned"}</span>
+              {canAssign && data.assignee_id !== user.id && (
+                <>
+                  {" "}
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    disabled={assignMut.isPending}
+                    onClick={() => assignMut.mutate()}
+                  >
+                    {assignMut.isPending ? "Taking…" : "Take ownership"}
+                  </button>
+                </>
+              )}
+            </p>
+            <FindingsPanel alerts={data.alerts} onOpen={(id) => setItemId(`alert:${id}`)} />
             {data.member_unmask_permitted && (
               <label className="unmask">
                 <input
@@ -244,7 +276,10 @@ export function WorkspacePage() {
         }
         result={decideMut.data ?? null}
         existingProposal={data?.latest_proposal ?? null}
-        onSubmit={(action, reason) => decideMut.mutate({ action, reason })}
+        alerts={data?.alerts ?? []}
+        onSubmit={(action, reason, evidenceRefs) =>
+          decideMut.mutate({ action, reason, evidence_refs: evidenceRefs })
+        }
       />
 
       {itemId && (

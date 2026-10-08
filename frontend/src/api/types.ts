@@ -109,9 +109,25 @@ export interface QueueCase {
   f90: number | null;
 }
 
+export interface PeerGroup {
+  n_peers: number;
+  dimensions_used: string[];
+  selection: string;
+  specialty?: string;
+  provider_type?: string;
+  geography?: string;
+  service_line?: string;
+  relaxed?: boolean;
+  confidence?: string;
+  limitation?: string;
+  rural?: boolean;
+}
+
 export interface CaseAlert {
   alert_id: string;
   detector: string;
+  approach?: string;
+  review_reason?: string;
   rule_id: string | null;
   rule_version?: number | null;
   rule_title?: string | null;
@@ -408,4 +424,6 @@ export interface CaseDetail {
   latest_proposal?: WikiProposal | null;
   latest_label?: LabelRecord | null;
   member_unmask_permitted?: boolean;
+  can_assign?: boolean;
+  suspicion_only?: boolean;
 }

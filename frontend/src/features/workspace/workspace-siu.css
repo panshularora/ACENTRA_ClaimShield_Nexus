@@ -1,0 +1,95 @@
+.findings {
+  margin-top: 0.8rem;
+}
+
+.finding-list {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.finding-card {
+  display: grid;
+  gap: 0.15rem;
+  width: 100%;
+  text-align: left;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  cursor: pointer;
+}
+
+.finding-card:hover {
+  border-color: var(--green);
+}
+
+.badge.approach-hard_rule,
+.badge.approach-rules {
+  background: #d7f3e2;
+  color: #0d7a38;
+}
+.badge.approach-behavioral_anomaly,
+.badge.approach-anomaly {
+  background: #eadcc0;
+  color: #6d5a32;
+}
+.badge.approach-network_graph,
+.badge.approach-graph {
+  background: #d9dce8;
+  color: #3e5368;
+}
+
+.peer-compare {
+  margin-top: 0.45rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 10px;
+  background: #06141b;
+  color: #e8f4ec;
+  font-size: 0.82rem;
+}
+
+.peer-compare dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin: 0.3rem 0 0.5rem;
+}
+
+.peer-compare dt {
+  color: #8fb59d;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.peer-compare dd {
+  margin: 0;
+}
+
+.peer-compare.is-limited {
+  box-shadow: inset 0 0 0 1px #d4b46a;
+}
+
+.ref-list {
+  list-style: none;
+  margin: 0 0 0.6rem;
+  padding: 0;
+  max-height: 7rem;
+  overflow: auto;
+}
+
+.ref-list label {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 900px) {
+  .peer-compare dl {
+    grid-template-columns: 1fr 1fr;
+  }
+}

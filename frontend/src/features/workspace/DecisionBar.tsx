@@ -1,12 +1,28 @@
 import { useState } from "react";
-import type { DecisionResult, WikiProposal } from "../../api/types";
+import type { CaseAlert, DecisionResult, WikiProposal } from "../../api/types";
 import { ProposalCard } from "../wiki/ProposalCard";
 
 const ACTIONS = [
-  { id: "escalate" as const, label: "Escalate", hint: "Refer for further SIU / MFCU consideration." },
-  { id: "monitor" as const, label: "Monitor", hint: "Watch for displacement; do not close." },
-  { id: "dismiss" as const, label: "Dismiss", hint: "Close as not a screening lead." },
-  { id: "needs_evidence" as const, label: "Needs more evidence", hint: "Hold until records arrive." },
+  {
+    id: "needs_evidence" as const,
+    label: "Request more information",
+    hint: "Hold the case until records, EVV, or interviews arrive.",
+  },
+  {
+    id: "escalate" as const,
+    label: "Refer for deeper review",
+    hint: "Send to a fuller investigation or MFCU screening path.",
+  },
+  {
+    id: "monitor" as const,
+    label: "Keep under watch",
+    hint: "Suspicion remains; do not close and do not treat as fraud.",
+  },
+  {
+    id: "dismiss" as const,
+    label: "Dismiss with reason",
+    hint: "Evidence does not support concern. Document why.",
+  },
 ];
 
 export function DecisionBar({
@@ -16,6 +32,7 @@ export function DecisionBar({
   error,
   result,
   existingProposal,
+  alerts,
   onSubmit,
 }: {
   disabled: boolean;
@@ -24,21 +41,34 @@ export function DecisionBar({
   error: string | null;
   result: DecisionResult | null;
   existingProposal?: WikiProposal | null;
-  onSubmit: (action: (typeof ACTIONS)[number]["id"], reason: string) => void;
+  alerts: CaseAlert[];
+  onSubmit: (
+    action: (typeof ACTIONS)[number]["id"],
+    reason: string,
+    evidenceRefs: string[],
+  ) => void;
 }) {
   const [action, setAction] = useState<(typeof ACTIONS)[number]["id"]>("monitor");
   const [reason, setReason] = useState("");
+  const [refs, setRefs] = useState<string[]>([]);
   const ready = reason.trim().length >= 20 && !disabled && !pending;
   const proposal = result?.proposal ?? existingProposal ?? null;
+
+  function toggle(ref: string) {
+    setRefs((prev) => (prev.includes(ref) ? prev.filter((x) => x !== ref) : [...prev, ref]));
+  }
 
   return (
     <section className="ws-panel ws-decide" aria-labelledby="decide-title">
       <header className="ws-panel-head">
         <div>
-          <p className="kicker">Decision bar</p>
-          <h2 id="decide-title">Human decision</h2>
+          <p className="kicker">Disposition · human only</p>
+          <h2 id="decide-title">Record the next step</h2>
         </div>
-        <p className="muted">A reason of at least 20 characters is required. This never auto-labels fraud.</p>
+        <p className="muted">
+          An alert is suspicion, not a confirmed finding of fraud. Cite the evidence you inspected
+          and write a reason another reviewer can follow.
+        </p>
       </header>
       <div className="decide-grid">
         <fieldset className="decide-actions">
@@ -58,17 +88,42 @@ export function DecisionBar({
             </label>
           ))}
         </fieldset>
-        <label className="decide-reason">
-          Reason
-          <textarea
-            rows={3}
-            value={reason}
-            disabled={disabled || pending}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="Cite the evidence you reviewed and the screening recommendation…"
-          />
-          <span className="muted mono">{reason.trim().length}/20</span>
-        </label>
+        <div>
+          <p className="kicker">Supporting evidence reviewed</p>
+          {alerts.length === 0 ? (
+            <p className="muted">No findings to attach.</p>
+          ) : (
+            <ul className="ref-list">
+              {alerts.map((alert) => {
+                const ref = `alert:${alert.alert_id}`;
+                return (
+                  <li key={alert.alert_id}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={refs.includes(ref)}
+                        disabled={disabled || pending}
+                        onChange={() => toggle(ref)}
+                      />
+                      <span className="mono">{alert.rule_id ?? alert.detector}</span> {alert.label}
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <label className="decide-reason">
+            Notes and override rationale
+            <textarea
+              rows={3}
+              value={reason}
+              disabled={disabled || pending}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="What you verified, what remains uncertain, and why this next step…"
+            />
+            <span className="muted mono">{reason.trim().length}/20</span>
+          </label>
+        </div>
         <div className="decide-side">
           {action === "needs_evidence" && gaps.length > 0 && (
             <div>
@@ -84,9 +139,9 @@ export function DecisionBar({
             type="button"
             className="btn solid"
             disabled={!ready}
-            onClick={() => onSubmit(action, reason.trim())}
+            onClick={() => onSubmit(action, reason.trim(), refs)}
           >
-            {pending ? "Recording…" : "Record decision"}
+            {pending ? "Recording…" : "Record disposition"}
           </button>
         </div>
       </div>
@@ -94,46 +149,12 @@ export function DecisionBar({
       {result && (
         <div className="banner ok decide-receipt" role="status">
           <p className="kicker">Audit confirmation</p>
-          <dl className="facts dense audit-facts">
-            <div>
-              <dt>Action</dt>
-              <dd>{result.audit.action}</dd>
-            </div>
-            <div>
-              <dt>Actor</dt>
-              <dd>{result.audit.actor ?? "—"}</dd>
-            </div>
-            <div>
-              <dt>Timestamp</dt>
-              <dd className="mono">{result.audit.ts ?? result.created_at ?? "—"}</dd>
-            </div>
-            <div>
-              <dt>Case ID</dt>
-              <dd className="mono">{result.audit.case_id ?? result.case_id}</dd>
-            </div>
-            <div>
-              <dt>Decision / reason</dt>
-              <dd>
-                {result.action}: {result.audit.reason ?? result.reason}
-              </dd>
-            </div>
-            <div>
-              <dt>Audit sequence</dt>
-              <dd className="mono">{result.audit.seq}</dd>
-            </div>
-            <div>
-              <dt>Hash-chain</dt>
-              <dd>
-                {result.audit.chain_intact == null
-                  ? "not reported"
-                  : result.audit.chain_intact
-                    ? "intact"
-                    : "broken"}
-                {result.audit.last_seq != null ? ` · last seq ${result.audit.last_seq}` : ""}
-              </dd>
-            </div>
-          </dl>
-          <p>{result.note}</p>
+          <p>
+            {result.action} recorded. {result.note}
+          </p>
+          <p className="mono muted">
+            seq {result.audit.seq} · chain {result.audit.chain_intact ? "intact" : "broken"}
+          </p>
         </div>
       )}
       {proposal && (

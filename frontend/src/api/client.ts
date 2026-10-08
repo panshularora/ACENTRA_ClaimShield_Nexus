@@ -125,6 +125,11 @@ export const api = {
     ),
   getEvidence: (caseId: string, itemId: string) =>
     request<EvidenceItem>(`/api/v1/cases/${caseId}/evidence/${itemId}`),
+  assignCase: (caseId: string, assigneeId?: string) =>
+    request<CaseDetail>(`/api/v1/cases/${caseId}/assign`, {
+      method: "POST",
+      body: JSON.stringify(assigneeId ? { assignee_id: assigneeId } : {}),
+    }),
   decide: (
     caseId: string,
     body: {
