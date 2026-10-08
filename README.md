@@ -2,7 +2,7 @@
 
 Post-adjudication SIU platform for Medicaid-like FWA: synthetic extract, hash-chained audit, cookie JWT + RBAC auth, rules + peer anomaly + graph cases, capacity knapsack queue.
 
-This repository contains the backend, auth, and product docs. The frontend is not included.
+This repository contains the backend, auth, product docs, and the SIU frontend (queue, worklist, investigation workspace).
 
 ## Docs
 
@@ -33,6 +33,16 @@ uv run python -m claimshield generate --profile tiny --seed 7
 
 Docker: `docker compose up` from the repo root (Postgres + API).
 
+## Frontend
+
+```
+cd frontend
+npm install
+npm run dev
+```
+
+Vite proxies `/api` to `http://127.0.0.1:8000`. Routes: `/login`, `/manager/queue`, `/investigator/cases`, `/investigator/workspace/:caseId`.
+
 ## Auth
 
 Auth lives in `backend/src/claimshield/auth/` (Argon2id passwords, JWT cookies, RBAC, login rate limits). HTTP surface: `POST /api/v1/auth/login`, refresh, logout, `GET /api/v1/auth/me`. Cookies: `cs_access`, `cs_refresh`, `cs_csrf`.
@@ -49,6 +59,8 @@ Demo users (demo mode):
 | admin@demo.claimshield | demo-admin | admin |
 
 Manager loads data: `POST /api/v1/batches` `{"profile":"tiny","seed":7}`. Queue: `GET /api/v1/runs/{run_id}/queue`.
+
+Investigation workspace: `/investigator/workspace/:caseId`. APIs: `GET /api/v1/cases/{id}` plus `/brief`, `/claims`, `/timeline`, `/network`, `/evidence/{item_id}`; `POST /api/v1/cases/{id}/decisions`.
 
 ## Dataset notes
 

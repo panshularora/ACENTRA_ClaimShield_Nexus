@@ -1,54 +1,114 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from datetime import UTC, datetime
+
+from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from claimshield.api.deps import get_db, require
-from claimshield.core.errors import NotFound
-from claimshield.db.models import Alert, Case, User
+from claimshield.api.deps import check_csrf, get_db, require
+from claimshield.cases.workspace import (
+    claims_pack,
+    evidence_item,
+    get_case_or_404,
+    network_pack,
+    record_decision,
+    serialize_case,
+    template_brief,
+    timeline_pack,
+)
+from claimshield.db.models import User
 
 router = APIRouter(prefix="/api/v1/cases", tags=["cases"])
+
+
+class DecisionBody(BaseModel):
+    action: str
+    reason: str
+    ladder_step: str | None = None
+    evidence_refs: list[str] = Field(default_factory=list)
 
 
 @router.get("/{case_id}")
 def get_case(
     case_id: str,
     session: Session = Depends(get_db),
-    _: User = Depends(require("case:read")),
+    user: User = Depends(require("case:read")),
 ) -> dict:
-    case = session.get(Case, case_id)
-    if case is None:
-        raise NotFound("case not found")
-    alerts = session.execute(select(Alert).where(Alert.case_id == case_id)).scalars().all()
-    return {
-        "case_id": case.case_id,
-        "run_id": case.run_id,
-        "status": case.status,
-        "lane": case.lane,
-        "assignee_id": case.assignee_id,
-        "primary_entity_id": case.primary_entity_id,
-        "primary_entity_type": case.primary_entity_type,
-        "harm": case.harm,
-        "severity": case.severity,
-        "members_affected": case.members_affected,
-        "flagged_dollars": case.flagged_dollars,
-        "evidence_strength": case.evidence_strength,
-        "estimated_hours": case.estimated_hours,
-        "p_confirm": case.p_confirm,
-        "f30": case.f30,
-        "f60": case.f60,
-        "f90": case.f90,
-        "alerts": [
-            {
-                "alert_id": a.alert_id,
-                "detector": a.detector,
-                "rule_id": a.rule_id,
-                "entity_id": a.entity_id,
-                "score": a.score,
-                "evidence": a.evidence,
-                "line_ids": a.line_ids,
-            }
-            for a in alerts
-        ],
-    }
+    case = get_case_or_404(session, case_id)
+    return serialize_case(session, case, user)
+
+
+@router.get("/{case_id}/brief")
+def get_brief(
+    case_id: str,
+    session: Session = Depends(get_db),
+    user: User = Depends(require("case:read")),
+) -> dict:
+    case = get_case_or_404(session, case_id)
+    return template_brief(session, case, user)
+
+
+@router.get("/{case_id}/claims")
+def get_claims(
+    case_id: str,
+    unmask: bool = Query(default=False),
+    session: Session = Depends(get_db),
+    user: User = Depends(require("case:read")),
+) -> dict:
+    case = get_case_or_404(session, case_id)
+    return claims_pack(session, case, user, unmask=unmask)
+
+
+@router.get("/{case_id}/timeline")
+def get_timeline(
+    case_id: str,
+    unmask: bool = Query(default=False),
+    session: Session = Depends(get_db),
+    user: User = Depends(require("case:read")),
+) -> dict:
+    case = get_case_or_404(session, case_id)
+    return timeline_pack(session, case, user, unmask=unmask)
+
+
+@router.get("/{case_id}/network")
+def get_network(
+    case_id: str,
+    hops: int = Query(default=2, ge=1, le=2),
+    unmask: bool = Query(default=False),
+    session: Session = Depends(get_db),
+    user: User = Depends(require("case:read")),
+) -> dict:
+    case = get_case_or_404(session, case_id)
+    return network_pack(session, case, user, hops=hops, unmask=unmask)
+
+
+@router.get("/{case_id}/evidence/{item_id}")
+def get_evidence(
+    case_id: str,
+    item_id: str,
+    session: Session = Depends(get_db),
+    user: User = Depends(require("case:read")),
+) -> dict:
+    case = get_case_or_404(session, case_id)
+    return evidence_item(session, case, item_id, user)
+
+
+@router.post("/{case_id}/decisions", dependencies=[Depends(check_csrf)])
+def post_decision(
+    case_id: str,
+    body: DecisionBody,
+    session: Session = Depends(get_db),
+    user: User = Depends(require("case:decide")),
+) -> dict:
+    case = get_case_or_404(session, case_id)
+    return record_decision(
+        session,
+        case=case,
+        user=user,
+        action=body.action,
+        reason=body.reason,
+        ladder_step=body.ladder_step,
+        evidence_refs=body.evidence_refs,
+        now=datetime.now(UTC),
+    )

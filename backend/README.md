@@ -31,6 +31,8 @@ uv run python -m claimshield generate --profile tiny --seed 7
 Login: `POST /api/v1/auth/login`. Cookies: `cs_access`, `cs_refresh`, `cs_csrf`.
 Manager loads data: `POST /api/v1/batches` `{"profile":"tiny","seed":7}`.
 Queue: `GET /api/v1/runs/{run_id}/queue`.
+Workspace: `GET /api/v1/cases/{id}` plus `/brief`, `/claims`, `/timeline`, `/network`, `/evidence/{item_id}`.
+Decide: `POST /api/v1/cases/{id}/decisions` `{action, reason}` (escalate | monitor | dismiss | needs_evidence; reason ≥ 20 chars). Never an automatic fraud label.
 
 ## Dataset
 
