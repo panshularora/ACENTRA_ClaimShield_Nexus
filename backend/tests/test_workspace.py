@@ -22,7 +22,13 @@ def _load_tiny(client: TestClient) -> tuple[str, str]:
 
 
 def test_workspace_pack_and_decision(client: TestClient) -> None:
-    _run_id, case_id = _load_tiny(client)
+    run_id, case_id = _load_tiny(client)
+
+    queue = client.get(f"/api/v1/runs/{run_id}/queue")
+    assert queue.status_code == 200
+    queued = next(row for row in queue.json() if row["case_id"] == case_id)
+    assert queued["alert_group"]["n_alerts"] >= 1
+    assert queued["alert_group"]["text"]
 
     detail = client.get(f"/api/v1/cases/{case_id}")
     assert detail.status_code == 200
@@ -35,6 +41,16 @@ def test_workspace_pack_and_decision(client: TestClient) -> None:
     assert case.get("why_rank", {}).get("text")
     assert case.get("rank_factors", {}).get("composite") is not None
     assert case.get("recommendation") in {"today_queue", "gather_evidence", "tracked_backlog"}
+    assert case["grouping"]["alert_count"] == len(case["alerts"])
+    assert case["grouping"]["text"]
+    assert case["provenance"]["steps"]
+    assert case["provenance"]["data_sources"]
+    assert case["alerts"][0]["lineage"]["tables"]
+    assert case["alerts"][0]["lineage"]["method"]
+    held = set(case["grouping"].get("comparison_peers_held_out") or [])
+    assert held.isdisjoint(set(case["entity_ids"]))
+    if case["provenance"]["urgent"]:
+        assert case["harm"] >= 4
 
     brief = client.get(f"/api/v1/cases/{case_id}/brief")
     assert brief.status_code == 200

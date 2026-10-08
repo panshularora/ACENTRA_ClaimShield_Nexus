@@ -10,14 +10,13 @@ from sqlalchemy.orm import Session
 
 from claimshield.audit.service import append_event, chain_status
 from claimshield.auth.rbac import has_permission
+from claimshield.cases.provenance import alert_lineage, case_provenance, grouping_from_alerts
 from claimshield.core.clock import canonical_iso
 from claimshield.core.errors import Forbidden, NotFound, ValidationFailed
 from claimshield.core.ids import new_id
-from claimshield.queue.explain import screening_days_left, why_rank
-from claimshield.queue.rank import rank_pack_for_case, recommendation_for
-from claimshield.rules.catalog import rule_title as catalog_title
 from claimshield.db.models import (
     Alert,
+    Batch,
     Case,
     Claim,
     ClaimLine,
@@ -36,6 +35,9 @@ from claimshield.db.models import (
     User,
     WikiPage,
 )
+from claimshield.queue.explain import screening_days_left, why_rank
+from claimshield.queue.rank import rank_pack_for_case, recommendation_for
+from claimshield.rules.catalog import rule_title as catalog_title
 
 ACTIONS = ("escalate", "monitor", "dismiss", "needs_evidence")
 LADDER_STEPS = (
@@ -198,6 +200,7 @@ def serialize_alert(alert: Alert) -> dict[str, Any]:
         "label": KIND_LABELS.get(kind, kind.replace("_", " ") if kind else "Signal"),
         "review_reason": evidence.get("review_reason")
         or catalog_title(alert.rule_id, RULE_TITLES.get(alert.rule_id or "", "Review the supporting claims and fields.")),
+        "lineage": alert_lineage(alert),
     }
 
 
@@ -243,6 +246,18 @@ def serialize_case(session: Session, case: Case, user: User) -> dict[str, Any]:
         .first()
     )
     shown = override if override and override.action != "release" else None
+    entity_ids = case.entity_ids or [case.primary_entity_id]
+    grouping = grouping_from_alerts(alerts, entity_ids)
+    why = why_rank(case, factors)
+    batch = session.get(Batch, run.batch_id) if run is not None else None
+    provenance = case_provenance(
+        case=case,
+        alerts=alerts,
+        run=run,
+        batch=batch,
+        grouping=grouping,
+        why_rank_text=str(why.get("text") or ""),
+    )
     return {
         "case_id": case.case_id,
         "run_id": case.run_id,
@@ -251,7 +266,7 @@ def serialize_case(session: Session, case: Case, user: User) -> dict[str, Any]:
         "assignee_id": case.assignee_id,
         "primary_entity_id": case.primary_entity_id,
         "primary_entity_type": case.primary_entity_type,
-        "entity_ids": case.entity_ids or [case.primary_entity_id],
+        "entity_ids": entity_ids,
         "primary_entity": _provider_card(provider, case.primary_entity_id),
         "harm": case.harm,
         "severity": case.severity,
@@ -268,7 +283,7 @@ def serialize_case(session: Session, case: Case, user: User) -> dict[str, Any]:
         "screening_days_left": screening_days_left(case),
         "rank_factors": factors,
         "recommendation": recommendation_for(case.lane),
-        "why_rank": why_rank(case, factors),
+        "why_rank": why,
         "override": (
             {
                 "action": shown.action,
@@ -287,6 +302,8 @@ def serialize_case(session: Session, case: Case, user: User) -> dict[str, Any]:
         "member_unmask_permitted": can_unmask(user),
         "can_assign": has_permission(user.role, "case:assign") or has_permission(user.role, "admin:*"),
         "suspicion_only": True,
+        "grouping": grouping,
+        "provenance": provenance,
     }
 
 
@@ -428,6 +445,8 @@ def claims_pack(
                 "adjudicated_date": iso(claim.adjudicated_date) if claim else None,
                 "member": member_display(member_id, reveal, member.name if member else None),
                 "signals": by_line.get(ln.line_id, []),
+                "source_system": claim.source_system if claim else None,
+                "source_ref": claim.source_ref if claim else None,
             }
         )
     rows.sort(key=lambda r: (r["dos_from"] or "", r["line_id"]))
@@ -443,7 +462,9 @@ def evidence_item(session: Session, case: Case, item_id: str, user: User) -> dic
         alert = session.get(Alert, rest)
         if alert is None or alert.case_id != case.case_id:
             raise NotFound("evidence item not found")
-        return {"item_id": item_id, "kind": "alert", "payload": serialize_alert(alert)}
+        packed = serialize_alert(alert)
+        packed["lineage"] = alert_lineage(alert)
+        return {"item_id": item_id, "kind": "alert", "payload": packed}
     if kind == "line":
         pack = claims_pack(session, case, user, unmask=reveal, audit=False)
         row = next((r for r in pack["rows"] if r["line_id"] == rest), None)
@@ -856,7 +877,7 @@ def network_pack(session: Session, case: Case, user: User, *, hops: int = 2, unm
         m.member_id: m
         for m in session.execute(select(Member).where(Member.member_id.in_(seed_members))).scalars().all()
     } if seed_members else {}
-    for mid in list(seed_members)[:40]:
+    for mid in seed_members:
         m = member_rows.get(mid)
         disp = member_display(mid, reveal, m.name if m else None)
         add_node(mid, "member", disp["display"], masked=disp["masked"])
@@ -941,11 +962,21 @@ def network_pack(session: Session, case: Case, user: User, *, hops: int = 2, unm
         for n in node_list:
             if n["type"] in {"provider", "owner", "facility"}:
                 keep.add(n["id"])
-        members = [n for n in node_list if n["type"] == "member"]
-        keep.update(m["id"] for m in members[:20])
+        linked_members: list[str] = []
+        seen_members: set[str] = set()
+        for edge in edges:
+            for end in (edge["source"], edge["target"]):
+                node = nodes.get(end)
+                if not node or node["type"] != "member" or end in seen_members:
+                    continue
+                other = edge["target"] if edge["source"] == end else edge["source"]
+                if other in keep:
+                    seen_members.add(end)
+                    linked_members.append(end)
+        keep.update(linked_members[:20])
         node_list = [n for n in node_list if n["id"] in keep]
-        keep_ids = {n["id"] for n in node_list}
-        edges = [e for e in edges if e["source"] in keep_ids and e["target"] in keep_ids]
+    keep_ids = {n["id"] for n in node_list}
+    edges = [e for e in edges if e["source"] in keep_ids and e["target"] in keep_ids]
 
     return {
         "case_id": case.case_id,

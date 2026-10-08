@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from claimshield.api.deps import check_csrf, get_db, require
@@ -224,12 +224,18 @@ def get_queue(
         cases,
         key=lambda c: (order.get(c.lane, 9), -packs[c.case_id]["composite"]),
     )
+    alert_counts = dict(
+        session.execute(
+            select(Alert.case_id, func.count()).where(Alert.run_id == run_id).group_by(Alert.case_id)
+        ).all()
+    )
     return [
         _case_brief(
             c,
             factors=packs[c.case_id],
             queue_rank=ranks.get(c.case_id),
             override=latest_override.get(c.case_id),
+            n_alerts=int(alert_counts.get(c.case_id) or 0),
         )
         for c in cases
     ]
@@ -241,15 +247,18 @@ def _case_brief(
     factors: dict | None = None,
     queue_rank: int | None = None,
     override: QueueOverride | None = None,
+    n_alerts: int = 0,
 ) -> dict:
     pack = factors or {}
     shown = override if override and override.action != "release" else None
+    entity_ids = case.entity_ids or [case.primary_entity_id]
+    n_entities = len(entity_ids)
     return {
         "case_id": case.case_id,
         "lane": case.lane,
         "status": case.status,
         "primary_entity_id": case.primary_entity_id,
-        "entity_ids": case.entity_ids or [case.primary_entity_id],
+        "entity_ids": entity_ids,
         "harm": case.harm,
         "severity": case.severity,
         "members_affected": case.members_affected,
@@ -267,6 +276,16 @@ def _case_brief(
         "queue_rank": queue_rank,
         "recommendation": recommendation_for(case.lane),
         "why_rank": why_rank(case, pack),
+        "alert_group": {
+            "n_entities": n_entities,
+            "n_alerts": n_alerts,
+            "urgent": case.harm >= 4,
+            "text": (
+                "Linked NPIs (owner, TIN, contact, or referral). Comparison peers are not in this case."
+                if n_entities > 1
+                else "Alerts for this provider are grouped on the portal; there is no per-alert notice."
+            ),
+        },
         "override": (
             {
                 "action": shown.action,
