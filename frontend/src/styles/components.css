@@ -54,9 +54,6 @@
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
-  transition:
-    background-color var(--duration-fast) var(--ease-standard),
-    border-color var(--duration-fast) var(--ease-standard);
 }
 
 .app .btn:hover {
@@ -538,10 +535,6 @@
 
 .grid tbody tr:last-child > * {
   border-bottom: 0;
-}
-
-.grid tbody tr {
-  transition: background-color var(--duration-fast) var(--ease-standard);
 }
 
 .grid tbody tr:hover {
