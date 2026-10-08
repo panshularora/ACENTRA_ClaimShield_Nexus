@@ -7,6 +7,9 @@ body:has(.login-screen) {
   min-height: 100vh;
   color: #e8f4ec;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .login-stage {
@@ -18,14 +21,18 @@ body:has(.login-screen) {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(6, 20, 27, 0.88) 0%, rgba(6, 20, 27, 0.55) 48%, rgba(6, 20, 27, 0.2) 100%);
+  background:
+    radial-gradient(900px 520px at 50% 42%, rgba(6, 20, 27, 0.28), transparent 70%),
+    linear-gradient(180deg, rgba(6, 20, 27, 0.55) 0%, rgba(6, 20, 27, 0.22) 42%, rgba(6, 20, 27, 0.5) 100%);
   pointer-events: none;
 }
 
 .login-top {
   position: relative;
   z-index: 2;
+  width: 100%;
   padding: 1.2rem 6vw;
+  flex: 0 0 auto;
 }
 
 .login-top a {
@@ -33,51 +40,65 @@ body:has(.login-screen) {
   color: inherit;
 }
 
-.login-panel {
+.login-screen .login-panel {
   position: relative;
   z-index: 2;
-  max-width: 32rem;
-  margin: 6vh 8vw 8vh;
-  padding: 1.6rem 1.7rem 1.8rem;
-  background: rgba(8, 28, 36, 0.72);
-  border: 1px solid rgba(158, 230, 184, 0.22);
-  backdrop-filter: blur(16px);
-  border-radius: 18px;
+  width: min(46rem, calc(100% - 2.5rem));
+  max-width: 46rem;
+  margin: auto 0 7vh;
+  padding: 1.85rem 2.1rem 2rem;
+  background: rgba(244, 247, 243, 0.72);
+  color: #06141b;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 20px;
+  box-shadow: 0 18px 44px rgba(6, 20, 27, 0.28);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
 }
 
-.login-panel h1 {
+.login-screen .login-panel h1 {
   font-family: "Fraunces", Georgia, serif;
   font-size: clamp(1.8rem, 3vw, 2.5rem);
   letter-spacing: -0.03em;
   margin: 0.15rem 0 0.7rem;
+  color: #06141b;
 }
 
-.login-panel .lede {
-  color: #c5ddd0;
+.login-screen .login-panel .kicker {
+  color: #3d5a63;
+}
+
+.login-screen .login-panel .lede {
+  color: #3d5a63;
   margin-bottom: 1.2rem;
 }
 
-.login-form {
+.login-screen .login-form {
   display: grid;
   gap: 0.75rem;
 }
 
-.login-form label {
+.login-screen .login-form label {
   display: grid;
   gap: 0.3rem;
   font-size: 0.82rem;
-  color: #9ee6b8;
+  color: #1a3a32;
 }
 
-.login-form input {
-  background: rgba(6, 20, 27, 0.7);
-  border: 1px solid #2a4a3a;
-  color: #e8f4ec;
+.login-screen .login-form input {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(183, 207, 192, 0.9);
+  color: #06141b;
   padding: 0.55rem 0.7rem;
   border-radius: 8px;
 }
 
-.login-panel .btn.solid {
+.login-screen .login-form input:focus {
+  outline: 2px solid #1fbf5a;
+  outline-offset: 1px;
+}
+
+.login-screen .login-panel .btn.solid {
   margin-top: 0.3rem;
   background: #1fbf5a;
   color: #06141b;
@@ -86,47 +107,54 @@ body:has(.login-screen) {
   font-weight: 650;
 }
 
-.demo-switch {
+.login-screen .login-panel .error-text {
+  color: #8f1d1d;
+}
+
+.login-screen .demo-switch {
   margin-top: 1.3rem;
 }
 
-.demo-grid {
+.login-screen .demo-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.45rem;
 }
 
-.demo-chip {
+.login-screen .demo-chip {
   text-align: left;
-  background: rgba(6, 20, 27, 0.55);
-  border: 1px solid #2a4a3a;
-  color: #e8f4ec;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(183, 207, 192, 0.9);
+  color: #06141b;
   border-radius: 10px;
   padding: 0.45rem 0.55rem;
   cursor: pointer;
 }
 
-.demo-chip strong {
+.login-screen .demo-chip strong {
   display: block;
   text-transform: capitalize;
   font-size: 0.82rem;
+  color: #06141b;
 }
 
-.demo-chip span {
+.login-screen .demo-chip span {
   font-size: 0.68rem;
-  color: #8fb59d;
+  color: #3d5a63;
 }
 
-.demo-chip.is-on {
+.login-screen .demo-chip.is-on {
   border-color: #1fbf5a;
   box-shadow: 0 0 0 1px #1fbf5a inset;
 }
 
 @media (max-width: 720px) {
-  .login-panel {
-    margin: 4vh 1rem 2rem;
+  .login-screen .login-panel {
+    width: calc(100% - 1.5rem);
+    margin: 3vh 0 2rem;
+    padding: 1.4rem 1.25rem 1.5rem;
   }
-  .demo-grid {
+  .login-screen .demo-grid {
     grid-template-columns: 1fr;
   }
 }
