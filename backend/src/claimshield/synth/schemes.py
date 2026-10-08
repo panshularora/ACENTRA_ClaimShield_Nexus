@@ -138,6 +138,33 @@ def _append_line(
     return line_id
 
 
+def _schedule(
+    rng: np.random.Generator,
+    spec: Profile,
+    start: date,
+    end: date,
+    *,
+    offset: int,
+    n: int,
+    gap: float,
+) -> list[date]:
+    """Service dates for an n-line scheme.
+
+    Default profiles keep the fixed offsets (so tiny/small stay byte-identical). A profile with
+    ``onset_spread`` draws a seeded onset anywhere in the window and stretches the spacing, so
+    schemes start in different months and run for weeks to months. That gives the 30/60/90
+    hazard model onsets and continuations to learn from.
+    """
+    if not spec.onset_spread:
+        return [start + timedelta(days=int(offset + i * gap)) for i in range(n)]
+    span = (end - start).days
+    step = max(1.0, gap) * float(rng.uniform(2.0, 5.0))
+    length = int(round((n - 1) * step))
+    latest = max(offset + 2, span - length - 5)
+    onset = int(rng.integers(min(offset, latest - 1), latest))
+    return [start + timedelta(days=min(span - 1, int(onset + i * step))) for i in range(n)]
+
+
 def _providers_by_line(ds: "Dataset", line: str) -> pd.DataFrame:
     frame = ds.tables["provider"]
     subset = frame[frame.service_line == line]
@@ -200,11 +227,12 @@ def plant_all_schemes(
                       provider_id=prof.provider_id, line_ids=line_ids, member_ids=mids))
     prof_b = _providers_by_line(ds, "professional").iloc[min(1, len(_providers_by_line(ds, "professional")) - 1)]
     line_ids_b = []
+    drift_dates = _schedule(rng, spec, start, end, offset=40, n=16, gap=6)
     for i in range(16):
         code = EM_LEVELS[min(4, 2 + i // 4)]
         line_ids_b.append(
             _append_line(ds, rng, provider_id=prof_b.provider_id, member_id=pick_member(),
-                         dos=start + timedelta(days=40 + i * 6), code=code, paid=150 + 15 * i)
+                         dos=drift_dates[i], code=code, paid=150 + 15 * i)
         )
     gt.append(_gt_row(scheme_id="S02", scheme_type="upcoding", variant="B",
                       provider_id=prof_b.provider_id, line_ids=line_ids_b, notes="gradual drift"))
@@ -251,16 +279,20 @@ def plant_all_schemes(
                       provider_id=dme.provider_id, line_ids=[l], member_ids=[decedent.member_id]))
 
     # S06 ambulance overlapping / no destination (HELD OUT)
+    # With spread onsets it goes on a second ambulance supplier so the held-out type can be
+    # scored without the S04/S16 lines on the first one.
+    amb_lines = _providers_by_line(ds, "ambulance")
+    s06 = amb_lines.iloc[1] if spec.onset_spread and len(amb_lines) > 1 else amb
     mem = pick_member()
     dos = pick_dos()
-    a = _append_line(ds, rng, provider_id=amb.provider_id, member_id=mem, dos=dos, code=AMB_MILEAGE,
+    a = _append_line(ds, rng, provider_id=s06.provider_id, member_id=mem, dos=dos, code=AMB_MILEAGE,
                      code_system=CODE_SYSTEM_HCPCS2, units=22, mileage=22, minutes=90,
                      claim_type="ambulance", paid=400, pos="41")
-    b = _append_line(ds, rng, provider_id=amb.provider_id, member_id=pick_member(), dos=dos, code=AMB_MILEAGE,
+    b = _append_line(ds, rng, provider_id=s06.provider_id, member_id=pick_member(), dos=dos, code=AMB_MILEAGE,
                      code_system=CODE_SYSTEM_HCPCS2, units=30, mileage=30, minutes=90,
                      claim_type="ambulance", paid=480, pos="41")
     gt.append(_gt_row(scheme_id="S06", scheme_type="ambulance_impossible", variant="A",
-                      provider_id=amb.provider_id, line_ids=[a, b], held_out=True,
+                      provider_id=s06.provider_id, line_ids=[a, b], held_out=True,
                       notes="overlapping trips same vehicle-day"))
 
     # S07 >24h behavioral (28 billed hours on one clinician-day)
@@ -300,10 +332,11 @@ def plant_all_schemes(
     hh = hh_all.iloc[0]
     ids = []
     heavy_member = pick_member()
+    visit_dates = _schedule(rng, spec, start, end, offset=60, n=28, gap=1)
     for i in range(28):
         ids.append(
             _append_line(ds, rng, provider_id=hh.provider_id, member_id=heavy_member,
-                         dos=start + timedelta(days=60 + i), code=HOME_VISIT, minutes=45,
+                         dos=visit_dates[i], code=HOME_VISIT, minutes=45,
                          claim_type="home_health", paid=92, pos=POS_HOME)
         )
     gt.append(_gt_row(scheme_id="S10", scheme_type="excessive_utilization", variant="A",
@@ -331,6 +364,7 @@ def plant_all_schemes(
     prescribers = _providers_by_line(ds, "professional")["provider_id"].tolist()[:5]
     pharmacies = _providers_by_line(ds, "pharmacy")["provider_id"].tolist()[:5]
     rx_rows = []
+    fill_dates = _schedule(rng, spec, start, end, offset=70, n=5, gap=12)
     for i in range(5):
         rx_rows.append(
             {
@@ -341,7 +375,7 @@ def plant_all_schemes(
                 "days_supply": 30,
                 "qty": 90,
                 "mme": 140,
-                "fill_date": start + timedelta(days=70 + i * 12),
+                "fill_date": fill_dates[i],
             }
         )
     ds.tables["rx_fill"] = pd.concat([ds.tables["rx_fill"], pd.DataFrame(rx_rows)], ignore_index=True)
@@ -349,20 +383,27 @@ def plant_all_schemes(
                       provider_id=prescribers[0], member_ids=[member], entity_ids=prescribers + pharmacies))
 
     # G1 telefraud ring — every claim passes single-claim rules
-    g1 = _plant_ring(ds, rng, fake, start, kind="telefraud")
+    g1 = _plant_ring(ds, rng, fake, start, kind="telefraud",
+                     dates=_schedule(rng, spec, start, end, offset=40, n=24, gap=1),
+                     spread=spec.onset_spread)
     gt.append(g1)
     # G2 sober-home
-    gt.append(_plant_ring(ds, rng, fake, start, kind="sober_home"))
+    gt.append(_plant_ring(ds, rng, fake, start, kind="sober_home",
+                          dates=_schedule(rng, spec, start, end, offset=40, n=24, gap=1),
+                          spread=spec.onset_spread))
     # G3 shell cluster
-    gt.append(_plant_shell(ds, rng, fake, start))
+    gt.append(_plant_shell(ds, rng, fake, start,
+                           dates=_schedule(rng, spec, start, end, offset=20, n=15, gap=1),
+                           spread=spec.onset_spread))
 
     # C1 camouflaged: just under thresholds
     cam = _providers_by_line(ds, "home_health").iloc[min(1, len(_providers_by_line(ds, "home_health")) - 1)]
     ids = []
+    cam_dates = _schedule(rng, spec, start, end, offset=90, n=14, gap=2)
     for i in range(14):
         ids.append(
             _append_line(ds, rng, provider_id=cam.provider_id, member_id=pick_member(),
-                         dos=start + timedelta(days=90 + i * 2), code=HOME_VISIT, minutes=40,
+                         dos=cam_dates[i], code=HOME_VISIT, minutes=40,
                          units=3, claim_type="home_health", paid=85, pos=POS_HOME)
         )
     gt.append(_gt_row(scheme_id="C1", scheme_type="camouflaged", variant="A",
@@ -385,6 +426,9 @@ def plant_all_schemes(
 
     # S15 weekend mill for office-only
     weekend = start + timedelta(days=((5 - start.weekday()) % 7) + 14)
+    if spec.onset_spread:
+        weeks_left = max(1, ((end - weekend).days - 7 * 8) // 7)
+        weekend += timedelta(days=7 * int(rng.integers(0, weeks_left)))
     ids = [
         _append_line(ds, rng, provider_id=prof.provider_id, member_id=pick_member(), dos=weekend + timedelta(days=7 * i),
                      code="EM-EST-4", paid=180)
@@ -460,12 +504,13 @@ def plant_all_schemes(
     # S21 genetic testing mill (OIG consumer alert analogue)
     gen_ids = []
     gen_members = []
+    gen_dates = _schedule(rng, spec, start, end, offset=50, n=22, gap=1)
     for i in range(22):
         mem = pick_member()
         gen_members.append(mem)
         gen_ids.append(
             _append_line(ds, rng, provider_id=lab.provider_id, member_id=mem,
-                         dos=start + timedelta(days=50 + i), code="LAB-GEN-01",
+                         dos=gen_dates[i], code="LAB-GEN-01",
                          claim_type="laboratory", paid=2100)
         )
     gt.append(_gt_row(scheme_id="S21", scheme_type="genetic_mill", variant="A",
@@ -499,7 +544,16 @@ def fac_ok(ds: "Dataset") -> bool:
     return not ds.tables["facility"].empty
 
 
-def _plant_ring(ds: "Dataset", rng: np.random.Generator, fake: Faker, start: date, *, kind: str) -> dict[str, Any]:
+def _plant_ring(
+    ds: "Dataset",
+    rng: np.random.Generator,
+    fake: Faker,
+    start: date,
+    *,
+    kind: str,
+    dates: list[date],
+    spread: bool,
+) -> dict[str, Any]:
     loc_id = ds.tables["location"].iloc[0].location_id
     owner_id = _rid(rng, "OWN")
     owners = pd.DataFrame(
@@ -509,6 +563,8 @@ def _plant_ring(ds: "Dataset", rng: np.random.Generator, fake: Faker, start: dat
     new_provs = []
     n = 3 if kind == "telefraud" else 3
     line = "dme" if kind == "telefraud" else "behavioral_health"
+    enrolled = dates[0] - timedelta(days=30) if spread else start + timedelta(days=10)
+    linked = enrolled if spread else start
     for i in range(n):
         pid = _rid(rng, "PRV")
         new_provs.append(
@@ -520,7 +576,7 @@ def _plant_ring(ds: "Dataset", rng: np.random.Generator, fake: Faker, start: dat
                 "specialty": "dme_supplier" if kind == "telefraud" else "sud_clinic",
                 "service_line": line,
                 "location_id": loc_id,
-                "enroll_date": start + timedelta(days=10),
+                "enroll_date": enrolled,
                 "term_date": None,
                 "tin_token": "TIN-RING1" if kind == "telefraud" else "TIN-RING2",
                 "rural": False,
@@ -531,7 +587,7 @@ def _plant_ring(ds: "Dataset", rng: np.random.Generator, fake: Faker, start: dat
             [
                 ds.tables["ownership_link"],
                 pd.DataFrame(
-                    [{"owner_id": owner_id, "provider_id": pid, "pct": 80.0, "start": start, "end": None}]
+                    [{"owner_id": owner_id, "provider_id": pid, "pct": 80.0, "start": linked, "end": None}]
                 ),
             ],
             ignore_index=True,
@@ -570,7 +626,7 @@ def _plant_ring(ds: "Dataset", rng: np.random.Generator, fake: Faker, start: dat
                 rng,
                 provider_id=pid,
                 member_id=mem,
-                dos=start + timedelta(days=40 + i),
+                dos=dates[i],
                 code=code,
                 minutes=45 if kind != "telefraud" else None,
                 claim_type=line,
@@ -588,7 +644,7 @@ def _plant_ring(ds: "Dataset", rng: np.random.Generator, fake: Faker, start: dat
                             "referring_id": orderer,
                             "receiving_id": pid,
                             "member_id": mem,
-                            "date": start + timedelta(days=40 + i),
+                            "date": dates[i],
                             "kind": "order",
                         }
                     ]
@@ -608,7 +664,15 @@ def _plant_ring(ds: "Dataset", rng: np.random.Generator, fake: Faker, start: dat
     )
 
 
-def _plant_shell(ds: "Dataset", rng: np.random.Generator, fake: Faker, start: date) -> dict[str, Any]:
+def _plant_shell(
+    ds: "Dataset",
+    rng: np.random.Generator,
+    fake: Faker,
+    start: date,
+    *,
+    dates: list[date],
+    spread: bool,
+) -> dict[str, Any]:
     loc_id = ds.tables["location"].iloc[1 % len(ds.tables["location"])].location_id
     excl = ds.tables["exclusion_record"].iloc[min(1, len(ds.tables["exclusion_record"]) - 1)]
     owner_id = _rid(rng, "OWN")
@@ -629,6 +693,8 @@ def _plant_shell(ds: "Dataset", rng: np.random.Generator, fake: Faker, start: da
         ignore_index=True,
     )
     pids = []
+    enrolled = dates[0] - timedelta(days=30) if spread else start + timedelta(days=5)
+    linked = enrolled if spread else start
     for _ in range(5):
         pid = _rid(rng, "PRV")
         pids.append(pid)
@@ -645,7 +711,7 @@ def _plant_shell(ds: "Dataset", rng: np.random.Generator, fake: Faker, start: da
                             "specialty": "home_health_agency",
                             "service_line": "home_health",
                             "location_id": loc_id,
-                            "enroll_date": start + timedelta(days=5),
+                            "enroll_date": enrolled,
                             "term_date": None,
                             "tin_token": "TIN-SHELL",
                             "rural": False,
@@ -660,7 +726,7 @@ def _plant_shell(ds: "Dataset", rng: np.random.Generator, fake: Faker, start: da
             [
                 ds.tables["ownership_link"],
                 pd.DataFrame(
-                    [{"owner_id": owner_id, "provider_id": pid, "pct": 100.0, "start": start, "end": None}]
+                    [{"owner_id": owner_id, "provider_id": pid, "pct": 100.0, "start": linked, "end": None}]
                 ),
             ],
             ignore_index=True,
@@ -674,7 +740,7 @@ def _plant_shell(ds: "Dataset", rng: np.random.Generator, fake: Faker, start: da
             rng,
             provider_id=pids[i % 5],
             member_id=str(living_ids[i % len(living_ids)]),
-            dos=start + timedelta(days=20 + i),
+            dos=dates[i],
             code=HOME_VISIT,
             minutes=40,
             claim_type="home_health",

@@ -1,3 +1,7 @@
+from datetime import date, timedelta
+
+import pandas as pd
+
 from claimshield.synth.codes import CODE_SYSTEM_SYNTH
 from claimshield.synth.generator import generate
 from claimshield.synth.luhn import is_luhn
@@ -87,3 +91,32 @@ def test_data_card_states_design_knobs(tiny_dataset) -> None:
     assert "synthetic data" in card["limitations"]
     assert card["n_members"] == 120
     assert card["n_claim_lines"] > 2000
+
+
+def _scheme_dates(ds, scheme_id: str) -> list:
+    row = ds.ground_truth[ds.ground_truth.scheme_id == scheme_id].iloc[0]
+    lines = ds.tables["claim_line"].set_index("line_id")
+    return sorted(pd.Timestamp(d).date() for d in lines.loc[list(row.line_ids), "dos_from"])
+
+
+def test_default_profiles_keep_fixed_scheme_offsets(tiny_dataset) -> None:
+    start = date(2024, 1, 1)
+    dates = _scheme_dates(tiny_dataset, "S10")
+    assert dates[0] == start + timedelta(days=60)
+    assert dates[-1] == start + timedelta(days=87)
+
+
+def test_panel_profile_spreads_onsets_across_seeds() -> None:
+    worlds = {seed: generate("panel", seed) for seed in (1, 2, 3)}
+    onsets = {_scheme_dates(ds, "G1")[0] for ds in worlds.values()}
+    assert len(onsets) == 3
+    assert _scheme_dates(generate("panel", 2), "G1") == _scheme_dates(worlds[2], "G1")
+    ring = _scheme_dates(worlds[1], "G1")
+    assert (ring[-1] - ring[0]).days > 30
+
+
+def test_panel_puts_held_out_ambulance_on_its_own_provider() -> None:
+    ds = generate("panel", 4)
+    gt = ds.ground_truth.set_index("scheme_id")
+    assert gt.loc["S06", "provider_id"] != gt.loc["S04"].iloc[0]["provider_id"]
+    assert bool(gt.loc["S06", "held_out"])

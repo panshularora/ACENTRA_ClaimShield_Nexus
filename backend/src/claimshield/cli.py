@@ -12,7 +12,7 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command", required=True)
 
     gen = sub.add_parser("generate", help="Write a synthetic extract to data/generated/")
-    gen.add_argument("--profile", default="tiny", choices=["tiny", "small", "full"])
+    gen.add_argument("--profile", default="tiny", choices=["tiny", "small", "panel", "full"])
     gen.add_argument("--seed", type=int, default=7)
     gen.add_argument("--out", type=Path, default=None)
 
