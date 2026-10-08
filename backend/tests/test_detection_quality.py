@@ -2,7 +2,8 @@ from collections import Counter
 
 import pandas as pd
 
-from claimshield.pipeline.service import detect, discrete_hazard
+from claimshield.pipeline.service import detect
+from claimshield.risk.heuristic import apply_heuristic_hazard
 from claimshield.rules.engine import evaluate_rules
 
 
@@ -77,9 +78,9 @@ def test_harm_lane_does_not_consume_capacity(tiny_dataset) -> None:
     assert lanes_low["needs_evidence"] >= 1 or lanes_high["needs_evidence"] >= 1
 
 
-def test_discrete_hazard_is_monotonic() -> None:
+def test_heuristic_fallback_hazard_is_monotonic() -> None:
     case = {"p_confirm": 0.4, "harm": 2}
-    f30, f60, f90 = discrete_hazard(case)
+    f30, f60, f90 = apply_heuristic_hazard(case)
     assert 0 < f30 <= f60 <= f90 < 1
     expected = 1 - (1 - case["monthly_hazard"]) ** 2
     assert abs(f60 - expected) < 5e-4

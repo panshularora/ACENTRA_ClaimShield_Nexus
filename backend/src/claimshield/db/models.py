@@ -350,6 +350,22 @@ class Case(Base):
     f90: Mapped[float | None] = mapped_column(Float, nullable=True)
 
 
+class CaseRisk(Base):
+    """Which model scored a case, whether it was calibrated, and its top contributing factors.
+
+    A separate table so existing databases gain it through ``create_all`` without a migration.
+    """
+
+    __tablename__ = "case_risk"
+
+    case_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    run_id: Mapped[str] = mapped_column(String(32), index=True)
+    score_kind: Mapped[str] = mapped_column(String(32))
+    model_version: Mapped[str] = mapped_column(String(64))
+    calibrated: Mapped[bool] = mapped_column(Boolean, default=False)
+    detail: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
 class QueueOverride(Base):
     __tablename__ = "queue_override"
 
