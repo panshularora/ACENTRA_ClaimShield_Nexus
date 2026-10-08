@@ -18,6 +18,9 @@ class Profile:
     n_investigations: int
     fraud_provider_rate: float = 0.03
     fraud_line_rate: float = 0.01
+    # Spread scheme onsets over the window (seeded) instead of fixed day offsets. Used by the
+    # training panel so the 30/60/90 hazard has onsets and continuations across months.
+    onset_spread: bool = False
 
 
 PROFILES: dict[str, Profile] = {
@@ -46,6 +49,22 @@ PROFILES: dict[str, Profile] = {
         n_evv=24_000,
         n_rx=40_000,
         n_investigations=80,
+    ),
+    # Many small worlds (one per seed) for training and backtesting the risk models. Fifteen
+    # 30-day months give rolling origins with a full 90-day label window and a purge gap.
+    "panel": Profile(
+        name="panel",
+        n_members=260,
+        n_providers=48,
+        n_locations=24,
+        n_owners=26,
+        n_months=15,
+        target_lines=5600,
+        n_referrals=340,
+        n_evv=0,
+        n_rx=560,
+        n_investigations=12,
+        onset_spread=True,
     ),
     "full": Profile(
         name="full",

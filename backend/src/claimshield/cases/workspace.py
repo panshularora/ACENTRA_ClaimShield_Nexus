@@ -37,6 +37,7 @@ from claimshield.db.models import (
 )
 from claimshield.queue.explain import screening_days_left, why_rank
 from claimshield.queue.rank import rank_pack_for_case, recommendation_for
+from claimshield.risk.present import case_risk, risk_fields, score_label
 from claimshield.rules.catalog import rule_title as catalog_title
 
 ACTIONS = ("escalate", "monitor", "dismiss", "needs_evidence")
@@ -279,6 +280,7 @@ def serialize_case(session: Session, case: Case, user: User) -> dict[str, Any]:
         "f30": case.f30,
         "f60": case.f60,
         "f90": case.f90,
+        **risk_fields(case, case_risk(session, case.case_id)),
         "sla_due": iso(case.sla_due),
         "screening_days_left": screening_days_left(case),
         "rank_factors": factors,
@@ -612,8 +614,9 @@ def template_brief(session: Session, case: Case, user: User) -> dict[str, Any]:
             "sentences": [
                 {
                     "text": (
-                        f"P(confirm) {case.p_confirm:.0%}; evidence strength {case.evidence_strength:.0%}; "
-                        f"30/60/90 risk {case.f30 if case.f30 is not None else '—'} / "
+                        f"P(confirm) {case.p_confirm:.0%} ({score_label(case_risk(session, case.case_id))}); "
+                        f"evidence strength {case.evidence_strength:.0%}; "
+                        f"30/60/90-day risk {case.f30 if case.f30 is not None else '—'} / "
                         f"{case.f60 if case.f60 is not None else '—'} / "
                         f"{case.f90 if case.f90 is not None else '—'}."
                     ),

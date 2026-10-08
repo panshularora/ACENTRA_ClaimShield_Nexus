@@ -17,6 +17,14 @@ Write the tiny extract (CSV + data card, ground truth kept separate):
 uv run python -m claimshield generate --profile tiny --seed 7
 ```
 
+Train the risk models (P(confirm) and the 30/60/90-day hazard) on 24 seeded `panel` worlds and write `../data/models/risk_model.json` (about 1–2 minutes on CPU; `make train` does the same):
+
+```
+uv run python -m claimshield train --profile panel --seed 7
+```
+
+The pipeline loads that artifact on every run. Without it, scores fall back to a labelled "uncalibrated heuristic". Artifact summary and backtest metrics: `GET /api/v1/models/risk` (roles with `model:read`). Method, numbers and limits: [../docs/MODEL_CARD.md](../docs/MODEL_CARD.md).
+
 ## Demo users (demo mode)
 
 | Email | Password | Role |
@@ -38,7 +46,7 @@ Decide: `POST /api/v1/cases/{id}/decisions` `{action, reason}` (escalate | monit
 ## Dataset
 
 Planted schemes S01–S21, rings G1–G3, camouflage C1, hard negatives HN1–HN2.
-S06 ambulance is held out of model training (still visible to rules).
+S06 ambulance providers are excluded from risk-model training and scored as an unseen scheme in the backtest (still visible to rules; see `../docs/MODEL_CARD.md`).
 No CPT. Synthetic NPIs pass Luhn. Ground truth is not a feature table.
 
 Research map: `../data/reference/PAPERS.md`.

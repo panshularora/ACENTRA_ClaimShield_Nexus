@@ -7,33 +7,20 @@ import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from claimshield.anomaly.peer import evaluate_anomalies
 from claimshield.audit.service import append_event
 from claimshield.cases.builder import build_cases
 from claimshield.core.config import Settings
 from claimshield.core.errors import NotFound
 from claimshield.core.ids import new_id
-from claimshield.db.models import Alert, Batch, Case, PipelineRun, User
-from claimshield.graph.build import build_graph, strong_component_map
-from claimshield.graph.detect import evaluate_graph
+from claimshield.db.models import Alert, Batch, Case, CaseRisk, PipelineRun, User
 from claimshield.ingest.service import load_tables, persist_dataset
+from claimshield.pipeline.detectors import run_detectors
 from claimshield.queue.knapsack import expected_value, knapsack_select
 from claimshield.queue.rank import attach_rank_factors, ranking_policy
-from claimshield.rules.catalog import stamp_catalog
-from claimshield.rules.engine import AlertDraft, evaluate_rules
+from claimshield.risk.artifact import RiskArtifact, default_path, load_artifact
+from claimshield.risk.scoring import score_cases
+from claimshield.rules.engine import AlertDraft
 from claimshield.synth.generator import Dataset, generate
-
-
-def discrete_hazard(case: dict[str, Any]) -> tuple[float, float, float]:
-    """Constant monthly hazard, discrete-time CDF at 1/2/3 months."""
-    monthly = 0.05 + 0.28 * float(case["p_confirm"]) + 0.03 * int(case["harm"])
-    monthly = min(0.65, max(0.02, monthly))
-    case["monthly_hazard"] = round(monthly, 4)
-
-    def cdf(months: int) -> float:
-        return round(1.0 - (1.0 - monthly) ** months, 3)
-
-    return cdf(1), cdf(2), cdf(3)
 
 
 def assign_lanes(
@@ -92,21 +79,19 @@ def detect(
     evidence_min: float = 0.4,
     max_slots: int = 20,
     member_weight: float = 1.0,
+    risk_artifact: RiskArtifact | None = None,
+    use_trained_risk: bool = True,
 ) -> dict[str, Any]:
-    graph = build_graph(tables)
-    strong = strong_component_map(graph)
-    alerts = stamp_catalog(
-        evaluate_rules(tables)
-        + evaluate_anomalies(tables)
-        + evaluate_graph(tables, graph, strong)
-    )
-    cases = build_cases(alerts, tables, strong)
+    det = run_detectors(tables)
+    graph, alerts = det.graph, det.alerts
+    cases = build_cases(alerts, tables, det.strong)
+    artifact = risk_artifact or (load_artifact() if use_trained_risk else None)
+    risk_model = score_cases(cases, tables, det, artifact=artifact)
     for case in cases:
         case["expected_value"] = expected_value(
             case, horizon_days=horizon_days, recovery=recovery, harm_lambda=harm_lambda
         )
         case["ev"] = case["expected_value"]
-        case["f30"], case["f60"], case["f90"] = discrete_hazard(case)
     attach_rank_factors(cases, horizon_days=horizon_days, member_weight=member_weight)
     assign_lanes(
         cases,
@@ -125,6 +110,7 @@ def detect(
         "ranking_policy": ranking_policy(
             max_slots=max_slots, member_weight=member_weight, capacity_hours=capacity_hours
         ),
+        "risk_model": risk_model,
     }
 
 
@@ -161,6 +147,17 @@ def persist_detection(
                 f30=case["f30"],
                 f60=case["f60"],
                 f90=case["f90"],
+            )
+        )
+        risk = case.get("risk") or {}
+        session.add(
+            CaseRisk(
+                case_id=case["case_id"],
+                run_id=run_id,
+                score_kind=str(risk.get("score_kind") or "uncalibrated_heuristic"),
+                model_version=str(risk.get("model_version") or "unknown"),
+                calibrated=bool(risk.get("calibrated")),
+                detail=risk,
             )
         )
     for alert in alerts:
@@ -221,6 +218,7 @@ def execute_run(
         evidence_min=settings.evidence_strength_min,
         max_slots=slots,
         member_weight=impact,
+        risk_artifact=load_artifact(default_path(settings)),
     )
     sla_due = instant.date() + timedelta(days=int(settings.screening_days))
     for case in result["cases"]:
@@ -239,6 +237,7 @@ def execute_run(
         "max_slots": slots,
         "member_weight": impact,
         "ranking_policy": result["ranking_policy"],
+        "risk_model": result["risk_model"],
         "recompute": False,
         "lanes": _lane_counts(result["cases"]),
     }

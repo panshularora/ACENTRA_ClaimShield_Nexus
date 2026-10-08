@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_model: str = "grok-4.7"
     data_dir: Path = Path(__file__).resolve().parents[4] / "data"
+    # Trained risk-model artifact; defaults to data_dir/models/risk_model.json when unset.
+    risk_model_path: Path | None = None
     internal_token: str = ""
     aws_region: str = "ap-south-1"
     s3_bucket: str = "claimshield-nexus-data-2026"
