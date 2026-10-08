@@ -159,7 +159,7 @@ def _schedule(
         return [start + timedelta(days=int(offset + i * gap)) for i in range(n)]
     span = (end - start).days
     step = max(1.0, gap) * float(rng.uniform(2.0, 5.0))
-    length = int(round((n - 1) * step))
+    length = round((n - 1) * step)
     latest = max(offset + 2, span - length - 5)
     onset = int(rng.integers(min(offset, latest - 1), latest))
     return [start + timedelta(days=min(span - 1, int(onset + i * step))) for i in range(n)]
