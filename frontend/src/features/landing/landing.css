@@ -1,0 +1,207 @@
+html:has(.landing),
+body:has(.landing) {
+  background: #06141b;
+}
+
+.landing {
+  position: relative;
+  color: #e8f4ec;
+  background: #06141b;
+  min-height: 100%;
+}
+
+.landing-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+.landing-veil {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(6, 20, 27, 0.18) 0%, rgba(6, 20, 27, 0.55) 55%, rgba(6, 20, 27, 0.88) 100%),
+    radial-gradient(1200px 600px at 80% 10%, rgba(31, 191, 90, 0.16), transparent 60%);
+  pointer-events: none;
+}
+
+.landing-nav,
+.landing-hero,
+.landing-chapter,
+.landing-end {
+  position: relative;
+  z-index: 1;
+}
+
+.landing-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.1rem 6vw;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: linear-gradient(180deg, rgba(6, 20, 27, 0.85), transparent);
+}
+
+.brand-lockup {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.brand-mark {
+  width: 1.7rem;
+  height: 1.7rem;
+  display: block;
+  background: conic-gradient(from 210deg, #1fbf5a, #9ee6b8, #0d7a38);
+  clip-path: polygon(50% 0%, 100% 78%, 78% 100%, 50% 72%, 22% 100%, 0 78%);
+}
+
+.brand-lockup strong {
+  display: block;
+  font-family: "Outfit", var(--sans);
+  letter-spacing: -0.03em;
+}
+
+.brand-lockup em {
+  display: block;
+  font-style: normal;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9ee6b8;
+}
+
+.landing-nav nav {
+  display: flex;
+  gap: 1.25rem;
+  align-items: center;
+}
+
+.landing-nav a {
+  text-decoration: none;
+  font-size: 0.92rem;
+  color: #cfe6d7;
+}
+
+.landing-nav a:last-child {
+  border: 1px solid #1fbf5a;
+  color: #06141b;
+  background: #1fbf5a;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  font-weight: 650;
+}
+
+.landing-hero {
+  min-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 12vh 8vw 8vh;
+  max-width: 58rem;
+}
+
+.landing h1,
+.landing h2 {
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 560;
+  letter-spacing: -0.03em;
+  line-height: 1.08;
+}
+
+.landing h1 {
+  font-size: clamp(2.2rem, 5vw, 4.4rem);
+  margin: 0.2rem 0 1rem;
+}
+
+.landing .lede {
+  font-size: 1.15rem;
+  max-width: 38rem;
+  color: #c5ddd0;
+}
+
+.landing-cta {
+  display: flex;
+  gap: 0.75rem;
+  margin: 1.6rem 0 2.4rem;
+  flex-wrap: wrap;
+}
+
+.landing .btn {
+  text-decoration: none;
+  border-radius: 999px;
+  padding: 0.7rem 1.15rem;
+  font-weight: 650;
+}
+
+.landing .btn.solid {
+  background: #1fbf5a;
+  color: #06141b;
+  border-color: #1fbf5a;
+}
+
+.landing .btn.ghost {
+  background: transparent;
+  color: #e8f4ec;
+  border-color: #3d5e4c;
+}
+
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0;
+}
+
+.stat-row dt {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #8fb59d;
+}
+
+.stat-row dd {
+  margin: 0.2rem 0 0;
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 1.15rem;
+}
+
+.landing-chapter {
+  min-height: 78vh;
+  padding: 18vh 8vw 10vh;
+  max-width: 40rem;
+  opacity: 0.38;
+  transition: opacity 0.4s ease;
+}
+
+.landing-chapter.is-active {
+  opacity: 1;
+}
+
+.landing-chapter h2,
+.landing-end h2 {
+  font-size: clamp(1.8rem, 3.4vw, 3rem);
+  margin: 0.2rem 0 0.9rem;
+}
+
+.landing-end {
+  padding: 18vh 8vw 12vh;
+  max-width: 42rem;
+}
+
+@media (max-width: 720px) {
+  .stat-row {
+    grid-template-columns: 1fr;
+  }
+  .landing-nav nav a:not(:last-child) {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-chapter {
+    opacity: 1;
+  }
+}

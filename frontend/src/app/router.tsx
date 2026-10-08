@@ -1,23 +1,30 @@
-import { createRootRoute, createRoute, createRouter, redirect } from "@tanstack/react-router";
+import { Outlet, createRootRoute, createRoute, createRouter, useRouterState } from "@tanstack/react-router";
 import { Shell } from "../components/Shell";
 import { InvestigatorCasesPage } from "../features/cases/InvestigatorCasesPage";
 import { LoginPage } from "../features/auth/LoginPage";
+import { LandingPage } from "../features/landing/LandingPage";
 import { ManagerQueuePage } from "../features/queue/ManagerQueuePage";
 import { WorkspacePage } from "../features/workspace/WorkspacePage";
 import { AuditPage } from "../features/audit/AuditPage";
 import { WikiProposalDetailPage } from "../features/wiki/WikiProposalDetailPage";
 import { WikiProposalsPage } from "../features/wiki/WikiProposalsPage";
 
+function Root() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  if (pathname === "/" || pathname === "/login") {
+    return <Outlet />;
+  }
+  return <Shell />;
+}
+
 const rootRoute = createRootRoute({
-  component: Shell,
+  component: Root,
 });
 
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  beforeLoad: () => {
-    throw redirect({ to: "/login" });
-  },
+  component: LandingPage,
 });
 
 const loginRoute = createRoute({
