@@ -122,7 +122,7 @@
 
 .case-cell {
   display: grid;
-  gap: 0.1rem;
+  gap: 0.18rem;
 }
 
 .case-cell strong {
@@ -132,7 +132,74 @@
 }
 
 .queue-page .control-board {
-  grid-template-columns: repeat(2, minmax(12rem, 1fr)) auto;
+  grid-template-columns: repeat(2, minmax(14rem, 1fr));
+  gap: 1rem 1.5rem;
+  align-items: start;
+}
+
+.queue-page .control-board .btn.solid {
+  justify-self: start;
+  align-self: end;
+}
+
+.queue-page .toolbar {
+  align-items: flex-end;
+  margin: 0 0 0.85rem;
+  gap: 0.85rem;
+}
+
+.queue-page .toolbar label {
+  min-width: 8.5rem;
+}
+
+.queue-page .table-wrap {
+  overflow-x: auto;
+}
+
+.queue-page .queue-grid {
+  width: 100%;
+  min-width: 960px;
+}
+
+.queue-page .queue-grid th,
+.queue-page .queue-grid td {
+  vertical-align: middle;
+  padding: 0.58rem 0.5rem;
+}
+
+.queue-page .queue-grid th.num,
+.queue-page .queue-grid td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.queue-page .queue-grid th.check,
+.queue-page .queue-grid td.check {
+  width: 2.6rem;
+  text-align: center;
+  padding-left: 0.7rem;
+  padding-right: 0.35rem;
+}
+
+.case-id-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+}
+
+.today-rank {
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.harm-cell,
+.factors-cell,
+.override-cell {
+  white-space: nowrap;
 }
 
 .factor-bars {
@@ -151,6 +218,19 @@
   color: var(--ink-2);
 }
 .factor-bars.compact li { font-size: 0.62rem; grid-template-columns: 3.6rem 1fr 2rem; }
+.factor-bars.strip {
+  display: flex;
+  gap: 0.2rem;
+  align-items: center;
+  margin: 0;
+  width: 6.8rem;
+}
+.factor-bars.strip li {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  grid-template-columns: none;
+}
 .factor-track {
   display: block;
   height: 6px;
@@ -158,6 +238,7 @@
   border-radius: 99px;
   overflow: hidden;
 }
+.factor-bars.strip .factor-track { height: 9px; }
 .factor-track i {
   display: block;
   height: 100%;
@@ -176,7 +257,12 @@
   box-shadow: var(--shadow);
 }
 .override-form textarea { width: 100%; }
-.override-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.4rem; }
+.override-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0; }
+.queue-page .override-actions .btn {
+  padding: 0.28rem 0.6rem;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
 
 .sla-chip {
   display: inline-block;
@@ -186,6 +272,7 @@
   border-radius: 999px;
   background: #eef4f1;
   color: #1f3a40;
+  white-space: nowrap;
 }
 .sla-chip.sla-ok { background: #e3f6ea; color: #0d7a38; }
 .sla-chip.sla-warn { background: #f4ead3; color: #6d5a32; }

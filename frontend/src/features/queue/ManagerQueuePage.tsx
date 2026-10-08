@@ -7,7 +7,16 @@ import { useAuth } from "../../auth/AuthProvider";
 import { CaseDrawer } from "../../components/CaseDrawer";
 import { EvidenceBar } from "../../components/EvidenceBar";
 import { HarmBadge, LaneBadge, StatusBadge } from "../../components/Badge";
-import { hours, horizonRisk, money, pct, screeningLabel, screeningTone, whyPriority } from "../../lib/format";
+import {
+  hours,
+  horizonRisk,
+  money,
+  pct,
+  screeningLabel,
+  screeningShort,
+  screeningTone,
+  whyPriority,
+} from "../../lib/format";
 import { readStoredRun, writeStoredRun } from "../../lib/runStore";
 import { QueueScene } from "../../three/QueueScene";
 import { FactorBars } from "./FactorBars";
@@ -603,25 +612,23 @@ export function ManagerQueuePage() {
           )}
 
           <div className="table-wrap">
-            <table className="grid">
+            <table className="grid queue-grid">
               <thead>
                 <tr>
-                  <th>Compare</th>
+                  <th className="check"> </th>
                   <th>Case</th>
-                  <th>Entity</th>
                   <th>Lane</th>
                   <th>Status</th>
-                  <th>45-day</th>
-                  <th>P(confirm)</th>
-                  <th>Horizon risk</th>
-                  <th>EV</th>
-                  <th>Flagged</th>
-                  <th>Members</th>
-                  <th>Sev</th>
+                  <th className="num">45-day</th>
+                  <th className="num">P(confirm)</th>
+                  <th className="num">Horizon</th>
+                  <th className="num">EV</th>
+                  <th className="num">Flagged</th>
+                  <th className="num">Members</th>
+                  <th>Harm</th>
                   <th>Evidence</th>
-                  <th>Hours</th>
-                  <th>Factors</th>
-                  <th>Why this rank</th>
+                  <th className="num">Hours</th>
+                  <th title="Severity · Exposure · Members · Evidence · Urgency">Factors</th>
                   <th>Override</th>
                 </tr>
               </thead>
@@ -718,10 +725,12 @@ function QueueRow({
   const risk = horizonRisk(row, horizon);
   const sla = screeningTone(row.screening_days_left);
   const today = row.lane === "harm_priority" || row.lane === "selected";
+  const why = whyPriority(row);
   return (
     <tr
       className={`lane-${row.lane} ${row.harm >= 4 ? "is-harm" : ""} ${selected ? "is-open" : ""}`}
       tabIndex={0}
+      title={why}
       onClick={onOpen}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -730,7 +739,7 @@ function QueueRow({
         }
       }}
     >
-      <td>
+      <td className="check">
         <input
           type="checkbox"
           aria-label={`Compare ${row.case_id}`}
@@ -741,41 +750,43 @@ function QueueRow({
       </td>
       <td>
         <div className="case-cell">
-          <strong className="mono">{row.case_id}</strong>
+          <div className="case-id-row">
+            <strong className="mono">{row.case_id}</strong>
+            {row.queue_rank ? <span className="today-rank">#{row.queue_rank}</span> : null}
+          </div>
+          <span className="mono muted">{row.primary_entity_id}</span>
+          {row.override && (
+            <span className="muted">Human {row.override.action}</span>
+          )}
         </div>
       </td>
-      <td className="mono">{row.primary_entity_id}</td>
       <td>
         <LaneBadge lane={row.lane} />
       </td>
       <td>
         <StatusBadge status={row.status} />
       </td>
-      <td>
-        <span className={`sla-chip sla-${sla}`}>{screeningLabel(row.screening_days_left)}</span>
+      <td className="num">
+        <span className={`sla-chip sla-${sla}`} title={screeningLabel(row.screening_days_left)}>
+          {screeningShort(row.screening_days_left)}
+        </span>
       </td>
-      <td className="mono">{pct(row.p_confirm)}</td>
-      <td className="mono">{pct(risk)}</td>
-      <td className="mono">{money(row.expected_value ?? 0)}</td>
-      <td className="mono dollars">{money(row.flagged_dollars)}</td>
-      <td className="mono">{row.members_affected}</td>
-      <td>
+      <td className="mono num">{pct(row.p_confirm)}</td>
+      <td className="mono num">{pct(risk)}</td>
+      <td className="mono num">{money(row.expected_value ?? 0)}</td>
+      <td className="mono num dollars">{money(row.flagged_dollars)}</td>
+      <td className="mono num">{row.members_affected}</td>
+      <td className="harm-cell">
         <HarmBadge harm={row.harm} />
-        <span className="muted"> / {row.severity}</span>
       </td>
       <td>
         <EvidenceBar value={row.evidence_strength} />
       </td>
-      <td className="mono">{hours(row.estimated_hours)}</td>
-      <td>
-        <FactorBars factors={row.rank_factors} compact />
-        {row.queue_rank ? <p className="muted mono">Today #{row.queue_rank}</p> : null}
+      <td className="mono num">{hours(row.estimated_hours)}</td>
+      <td className="factors-cell">
+        <FactorBars factors={row.rank_factors} variant="strip" />
       </td>
-      <td className="why">
-        {whyPriority(row)}
-        {row.override && <p className="muted">Human {row.override.action}: {row.override.reason}</p>}
-      </td>
-      <td>
+      <td className="override-cell">
         {canOverride && (
           <div className="override-actions" onClick={(e) => e.stopPropagation()}>
             {!today && (

@@ -91,6 +91,12 @@ export function screeningLabel(days: number | null | undefined): string {
   return `${days}d left on 45-day screen`;
 }
 
+export function screeningShort(days: number | null | undefined): string {
+  if (days === null || days === undefined) return "—";
+  if (days < 0) return `${Math.abs(days)}d past`;
+  return `${days}d`;
+}
+
 export function screeningTone(days: number | null | undefined): "ok" | "warn" | "hot" | "none" {
   if (days === null || days === undefined) return "none";
   if (days <= 7) return "hot";
