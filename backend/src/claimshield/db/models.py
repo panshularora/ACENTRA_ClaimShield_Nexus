@@ -385,3 +385,50 @@ class PipelineRun(Base):
     summary: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     created_by: Mapped[str] = mapped_column(String(32))
+
+
+class Label(Base):
+    __tablename__ = "label"
+
+    label_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    case_id: Mapped[str] = mapped_column(String(32), index=True)
+    decision_id: Mapped[str] = mapped_column(String(32), index=True)
+    action: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    scheme_tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    rule_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    approved_by: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class WikiProposal(Base):
+    __tablename__ = "wiki_proposal"
+
+    proposal_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(32), default="precedent", index=True)
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    source_case_id: Mapped[str] = mapped_column(String(32), index=True)
+    decision_id: Mapped[str] = mapped_column(String(32), index=True)
+    body: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_by: Mapped[str] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    reviewed_by: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    page_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+
+class WikiPage(Base):
+    __tablename__ = "wiki_page"
+
+    page_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    slug: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    type: Mapped[str] = mapped_column(String(32), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    status: Mapped[str] = mapped_column(String(16), default="published")
+    body: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    source_proposal_id: Mapped[str] = mapped_column(String(32), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    approved_by: Mapped[str] = mapped_column(String(32))

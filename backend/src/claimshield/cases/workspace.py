@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from claimshield.audit.service import append_event
+from claimshield.audit.service import append_event, chain_status
 from claimshield.auth.rbac import has_permission
 from claimshield.core.clock import canonical_iso
 from claimshield.core.errors import NotFound, ValidationFailed
@@ -29,6 +29,7 @@ from claimshield.db.models import (
     Provider,
     Referral,
     User,
+    WikiPage,
 )
 
 ACTIONS = ("escalate", "monitor", "dismiss", "needs_evidence")
@@ -198,8 +199,24 @@ def serialize_case(session: Session, case: Case, user: User) -> dict[str, Any]:
         "alerts": [serialize_alert(a) for a in alerts],
         "evidence_gaps": evidence_gaps(alerts, case),
         "latest_decision": serialize_decision(latest) if latest else None,
+        "latest_proposal": _latest_proposal(session, case.case_id),
+        "latest_label": _latest_label(session, case.case_id),
         "member_unmask_permitted": can_unmask(user),
     }
+
+
+def _latest_proposal(session: Session, case_id: str) -> dict[str, Any] | None:
+    from claimshield.wiki.service import proposal_for_case, serialize_proposal
+
+    row = proposal_for_case(session, case_id)
+    return serialize_proposal(row) if row else None
+
+
+def _latest_label(session: Session, case_id: str) -> dict[str, Any] | None:
+    from claimshield.wiki.service import label_for_case, serialize_label
+
+    row = label_for_case(session, case_id)
+    return serialize_label(row) if row else None
 
 
 def _provider_card(provider: Provider | None, fallback_id: str) -> dict[str, Any]:
@@ -233,6 +250,7 @@ def serialize_decision(row: Decision) -> dict[str, Any]:
         "ladder_step": row.ladder_step,
         "reason": row.reason,
         "evidence_refs": row.evidence_refs or [],
+        "approved_by": row.approved_by,
         "created_at": iso(row.created_at),
     }
 
@@ -344,6 +362,13 @@ def evidence_item(session: Session, case: Case, item_id: str, user: User) -> dic
                 "estimated_hours": case.estimated_hours,
             },
         }
+    if kind in ("prec", "precedent"):
+        from claimshield.wiki.service import serialize_page
+
+        page = session.get(WikiPage, rest)
+        if page is None or page.status != "published":
+            raise NotFound("evidence item not found")
+        return {"item_id": item_id, "kind": "precedent", "payload": serialize_page(page)}
     raise NotFound("evidence item not found")
 
 
@@ -471,6 +496,27 @@ def template_brief(session: Session, case: Case, user: User) -> dict[str, Any]:
             "sentences": [{"text": action, "cites": metric_cite}],
         },
     ]
+    from claimshield.wiki.service import match_precedents
+
+    precedents = match_precedents(session, case)
+    if precedents:
+        sections.insert(
+            3,
+            {
+                "title": "Matched precedents",
+                "sentences": [
+                    {
+                        "text": (
+                            f"{hit['title']}. {hit['why_it_matches']} "
+                            f"Matching facts: {'; '.join(hit['matching_facts'])}. "
+                            f"Source case {hit['source_case']}. Citation {hit['citation']}."
+                        ),
+                        "cites": [_cite(hit["citation"], "precedent", hit["title"][:48])],
+                    }
+                    for hit in precedents
+                ],
+            },
+        )
     n_sents = sum(len(s["sentences"]) for s in sections)
     n_cited = sum(1 for s in sections for sent in s["sentences"] if sent["cites"])
     return {
@@ -483,6 +529,7 @@ def template_brief(session: Session, case: Case, user: User) -> dict[str, Any]:
         ],
         "action": action,
         "evidence_gaps": evidence_gaps(alerts, case),
+        "precedents": precedents,
         "sections": sections,
         "validator": {"checked": n_sents, "dropped": 0, "cited": n_cited},
     }
@@ -818,6 +865,10 @@ def record_decision(
         ts=now,
     )
     session.flush()
+    from claimshield.wiki.service import draft_precedent, serialize_label, serialize_proposal
+
+    proposal, label = draft_precedent(session, case=case, decision=row, user=user, now=now)
+    verification = chain_status(session)
     return {
         "decision_id": row.decision_id,
         "case_id": case.case_id,
@@ -833,6 +884,14 @@ def record_decision(
             "prev_hash": event.prev_hash,
             "ts": iso(event.ts),
             "action": event.action,
+            "actor": user.display_name,
+            "actor_id": user.id,
+            "case_id": case.case_id,
+            "reason": text,
+            "chain_intact": verification["intact"],
+            "last_seq": verification["last_seq"],
         },
+        "proposal": serialize_proposal(proposal),
+        "label": serialize_label(label),
         "note": "Potential FWA pattern requiring investigation. This is not an automatic fraud label.",
     }
