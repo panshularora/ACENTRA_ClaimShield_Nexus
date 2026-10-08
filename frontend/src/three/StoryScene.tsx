@@ -60,7 +60,7 @@ function ClaimCloud({
         MathUtils.lerp(z, Math.sin(s.a) * 1.6, cluster),
       );
       dummy.scale.setScalar(s.s * (0.55 + scatter * 0.5));
-      dummy.rotation.set(0.4, a, 0.2);
+      dummy.rotation.set(0, 0, 0);
       dummy.updateMatrix();
       ref.setMatrixAt(i, dummy.matrix);
     }
@@ -69,11 +69,11 @@ function ClaimCloud({
 
   return (
     <instancedMesh ref={mesh} args={[undefined, undefined, count]}>
-      <boxGeometry args={[0.11, 0.025, 0.16]} />
+      <sphereGeometry args={[0.055, 12, 12]} />
       <meshStandardMaterial
         color={palette.mint}
         emissive={palette.green}
-        emissiveIntensity={0.28}
+        emissiveIntensity={0.34}
         roughness={0.35}
         metalness={0.15}
       />
