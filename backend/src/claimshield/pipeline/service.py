@@ -23,6 +23,11 @@ from claimshield.rules.engine import AlertDraft
 from claimshield.synth.generator import Dataset, generate
 
 
+def is_priority_override(case: dict[str, Any]) -> bool:
+    """Beneficiary harm 4, or a program-integrity override (excluded party, services after death)."""
+    return int(case["harm"]) >= 4 or bool(case.get("priority_override"))
+
+
 def assign_lanes(
     cases: list[dict[str, Any]],
     *,
@@ -30,14 +35,19 @@ def assign_lanes(
     harm_capacity_share: float,
     evidence_min: float,
     max_slots: int = 20,
-) -> None:
-    harm = [c for c in cases if c["harm"] >= 4]
-    rest = [c for c in cases if c["harm"] < 4]
-    for case in harm:
+) -> dict[str, Any]:
+    """Fill the investigator hours: override cases first, then the knapsack on what is left.
+
+    Override hours count against capacity. When they alone exceed it, nothing else is selected
+    and the shortfall is reported, so the queue never silently commits more hours than exist.
+    """
+    override = [c for c in cases if is_priority_override(c)]
+    rest = [c for c in cases if not is_priority_override(c)]
+    for case in override:
         case["lane"] = "harm_priority"
-    harm_hours = sum(float(c["estimated_hours"]) for c in harm)
-    reserved = min(harm_hours, max(0.0, float(capacity_hours) * harm_capacity_share))
-    remaining = max(0.5, float(capacity_hours) - reserved)
+    capacity = max(0.0, float(capacity_hours))
+    override_hours = sum(float(c["estimated_hours"]) for c in override)
+    remaining = max(0.0, capacity - override_hours)
     needs = [c for c in rest if c["evidence_strength"] < evidence_min]
     workable = [c for c in rest if c["evidence_strength"] >= evidence_min]
     for case in needs:
@@ -47,6 +57,18 @@ def assign_lanes(
     for case in workable:
         case["lane"] = "selected" if case["case_id"] in chosen else "overflow"
     _apply_slot_cap(cases, max_slots=max_slots)
+    selected_hours = sum(float(c["estimated_hours"]) for c in cases if c["lane"] == "selected")
+    used = override_hours + selected_hours
+    return {
+        "capacity_hours": round(capacity, 1),
+        "priority_override_hours": round(override_hours, 1),
+        "selected_hours": round(selected_hours, 1),
+        "capacity_used_hours": round(used, 1),
+        "over_capacity_hours": round(max(0.0, used - capacity), 1),
+        "override_share": round(override_hours / capacity, 3) if capacity else None,
+        "override_share_warning": bool(capacity) and override_hours > harm_capacity_share * capacity,
+        "needs_evidence_hours": round(sum(float(c["estimated_hours"]) for c in needs), 1),
+    }
 
 
 def _apply_slot_cap(cases: list[dict[str, Any]], *, max_slots: int) -> None:
@@ -73,7 +95,6 @@ def detect(
     *,
     horizon_days: int,
     recovery: float,
-    harm_lambda: float,
     capacity_hours: float,
     harm_capacity_share: float = 0.35,
     evidence_min: float = 0.4,
@@ -88,12 +109,10 @@ def detect(
     artifact = risk_artifact or (load_artifact() if use_trained_risk else None)
     risk_model = score_cases(cases, tables, det, artifact=artifact)
     for case in cases:
-        case["expected_value"] = expected_value(
-            case, horizon_days=horizon_days, recovery=recovery, harm_lambda=harm_lambda
-        )
+        case["expected_value"] = expected_value(case, horizon_days=horizon_days, recovery=recovery)
         case["ev"] = case["expected_value"]
     attach_rank_factors(cases, horizon_days=horizon_days, member_weight=member_weight)
-    assign_lanes(
+    capacity = assign_lanes(
         cases,
         capacity_hours=capacity_hours,
         harm_capacity_share=harm_capacity_share,
@@ -107,6 +126,7 @@ def detect(
         "graph_nodes": graph.number_of_nodes(),
         "graph_edges": graph.number_of_edges(),
         "selected": selected,
+        "capacity": capacity,
         "ranking_policy": ranking_policy(
             max_slots=max_slots, member_weight=member_weight, capacity_hours=capacity_hours
         ),
@@ -137,6 +157,7 @@ def persist_detection(
                 primary_entity_type=case["primary_entity_type"],
                 entity_ids=case.get("entity_ids") or [case["primary_entity_id"]],
                 harm=case["harm"],
+                override_kinds=case.get("override_kinds") or [],
                 severity=case["severity"],
                 members_affected=case["members_affected"],
                 flagged_dollars=case["flagged_dollars"],
@@ -190,7 +211,6 @@ def execute_run(
     capacity_hours: float = 40.0,
     max_slots: int | None = None,
     member_weight: float | None = None,
-    harm_lambda: float | None = None,
     now: datetime | None = None,
 ) -> PipelineRun:
     instant = now or datetime.now(UTC)
@@ -207,12 +227,10 @@ def execute_run(
     session.flush()
     slots = int(max_slots if max_slots is not None else settings.max_queue_slots)
     impact = float(member_weight if member_weight is not None else settings.default_member_weight)
-    lambda_h = float(harm_lambda if harm_lambda is not None else settings.harm_lambda)
     result = detect(
         tables,
         horizon_days=horizon_days,
         recovery=settings.default_recovery_rate,
-        harm_lambda=lambda_h,
         capacity_hours=capacity_hours,
         harm_capacity_share=settings.harm_capacity_share,
         evidence_min=settings.evidence_strength_min,
@@ -233,7 +251,7 @@ def execute_run(
         "capacity_hours": capacity_hours,
         "horizon_days": horizon_days,
         "screening_days": int(settings.screening_days),
-        "harm_lambda": lambda_h,
+        "capacity": result["capacity"],
         "max_slots": slots,
         "member_weight": impact,
         "ranking_policy": result["ranking_policy"],
@@ -406,7 +424,6 @@ def recompute_run(
     capacity_hours: float = 40.0,
     max_slots: int | None = None,
     member_weight: float | None = None,
-    harm_lambda: float | None = None,
 ) -> PipelineRun:
     target = batch or latest_batch(session)
     if target is None:
@@ -422,7 +439,6 @@ def recompute_run(
         capacity_hours=capacity_hours,
         max_slots=max_slots,
         member_weight=member_weight,
-        harm_lambda=harm_lambda,
     )
     summary = dict(run.summary or {})
     summary["recompute"] = True

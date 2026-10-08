@@ -11,7 +11,6 @@ def test_comparison_peers_are_not_case_subjects(tiny_dataset) -> None:
         tiny_dataset.tables,
         horizon_days=60,
         recovery=0.5,
-        harm_lambda=250.0,
         capacity_hours=40.0,
         harm_capacity_share=0.35,
         evidence_min=0.4,
@@ -71,7 +70,6 @@ def test_ring_link_still_groups_providers(tiny_dataset) -> None:
         tiny_dataset.tables,
         horizon_days=60,
         recovery=0.5,
-        harm_lambda=250.0,
         capacity_hours=40.0,
     )
     g1 = tiny_dataset.ground_truth[tiny_dataset.ground_truth.scheme_id == "G1"].iloc[0]

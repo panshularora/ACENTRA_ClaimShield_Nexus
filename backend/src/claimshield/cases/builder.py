@@ -35,8 +35,14 @@ MEDIUM_KINDS = frozenset(
         "mileage_padding",
     }
 )
-HARM4_KINDS = frozenset({"after_death", "excluded_party", "excluded_owner"})
-HARM3_KINDS = frozenset({"inpatient_overlap", "doctor_shopping", "daily_minutes_cap"})
+# Beneficiary harm (CMS PIM scale, top = risk to a living member): a multi-prescriber opioid
+# pattern, services billed during an inpatient stay, and impossible daily therapy hours.
+HARM4_KINDS = frozenset({"doctor_shopping", "inpatient_overlap", "daily_minutes_cap"})
+# An excluded provider or owner still treating members is a potential unsafe-provider signal.
+HARM3_KINDS = frozenset({"excluded_party", "excluded_owner"})
+# Program-integrity override: act now (stop payment exposure, refer), whatever the dollar rank.
+# Services after death cannot harm that member, so they set priority, not harm.
+PRIORITY_OVERRIDE_KINDS = frozenset({"after_death", "excluded_party", "excluded_owner"})
 # Merge NPIs into one case only for a specific visible link. Statistical peers stay out.
 LINK_KINDS = frozenset({"identity_ring", "excluded_owner", "referral_monopoly"})
 
@@ -67,6 +73,7 @@ def build_cases(
         kinds = {str(a.evidence.get("kind")) for a in group}
         detectors = {a.detector for a in group}
         harm = _harm(kinds)
+        override_kinds = sorted(kinds & PRIORITY_OVERRIDE_KINDS)
         severity = _severity(kinds)
         evidence = _evidence_strength(kinds, detectors, group)
         n_providers = max(1, len(entity_ids))
@@ -89,6 +96,8 @@ def build_cases(
                 "members_affected": len(members),
                 "flagged_dollars": round(dollars, 2),
                 "harm": harm,
+                "priority_override": bool(override_kinds),
+                "override_kinds": override_kinds,
                 "severity": severity,
                 "evidence_strength": round(evidence, 3),
                 "estimated_hours": hours,

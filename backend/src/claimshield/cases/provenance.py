@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from claimshield.cases.builder import HARM4_KINDS, LINK_KINDS
+from claimshield.cases.builder import HARM4_KINDS, LINK_KINDS, PRIORITY_OVERRIDE_KINDS
 from claimshield.db.models import Alert, Batch, Case, PipelineRun
 from claimshield.rules.catalog import rule_title as catalog_title
 
@@ -116,7 +116,7 @@ def urgent_alerts(alerts: list[Alert]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for alert in alerts:
         kind = str((alert.evidence or {}).get("kind") or "")
-        if kind not in HARM4_KINDS:
+        if kind not in HARM4_KINDS | PRIORITY_OVERRIDE_KINDS:
             continue
         out.append(
             {

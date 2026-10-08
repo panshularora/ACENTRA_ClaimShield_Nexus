@@ -338,6 +338,8 @@ class Case(Base):
     primary_entity_type: Mapped[str] = mapped_column(String(16), default="provider")
     entity_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
     harm: Mapped[int] = mapped_column(Integer, default=1)
+    # Program-integrity override kinds (after_death, excluded_party, excluded_owner); empty = none.
+    override_kinds: Mapped[list[str]] = mapped_column(JSON, default=list)
     severity: Mapped[int] = mapped_column(Integer, default=1)
     members_affected: Mapped[int] = mapped_column(Integer, default=0)
     flagged_dollars: Mapped[float] = mapped_column(Float, default=0.0)

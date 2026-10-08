@@ -15,7 +15,7 @@ from claimshield.pipeline.service import (
     load_synthetic_batch,
     recompute_run,
 )
-from claimshield.queue.explain import run_payload, screening_days_left, why_rank
+from claimshield.queue.explain import LANE_LABELS, run_payload, screening_days_left, why_rank
 from claimshield.queue.rank import rank_pack_for_case, recommendation_for
 from claimshield.risk.present import risk_fields
 
@@ -49,7 +49,6 @@ class RecomputeBody(BaseModel):
     capacity_hours: float = Field(default=40.0, gt=0, le=10_000)
     max_slots: int = Field(default=20, ge=1, le=200)
     member_weight: float = Field(default=1.0, ge=0.25, le=3.0)
-    harm_lambda: float | None = Field(default=None, gt=0)
 
 
 @router.post("/batches", dependencies=[Depends(check_csrf)])
@@ -110,7 +109,6 @@ def start_run(
         capacity_hours=body.capacity_hours,
         max_slots=body.max_slots,
         member_weight=body.member_weight,
-        harm_lambda=body.harm_lambda,
     )
     n_alerts = session.execute(select(Alert).where(Alert.run_id == run.run_id)).scalars().all()
     n_cases = session.execute(select(Case).where(Case.run_id == run.run_id)).scalars().all()
@@ -267,6 +265,9 @@ def _case_brief(
         "primary_entity_id": case.primary_entity_id,
         "entity_ids": entity_ids,
         "harm": case.harm,
+        "priority_override": bool(case.override_kinds) or case.harm >= 4,
+        "override_kinds": case.override_kinds or [],
+        "lane_label": LANE_LABELS.get(case.lane, case.lane),
         "severity": case.severity,
         "members_affected": case.members_affected,
         "flagged_dollars": case.flagged_dollars,
@@ -287,7 +288,7 @@ def _case_brief(
         "alert_group": {
             "n_entities": n_entities,
             "n_alerts": n_alerts,
-            "urgent": case.harm >= 4,
+            "urgent": case.harm >= 4 or bool(case.override_kinds),
             "text": (
                 "Linked NPIs (owner, TIN, contact, or referral). Comparison peers are not in this case."
                 if n_entities > 1

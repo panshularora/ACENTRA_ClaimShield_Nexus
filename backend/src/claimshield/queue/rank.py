@@ -90,7 +90,7 @@ def factor_scores(
     dollars = float(_get(case, "flagged_dollars") or 0.0)
     evidence = float(_get(case, "evidence_strength") or 0.0)
     return {
-        "severity": round(min(1.0, max(harm, severity) / 5.0), 4),
+        "severity": round(min(1.0, max(harm, severity) / 4.0), 4),  # both scales run 1-4
         "exposure": round(min(1.0, dollars / max(dollar_scale, 1.0)), 4),
         "member": round(min(1.0, (harm * members) / max(member_scale, 1.0)), 4),
         "evidence": round(min(1.0, max(0.0, evidence)), 4),

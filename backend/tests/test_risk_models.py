@@ -22,7 +22,6 @@ def _detect(tables, **kwargs):
         tables,
         horizon_days=60,
         recovery=0.5,
-        harm_lambda=250.0,
         capacity_hours=40.0,
         **kwargs,
     )

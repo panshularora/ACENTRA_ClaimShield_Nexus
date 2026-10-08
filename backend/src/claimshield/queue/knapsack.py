@@ -1,14 +1,21 @@
 from __future__ import annotations
 
 
-def expected_value(case: dict, *, horizon_days: int, recovery: float, harm_lambda: float) -> float:
+def expected_value(case: dict, *, horizon_days: int, recovery: float) -> float:
+    """Expected recoverable dollars: P(confirm) x recovery rate x (flagged + run-rate to the horizon).
+
+    Dollars only. Member harm ranks cases through the composite score and the priority-override
+    lane; it is not converted into pseudo-dollars here.
+    """
     run_rate = case["flagged_dollars"] * (horizon_days / 90.0)
     dollars = case["flagged_dollars"] + run_rate
-    return case["p_confirm"] * recovery * dollars + harm_lambda * case["harm"] * max(1, case["members_affected"])
+    return float(case["p_confirm"] * recovery * dollars)
 
 
 def knapsack_select(cases: list[dict], *, capacity_hours: float, value_key: str = "ev") -> list[dict]:
-    units = max(1, int(round(capacity_hours * 2)))  # half hours
+    if capacity_hours < 0.5 or not cases:
+        return []
+    units = int(round(capacity_hours * 2))  # half hours
     n = len(cases)
     weights = [max(1, int(round(c["estimated_hours"] * 2))) for c in cases]
     values = [float(c.get(value_key, c.get("composite", c.get("ev", 0.0))) or 0.0) for c in cases]

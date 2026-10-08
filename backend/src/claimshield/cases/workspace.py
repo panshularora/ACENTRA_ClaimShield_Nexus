@@ -49,7 +49,7 @@ from claimshield.db.models import (
     User,
     WikiPage,
 )
-from claimshield.queue.explain import screening_days_left, why_rank
+from claimshield.queue.explain import LANE_LABELS, override_text, screening_days_left, why_rank
 from claimshield.queue.rank import rank_pack_for_case, recommendation_for
 from claimshield.risk.present import case_risk, risk_fields, score_label
 from claimshield.wiki.service import (
@@ -141,6 +141,9 @@ def serialize_case(session: Session, case: Case, user: User) -> dict[str, Any]:
         "entity_ids": entity_ids,
         "primary_entity": _provider_card(provider, case.primary_entity_id),
         "harm": case.harm,
+        "priority_override": bool(case.override_kinds) or case.harm >= 4,
+        "override_kinds": case.override_kinds or [],
+        "lane_label": LANE_LABELS.get(case.lane, case.lane),
         "severity": case.severity,
         "members_affected": case.members_affected,
         "flagged_dollars": case.flagged_dollars,
@@ -311,19 +314,19 @@ def template_brief(session: Session, case: Case, user: User) -> dict[str, Any]:
     top_kind = serialized[0]["label"] if serialized else "detector output"
     n_lines = len(line_ids_for(alerts))
     why_lane = (
-        "Harm override (harm ≥ 4) places this case in the harm-priority lane regardless of remaining hours."
+        override_text(case)
         if case.lane == "harm_priority"
         else (
             "Evidence strength is below the 0.40 floor, so the knapsack left this case in needs-evidence."
             if case.lane == "needs_evidence"
             else (
-                "The case sits in Monitor because it fell outside remaining investigator hours after knapsack fill."
+                "The case is on the tracked backlog because it fell outside remaining investigator hours after knapsack fill."
                 if case.lane == "overflow"
-                else "The capacity knapsack selected this case on expected value within remaining hours."
+                else "The capacity knapsack selected this case on its combined rank score within remaining hours."
             )
         )
     )
-    if case.harm >= 4:
+    if case.harm >= 4 or case.override_kinds:
         action = "Escalate for human review of a potential FWA pattern requiring investigation."
     elif case.evidence_strength < 0.4:
         action = "Needs more evidence before a screening recommendation can be made."

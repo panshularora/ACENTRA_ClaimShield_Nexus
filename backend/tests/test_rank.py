@@ -46,7 +46,6 @@ def test_slot_cap_keeps_overflow_open(tiny_dataset) -> None:
         tiny_dataset.tables,
         horizon_days=60,
         recovery=0.5,
-        harm_lambda=250.0,
         capacity_hours=200,
         max_slots=3,
         member_weight=1.0,
@@ -72,6 +71,27 @@ def test_needs_evidence_stays_out_of_today_knapsack() -> None:
     assert by_id["H"] == "harm_priority"
     assert by_id["E"] == "needs_evidence"
     assert by_id["S"] == "selected"
+
+
+def test_override_lane_uses_capacity_and_reports_overrun() -> None:
+    cases = [
+        _case(case_id="O1", evidence_strength=0.9, harm=2, estimated_hours=30.0, priority_override=True),
+        _case(case_id="H1", evidence_strength=0.9, harm=4, estimated_hours=20.0),
+        _case(case_id="S1", evidence_strength=0.8, harm=2, estimated_hours=4.0),
+    ]
+    attach_rank_factors(cases, horizon_days=60, member_weight=1.0)
+    summary = assign_lanes(cases, capacity_hours=40, harm_capacity_share=0.35, evidence_min=0.4, max_slots=20)
+    by_id = {c["case_id"]: c["lane"] for c in cases}
+    assert by_id == {"O1": "harm_priority", "H1": "harm_priority", "S1": "overflow"}
+    assert summary["priority_override_hours"] == 50.0
+    assert summary["capacity_used_hours"] == 50.0
+    assert summary["over_capacity_hours"] == 10.0
+    assert summary["override_share_warning"] is True
+
+    roomy = assign_lanes(cases, capacity_hours=60, harm_capacity_share=0.35, evidence_min=0.4, max_slots=20)
+    assert {c["case_id"]: c["lane"] for c in cases}["S1"] == "selected"
+    assert roomy["over_capacity_hours"] == 0.0
+    assert roomy["capacity_used_hours"] == 54.0
 
 
 def test_weights_renormalize_with_member_scale() -> None:

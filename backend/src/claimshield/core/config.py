@@ -30,7 +30,6 @@ class Settings(BaseSettings):
     evidence_strength_min: float = 0.4
     harm_capacity_share: float = 0.35
     harm_override_level: int = 4
-    harm_lambda: float = 250.0
     screening_days: int = 45
     max_queue_slots: int = 20
     default_member_weight: float = 1.0

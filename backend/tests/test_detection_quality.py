@@ -16,7 +16,6 @@ def _run(tiny_dataset, capacity_hours: float = 40.0):
         tiny_dataset.tables,
         horizon_days=60,
         recovery=0.5,
-        harm_lambda=250.0,
         capacity_hours=capacity_hours,
         harm_capacity_share=0.35,
         evidence_min=0.4,
@@ -67,15 +66,36 @@ def test_stay_compression_detected(tiny_dataset) -> None:
     assert "stay_compression" in kinds
 
 
-def test_harm_lane_does_not_consume_capacity(tiny_dataset) -> None:
+def test_override_hours_count_against_capacity(tiny_dataset) -> None:
+    for hours in (8, 40, 120):
+        result = _run(tiny_dataset, capacity_hours=hours)
+        cap = result["capacity"]
+        committed = sum(c["estimated_hours"] for c in result["cases"] if c["lane"] in {"harm_priority", "selected"})
+        override = sum(c["estimated_hours"] for c in result["cases"] if c["lane"] == "harm_priority")
+        assert abs(cap["capacity_used_hours"] - committed) < 0.11
+        assert abs(cap["priority_override_hours"] - override) < 0.11
+        # Selected work only fills what the override lane leaves; any overrun comes from overrides alone.
+        assert cap["selected_hours"] <= max(0.0, hours - override) + 1e-6
+        assert cap["over_capacity_hours"] == round(max(0.0, committed - hours), 1)
     low = _run(tiny_dataset, capacity_hours=40)
     high = _run(tiny_dataset, capacity_hours=120)
     lanes_low = Counter(c["lane"] for c in low["cases"])
     lanes_high = Counter(c["lane"] for c in high["cases"])
-    assert lanes_low["harm_priority"] <= 4
-    assert lanes_low["selected"] >= 1
     assert lanes_high["selected"] > lanes_low["selected"]
     assert lanes_low["needs_evidence"] >= 1 or lanes_high["needs_evidence"] >= 1
+
+
+def test_member_harm_comes_from_safety_signals(tiny_dataset) -> None:
+    result = _run(tiny_dataset)
+    for case in result["cases"]:
+        kinds = {a.evidence.get("kind") for a in case["alerts"]}
+        if case["harm"] >= 4:
+            assert kinds & {"doctor_shopping", "inpatient_overlap", "daily_minutes_cap"}
+        if kinds == {"after_death"}:
+            assert case["harm"] < 4 and case["priority_override"] is True
+        if case["priority_override"]:
+            assert case["lane"] == "harm_priority"
+            assert set(case["override_kinds"]) <= {"after_death", "excluded_party", "excluded_owner"}
 
 
 def test_heuristic_fallback_hazard_is_monotonic() -> None:
