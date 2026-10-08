@@ -7,14 +7,14 @@ const CHAPTERS = [
   {
     kicker: "Acentra Health code-a-thon · Problem 3",
     title: "ClaimShield Nexus",
-    body: "Post-adjudication program integrity for Medicaid-like claims. Built to sit downstream of eCAMS and feed an SIU — not to label anyone as fraud.",
+    body: "Post-adjudication program integrity for Medicaid-like claims. Designed to sit downstream of a claims system such as eCAMS and feed an SIU — not to label anyone as fraud. No eCAMS integration exists in this prototype.",
     points: [
       "Lives after adjudication. It does not recode or deny a claim.",
       "Ranks suspicion for scarce investigator hours. A flag is a queue position.",
       "Due process stays with the state: humans decide, models cite.",
     ],
     facts: [
-      { value: "eCAMS", label: "Sits downstream of the claims engine" },
+      { value: "Downstream", label: "Designed to sit after a claims engine such as eCAMS" },
       { value: "SIU", label: "Built for special investigations, not pay-and-chase noise" },
       { value: "Recommend", label: "Never prints fraud on a provider" },
     ],
