@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session
 from claimshield.api.cookies import clear_auth_cookies, set_auth_cookies
 from claimshield.api.deps import check_csrf, get_current_user, get_db
 from claimshield.auth.rbac import PERMISSIONS, Role
-from claimshield.auth.service import authenticate, logout, rotate_refresh
+from claimshield.auth.service import authenticate, logout, rotate_refresh, user_from_access
 from claimshield.core.config import Settings, get_settings
-from claimshield.core.errors import Unauthorized
+from claimshield.core.errors import Forbidden, Unauthorized
 from claimshield.db.models import User
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
@@ -106,4 +106,47 @@ def me(user: User = Depends(get_current_user)) -> UserOut:
         role=user.role,
         display_name=user.display_name,
         permissions=_permissions(user.role),
+    )
+
+
+class SessionOut(BaseModel):
+    authenticated: bool
+    user: UserOut | None = None
+    refresh_available: bool = Field(
+        default=False,
+        description="No valid access token, but a refresh cookie is present: POST /auth/refresh may restore it.",
+    )
+
+
+@router.get("/session")
+def session_status(
+    request: Request,
+    session: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> SessionOut:
+    """Who is signed in, answering 200 for anonymous visitors (unlike /me, which answers 401).
+
+    Lets the landing and login pages check the session without a console error. It discloses
+    nothing an anonymous caller does not already know: no token means ``authenticated: false``.
+    """
+    token = request.cookies.get(settings.access_cookie_name)
+    if not token:
+        header = request.headers.get("authorization") or ""
+        token = header[7:] if header.lower().startswith("bearer ") else None
+    refresh_available = bool(request.cookies.get(settings.refresh_cookie_name))
+    if not token:
+        return SessionOut(authenticated=False, refresh_available=refresh_available)
+    try:
+        user = user_from_access(session, settings, token)
+    except (Unauthorized, Forbidden):
+        return SessionOut(authenticated=False, refresh_available=refresh_available)
+    return SessionOut(
+        authenticated=True,
+        user=UserOut(
+            id=user.id,
+            email=user.email,
+            role=user.role,
+            display_name=user.display_name,
+            permissions=_permissions(user.role),
+        ),
     )

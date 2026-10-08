@@ -13,6 +13,7 @@ from claimshield.api.routers import aws as aws_router
 from claimshield.api.routers import batches as batches_router
 from claimshield.api.routers import cases as cases_router
 from claimshield.api.routers import decisions as decisions_router
+from claimshield.api.routers import entities as entities_router
 from claimshield.api.routers import health as health_router
 from claimshield.api.routers import models as models_router
 from claimshield.api.routers import wiki as wiki_router
@@ -66,6 +67,7 @@ def create_app() -> FastAPI:
     app.include_router(audit_router.router)
     app.include_router(wiki_router.router)
     app.include_router(decisions_router.router)
+    app.include_router(entities_router.router)
     app.include_router(aws_router.router)
     app.include_router(models_router.router)
     return app

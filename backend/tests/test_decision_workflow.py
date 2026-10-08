@@ -42,10 +42,18 @@ def test_escalation_needs_owner_then_manager_approval(client: TestClient) -> Non
     detail = client.get(f"/api/v1/cases/{case_id}").json()
     assert detail["allowed_actions"] == []
     assert detail["decision_blocked_reason"]
-    escalate_steps = {o["step"]: o for o in detail["decision_options"]["escalate"]}
-    assert escalate_steps["state_pi_referral"]["default"] is True
+    assert detail["can_decide"] is False
+    opts = client.get(f"/api/v1/cases/{case_id}/decision-options").json()
+    assert opts["can_decide"] is False
+    assert "ownership" in opts["blocked_reason"]
+    assert not any(o["enabled"] for o in opts["options"])
+    escalate = next(o for o in opts["options"] if o["id"] == "escalate")
+    assert escalate["requires_approval"] is True
+    assert escalate["resulting_status"] == "pending_approval"
+    assert escalate["default_step"] == "state_pi_referral"
+    escalate_steps = {o["step"]: o for o in escalate["ladder"]}
     assert "mfcu_referral" not in escalate_steps
-    assert all(o["requires_approval"] for o in escalate_steps.values())
+    assert escalate_steps["payment_suspension_recommend"]["requires_basis_on_approval"] is True
     assert "state agency decision" in escalate_steps["payment_suspension_recommend"]["label"]
 
     assert client.post(f"/api/v1/cases/{case_id}/assign", json={}).status_code == 200
@@ -77,6 +85,10 @@ def test_escalation_needs_owner_then_manager_approval(client: TestClient) -> Non
     assert detail["status"] == "pending_approval"
     assert detail["pending_decision"]["decision_id"] == decision_id
     assert {"approve", "reject"} <= set(detail["allowed_actions"])
+    manager_opts = client.get(f"/api/v1/cases/{case_id}/decision-options").json()
+    assert manager_opts["can_approve"] is True
+    assert manager_opts["can_decide"] is False
+    assert manager_opts["pending_decision"]["decision_id"] == decision_id
     approved = client.post(f"/api/v1/decisions/{decision_id}:approve", json={"note": "Basis reviewed."})
     assert approved.status_code == 200, approved.text
     assert approved.json()["status"] == "escalated"

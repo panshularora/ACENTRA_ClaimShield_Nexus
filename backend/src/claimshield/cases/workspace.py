@@ -27,7 +27,7 @@ from claimshield.cases.decisions import (
     pending_decision,
     serialize_decision,
 )
-from claimshield.cases.network import node_detail
+from claimshield.cases.network import network_edge, node_detail
 from claimshield.cases.provenance import alert_lineage, case_provenance, grouping_from_alerts
 from claimshield.core.errors import Forbidden, NotFound, ValidationFailed
 from claimshield.core.ids import new_id
@@ -172,6 +172,7 @@ def serialize_case(session: Session, case: Case, user: User) -> dict[str, Any]:
         "latest_decision": serialize_decision(latest) if latest else None,
         "pending_decision": serialize_decision(pending) if pending else None,
         "allowed_actions": allowed_actions(session, case, user),
+        "can_decide": decision_block_reason(case, user) is None,
         "decision_blocked_reason": decision_block_reason(case, user),
         "decision_options": decision_options(),
         "latest_proposal": _latest_proposal(session, case.case_id),
@@ -232,7 +233,8 @@ def claims_pack(
 
 
 def evidence_item(session: Session, case: Case, item_id: str, user: User) -> dict[str, Any]:
-    reveal = can_unmask(user)
+    # Evidence cards are masked; member identity is revealed only through the audited unmask paths.
+    reveal = False
     kind, _, rest = item_id.partition(":")
     if not rest:
         kind, rest = "alert", item_id
@@ -264,6 +266,9 @@ def evidence_item(session: Session, case: Case, item_id: str, user: User) -> dic
     if kind == "node":
         detail = node_detail(session, case, user, rest)
         return {"item_id": item_id, "kind": "node", "payload": detail.model_dump(exclude_none=True)}
+    if kind == "edge":
+        edge = network_edge(session, case, user, rest)
+        return {"item_id": item_id, "kind": "edge", "payload": edge.model_dump(exclude_none=True)}
     if kind == "metric":
         return {
             "item_id": item_id,

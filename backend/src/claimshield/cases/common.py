@@ -164,6 +164,25 @@ def claim_rows(session: Session, alerts: list[Alert], *, reveal: bool) -> list[d
         return []
 
     lines = list(session.execute(select(ClaimLine).where(ClaimLine.line_id.in_(lids))).scalars().all())
+    by_line: dict[str, list[dict[str, Any]]] = {}
+    for alert in alerts:
+        payload = serialize_alert(alert)
+        for lid in alert.line_ids or []:
+            by_line.setdefault(lid, []).append(
+                {"alert_id": payload["alert_id"], "rule_id": payload["rule_id"], "label": payload["label"]}
+            )
+    return serialize_lines(session, lines, reveal=reveal, signals=by_line)
+
+
+def serialize_lines(
+    session: Session,
+    lines: list[ClaimLine],
+    *,
+    reveal: bool,
+    signals: dict[str, list[dict[str, Any]]] | None = None,
+) -> list[dict[str, Any]]:
+    """Claim-line rows (ClaimRow shape) sorted by date of service, members masked unless revealed."""
+    by_line = signals or {}
     claim_ids = {ln.claim_id for ln in lines}
     claims = {
         c.claim_id: c
@@ -174,14 +193,6 @@ def claim_rows(session: Session, alerts: list[Alert], *, reveal: bool) -> list[d
         m.member_id: m
         for m in session.execute(select(Member).where(Member.member_id.in_(member_ids))).scalars().all()
     }
-    by_line: dict[str, list[dict[str, Any]]] = {}
-    for alert in alerts:
-        payload = serialize_alert(alert)
-        for lid in alert.line_ids or []:
-            by_line.setdefault(lid, []).append(
-                {"alert_id": payload["alert_id"], "rule_id": payload["rule_id"], "label": payload["label"]}
-            )
-
     rows = []
     for ln in lines:
         claim = claims.get(ln.claim_id)

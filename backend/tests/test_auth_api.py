@@ -98,3 +98,18 @@ def test_failed_login_is_audited(client: TestClient) -> None:
 
 def test_overlong_password_is_rejected(client: TestClient) -> None:
     assert _login(client, "investigator@demo.claimshield", "x" * 257).status_code == 422
+
+
+def test_session_status_answers_anonymous_visitors_with_200(client: TestClient) -> None:
+    anonymous = client.get("/api/v1/auth/session")
+    assert anonymous.status_code == 200
+    assert anonymous.json() == {"authenticated": False, "user": None, "refresh_available": False}
+    assert client.get("/api/v1/auth/me").status_code == 401
+    assert _login(client, "manager@demo.claimshield", "demo-manager").status_code == 200
+    signed_in = client.get("/api/v1/auth/session").json()
+    assert signed_in["authenticated"] is True
+    assert signed_in["user"]["role"] == "manager"
+    client.cookies.set("cs_access", "not-a-jwt")
+    stale = client.get("/api/v1/auth/session").json()
+    assert stale["authenticated"] is False
+    assert stale["refresh_available"] is True

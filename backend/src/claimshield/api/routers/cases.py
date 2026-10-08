@@ -10,7 +10,13 @@ from sqlalchemy.orm import Session
 from claimshield.api.deps import check_csrf, get_current_user, get_db, require
 from claimshield.auth.rbac import has_permission
 from claimshield.cases.common import get_case_or_404
-from claimshield.cases.decisions import MAX_EVIDENCE_REFS, MAX_REASON, record_decision, reopen_case
+from claimshield.cases.decisions import (
+    MAX_EVIDENCE_REFS,
+    MAX_REASON,
+    decision_options_for,
+    record_decision,
+    reopen_case,
+)
 from claimshield.cases.network import DEFAULT_REFERRAL_TOP_N, network_pack, node_detail
 from claimshield.cases.network_models import NetworkPack, NodeDetail
 from claimshield.cases.workspace import (
@@ -117,6 +123,17 @@ def get_network_node(
     """Click-through for one network node: linked alerts, flagged claim lines and connections."""
     case = get_case_or_404(session, case_id)
     return node_detail(session, case, user, node_id, unmask=unmask)
+
+
+@router.get("/{case_id}/decision-options")
+def get_decision_options(
+    case_id: str,
+    session: Session = Depends(get_db),
+    user: User = Depends(require("case:read")),
+) -> dict:
+    """Decision actions, ladder steps and what this user may do on this case right now."""
+    case = get_case_or_404(session, case_id)
+    return decision_options_for(session, case, user)
 
 
 @router.get("/{case_id}/evidence/{item_id}")

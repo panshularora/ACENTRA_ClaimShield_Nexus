@@ -111,20 +111,63 @@ def allowed_actions(session: Session, case: Case, user: User) -> list[str]:
     return verbs
 
 
-def decision_options() -> dict[str, list[dict[str, Any]]]:
-    """Ladder steps per action, with defaults and whether a manager must approve."""
-    return {
-        action: [
-            {
-                "step": step,
-                "label": LADDER_LABELS[step],
-                "default": step == DEFAULT_LADDER[action],
-                "requires_approval": action in APPROVAL_REQUIRED_ACTIONS,
-                "requires_basis_on_approval": step in BASIS_REQUIRED_STEPS,
-            }
-            for step in steps
-        ]
+ACTION_LABELS = {
+    "escalate": "Escalate to the State Medicaid agency",
+    "needs_evidence": "Request more evidence",
+    "monitor": "Monitor",
+    "dismiss": "Dismiss with reason",
+}
+ACTION_HINTS = {
+    "escalate": "Refer to the state program integrity unit. A manager must approve before the case closes.",
+    "needs_evidence": "Keep the case open and request records; decide again when they arrive.",
+    "monitor": "Keep the case open and watch for a recurrence; education letter by default.",
+    "dismiss": "Evidence does not support concern. Closes the case; a manager can reopen it.",
+}
+
+
+def decision_options() -> list[dict[str, Any]]:
+    """Every decision action with its ladder steps, defaults and approval requirements."""
+    return [
+        {
+            "id": action,
+            "label": ACTION_LABELS[action],
+            "hint": ACTION_HINTS[action],
+            "requires_approval": action in APPROVAL_REQUIRED_ACTIONS,
+            "closes_case": ACTION_STATUS[action] in CLOSED_STATUSES,
+            "resulting_status": PENDING_STATUS if action in APPROVAL_REQUIRED_ACTIONS else ACTION_STATUS[action],
+            "default_step": DEFAULT_LADDER[action],
+            "ladder": [
+                {
+                    "step": step,
+                    "label": LADDER_LABELS[step],
+                    "default": step == DEFAULT_LADDER[action],
+                    "requires_basis_on_approval": step in BASIS_REQUIRED_STEPS,
+                }
+                for step in steps
+            ],
+        }
         for action, steps in ACTION_STEPS.items()
+    ]
+
+
+def decision_options_for(session: Session, case: Case, user: User) -> dict[str, Any]:
+    """What this user can do on this case now, for a config-driven decision bar."""
+    allowed = allowed_actions(session, case, user)
+    blocked = decision_block_reason(case, user)
+    pending = pending_decision(session, case.case_id) if case.status == PENDING_STATUS else None
+    return {
+        "case_id": case.case_id,
+        "status": case.status,
+        "role": user.role,
+        "can_decide": blocked is None,
+        "blocked_reason": blocked,
+        "allowed_actions": allowed,
+        "can_approve": "approve" in allowed,
+        "can_reopen": "reopen" in allowed,
+        "pending_decision": serialize_decision(pending) if pending else None,
+        "min_reason_chars": MIN_REASON,
+        "max_reason_chars": MAX_REASON,
+        "options": [{**option, "enabled": option["id"] in allowed} for option in decision_options()],
     }
 
 

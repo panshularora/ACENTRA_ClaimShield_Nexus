@@ -75,6 +75,12 @@ def test_every_network_is_scoped_and_consistent(loaded: tuple[TestClient, list[d
             assert edge["kind"] != "shared_location", "addresses are hub nodes, not cliques"
             assert 0 < edge["weight"] <= 1
             assert edge["id"] == f"{edge['kind']}:{edge['source']}:{edge['target']}"
+            assert edge["direction"] == ("out" if edge["directed"] else "none")
+            assert edge["inferred"] == (edge["kind"] in {"shared_tin", "shared_contact"})
+            alert_refs = {f"alert:{a}" for a in edge["evidence"]["alert_ids"]}
+            assert alert_refs <= set(edge["evidence_ids"])
+        for node in net["nodes"]:
+            assert ("harm" in node) == node["is_subject"]
         referrals = [e for e in net["edges"] if e["kind"] == "referral"]
         assert all(e["directed"] and e["count"] >= 1 for e in referrals)
         for subject in net["subject_ids"]:
@@ -102,7 +108,7 @@ def test_ring_case_draws_its_evidence(loaded: tuple[TestClient, list[dict[str, A
     for pid in ring["evidence"]["peer_ids"]:
         assert nodes[pid]["is_subject"] and nodes[pid]["in_case"]
         assert ring["alert_id"] in nodes[pid]["alert_ids"]
-        assert nodes[pid]["n_flagged_lines"] >= 1 and nodes[pid]["flagged_dollars"] > 0
+        assert nodes[pid]["n_flagged_lines"] >= 1 and nodes[pid]["flagged_paid"] > 0
     owners = [n for n in net["nodes"] if n["type"] == "owner" and ring["alert_id"] in n["alert_ids"]]
     assert owners
 
@@ -158,6 +164,42 @@ def test_node_click_through(loaded: tuple[TestClient, list[dict[str, Any]]]) -> 
     evidence = client.get(f"/api/v1/cases/{case['case_id']}/evidence/node:{primary['id']}")
     assert evidence.status_code == 200
     assert evidence.json()["kind"] == "node"
+
+    # Edges are citable, and their evidence ids resolve through the same evidence route.
+    cited = next(e for e in net["edges"] if e["evidence_ids"])
+    edge_item = client.get(f"/api/v1/cases/{case['case_id']}/evidence/edge:{cited['id']}")
+    assert edge_item.status_code == 200, edge_item.text
+    assert edge_item.json()["payload"]["id"] == cited["id"]
+    for ref in cited["evidence_ids"][:3]:
+        assert client.get(f"/api/v1/cases/{case['case_id']}/evidence/{ref}").status_code == 200, ref
+
+
+def test_entity_summary_covers_context_nodes(loaded: tuple[TestClient, list[dict[str, Any]]]) -> None:
+    client, queue = loaded
+    case = _ring_case(client, queue)
+    net = _network(client, case["case_id"])
+    context = [n for n in net["nodes"] if n["type"] == "provider" and not n["in_case"]]
+    targets = [next(n for n in net["nodes"] if n["primary"]), *context[:1]]
+    for node in targets:
+        res = client.get(f"/api/v1/entities/{node['id']}/summary", params={"case_id": case["case_id"]})
+        assert res.status_code == 200, res.text
+        body = res.json()
+        assert body["entity_id"] == node["id"]
+        assert body["claims"]["n_lines"] >= len(body["claims"]["sample"])
+        assert body["claims"]["n_lines"] >= 1
+        assert all(r["member"]["masked"] for r in body["claims"]["sample"])
+        involved = [
+            r for r in body["claims"]["sample"]
+            if node["id"] in {r["billing_provider_id"], r["rendering_provider_id"], r["ordering_provider_id"]}
+        ]
+        assert len(involved) == len(body["claims"]["sample"])
+    primary_summary = client.get(
+        f"/api/v1/entities/{targets[0]['id']}/summary", params={"case_id": case["case_id"]}
+    ).json()
+    assert any(c["case_id"] == case["case_id"] for c in primary_summary["cases"])
+    assert {a["alert_id"] for a in primary_summary["alerts"]} >= set(targets[0]["alert_ids"])
+    outside = client.get("/api/v1/entities/PRV-NOT-IN-CASE/summary", params={"case_id": case["case_id"]})
+    assert outside.status_code == 404
 
 
 def test_hops_one_is_smaller(loaded: tuple[TestClient, list[dict[str, Any]]]) -> None:

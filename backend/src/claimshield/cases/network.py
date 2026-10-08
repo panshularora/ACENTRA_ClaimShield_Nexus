@@ -26,11 +26,13 @@ from claimshield.cases.builder import LINK_KINDS
 from claimshield.cases.common import (
     alerts_for,
     audit_unmask,
+    can_unmask,
     claim_rows,
     iso,
     line_ids_for,
     member_display,
     serialize_alert,
+    serialize_lines,
 )
 from claimshield.cases.network_models import (
     EdgeEvidence,
@@ -39,8 +41,11 @@ from claimshield.cases.network_models import (
     NetworkLimits,
     NetworkNode,
     NetworkPack,
+    ClaimVolume,
+    EntitySummary,
     NodeDetail,
     NodeType,
+    RelatedCase,
     SharedAttribute,
 )
 from claimshield.core.errors import NotFound
@@ -67,6 +72,8 @@ EVIDENCE_ID_CAP = 50
 ADDRESS_PREFIX = "addr:"
 
 DIRECTED_KINDS: frozenset[str] = frozenset({"rendered", "billed", "at_facility", "owns", "referral", "located_at"})
+# Links inferred from a shared identifier rather than a recorded relationship.
+INFERRED_KINDS: frozenset[str] = frozenset({"shared_tin", "shared_contact"})
 # Ring alerts list the strong link kinds they rely on; map network edge kinds onto them.
 RING_EDGE_KIND: dict[str, str] = {"owns": "shared_owner", "shared_tin": "shared_tin", "shared_contact": "shared_contact"}
 EDGE_LABELS: dict[str, str] = {
@@ -320,6 +327,9 @@ class _NetworkBuilder:
                 is_subject=pid in subjects,
                 in_case=pid in subjects or pid in claim_providers,
             )
+            if pid in subjects:
+                node.harm = self.case.harm
+                node.severity = self.case.severity
             if pid == self.case.primary_entity_id:
                 node.primary = True
                 node.risk = self.case.p_confirm
@@ -502,7 +512,7 @@ class _NetworkBuilder:
             node.rule_ids = sorted({rule_of[a] for a in node.alert_ids})
             lids = [lid for lid, ids in line_parties.items() if node.id in ids]
             node.n_flagged_lines = len(lids)
-            node.flagged_dollars = round(sum(line_paid[lid] for lid in lids), 2)
+            node.flagged_paid = round(sum(line_paid[lid] for lid in lids), 2)
             if node.alert_ids and node.type in {"owner", "address"}:
                 node.in_case = True
         self._attribute_structural_edges()
@@ -540,13 +550,22 @@ class _NetworkBuilder:
             dates = sorted(d for d in draft.dates if d)
             source_node, target_node = self.nodes[draft.source], self.nodes[draft.target]
             alert_ids = sorted(draft.alert_ids)
+            claim_ids, line_ids = _cap(draft.claim_ids), _cap(draft.line_ids)
+            directed = draft.kind in DIRECTED_KINDS
             edges.append(
                 NetworkEdge(
                     id=f"{draft.kind}:{draft.source}:{draft.target}",
                     source=draft.source,
                     target=draft.target,
                     kind=draft.kind,
-                    directed=draft.kind in DIRECTED_KINDS,
+                    directed=directed,
+                    direction="out" if directed else "none",
+                    inferred=draft.kind in INFERRED_KINDS,
+                    evidence_ids=_cap(
+                        [f"alert:{a}" for a in alert_ids]
+                        + [f"claim:{c}" for c in claim_ids]
+                        + [f"line:{ln}" for ln in line_ids]
+                    ),
                     count=draft.count,
                     weight=round(draft.count / max(1, max_count[draft.kind]), 4),
                     label=_edge_label(draft),
@@ -554,8 +573,8 @@ class _NetworkBuilder:
                     evidence=EdgeEvidence(
                         alert_ids=alert_ids,
                         rule_ids=sorted({rule_of[a] for a in alert_ids}),
-                        claim_ids=_cap(draft.claim_ids),
-                        line_ids=_cap(draft.line_ids),
+                        claim_ids=claim_ids,
+                        line_ids=line_ids,
                         referral_ids=_cap(draft.referral_ids),
                         attribute=draft.attribute,
                         ownership_pct=draft.ownership_pct,
@@ -622,6 +641,85 @@ def node_detail(
         claim_lines=rows,
         connections=connections,
     )
+
+
+ENTITY_SAMPLE_LINES = 10
+
+
+def entity_summary(session: Session, case: Case, user: User, entity_id: str, *, unmask: bool = False) -> EntitySummary:
+    """Claims on file, run-wide findings and cases for any node of the case network.
+
+    The node must be inside the case's 2-hop network, so this cannot be used to browse
+    arbitrary providers or members. Owners and addresses stand for the providers they connect.
+    """
+    detail = node_detail(session, case, user, entity_id, unmask=unmask)
+    reveal = unmask and can_unmask(user)  # node_detail has already written the unmask audit event
+    node = detail.node
+    related = _related_ids(node, detail.connections)
+    stmt = select(ClaimLine).join(Claim, Claim.claim_id == ClaimLine.claim_id)
+    if node.type == "member":
+        stmt = stmt.where(Claim.member_id == node.id)
+    elif node.type == "facility":
+        stmt = stmt.where(Claim.facility_id == node.id)
+    else:
+        stmt = stmt.where(
+            Claim.billing_provider_id.in_(related)
+            | ClaimLine.rendering_provider_id.in_(related)
+            | ClaimLine.ordering_provider_id.in_(related)
+        )
+    lines = list(session.execute(stmt).scalars().all())
+    dates = sorted(iso(ln.dos_from) or "" for ln in lines)
+    recent = sorted(lines, key=lambda ln: (iso(ln.dos_from) or "", ln.line_id), reverse=True)[:ENTITY_SAMPLE_LINES]
+    names = related | {node.id}
+    run_alerts = list(session.execute(select(Alert).where(Alert.run_id == case.run_id)).scalars().all())
+    in_node = set(node.alert_ids)
+    alerts = [serialize_alert(a) for a in run_alerts if a.alert_id in in_node or _alert_names(a, names)]
+    run_cases = session.execute(select(Case).where(Case.run_id == case.run_id)).scalars().all()
+    cases = [
+        RelatedCase(
+            case_id=c.case_id,
+            status=c.status,
+            lane=c.lane,
+            primary_entity_id=c.primary_entity_id,
+            is_primary=c.primary_entity_id in names,
+        )
+        for c in run_cases
+        if c.primary_entity_id in names or names & set(c.entity_ids or [])
+    ]
+    return EntitySummary(
+        entity_id=node.id,
+        case_id=case.case_id,
+        node=node,
+        profile=detail.profile,
+        claims=ClaimVolume(
+            n_lines=len(lines),
+            paid=round(sum(float(ln.paid or 0.0) for ln in lines), 2),
+            first_dos=dates[0] if dates else None,
+            last_dos=dates[-1] if dates else None,
+            sample=serialize_lines(session, recent, reveal=reveal),
+        ),
+        alerts=alerts,
+        cases=cases,
+        case_claim_lines=detail.claim_lines,
+        connections=detail.connections,
+    )
+
+
+def _alert_names(alert: Alert, names: set[str]) -> bool:
+    evidence = alert.evidence or {}
+    named = {alert.entity_id, str(evidence.get("member_id") or ""), str(evidence.get("owner_id") or "")}
+    for key in ("peer_ids", "member_ids"):
+        named |= {str(v) for v in evidence.get(key) or []}
+    return bool(named & names)
+
+
+def network_edge(session: Session, case: Case, user: User, edge_id: str) -> NetworkEdge:
+    """One edge of the case network (masked view), for ``edge:`` evidence citations."""
+    pack = _NetworkBuilder(session, case, hops=2, referral_top_n=DEFAULT_REFERRAL_TOP_N, reveal=False).build()
+    edge = next((e for e in pack.edges if e.id == edge_id), None)
+    if edge is None:
+        raise NotFound("edge is not in this case network")
+    return edge
 
 
 def _related_ids(node: NetworkNode, connections: list[NetworkEdge]) -> set[str]:
