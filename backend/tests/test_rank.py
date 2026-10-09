@@ -59,6 +59,24 @@ def test_slot_cap_keeps_overflow_open(tiny_dataset) -> None:
     assert result["ranking_policy"]["human_in_the_loop"] is True
 
 
+def test_slot_cap_fills_today_to_max_slots() -> None:
+    """Hours may already be spent on harm; slots still fill today's queue from overflow."""
+    cases = [
+        _case(case_id="H1", harm=4, estimated_hours=20.0, evidence_strength=0.9, flagged_dollars=9_000),
+        _case(case_id="H2", harm=4, estimated_hours=20.0, evidence_strength=0.9, flagged_dollars=8_000),
+        _case(case_id="S1", harm=2, estimated_hours=8.0, evidence_strength=0.8, flagged_dollars=7_000),
+        _case(case_id="S2", harm=2, estimated_hours=8.0, evidence_strength=0.8, flagged_dollars=6_000),
+        _case(case_id="S3", harm=2, estimated_hours=8.0, evidence_strength=0.8, flagged_dollars=5_000),
+    ]
+    attach_rank_factors(cases, horizon_days=60, member_weight=1.0)
+    assign_lanes(cases, capacity_hours=12, harm_capacity_share=0.35, evidence_min=0.4, max_slots=3)
+    today = [c for c in cases if c["lane"] in {"harm_priority", "selected"}]
+    assert len(today) == 3
+    assign_lanes(cases, capacity_hours=12, harm_capacity_share=0.35, evidence_min=0.4, max_slots=4)
+    today = [c for c in cases if c["lane"] in {"harm_priority", "selected"}]
+    assert len(today) == 4
+
+
 def test_needs_evidence_stays_out_of_today_knapsack() -> None:
     cases = [
         _case(case_id="E", evidence_strength=0.2, harm=2, flagged_dollars=40_000),
@@ -82,10 +100,11 @@ def test_override_lane_uses_capacity_and_reports_overrun() -> None:
     attach_rank_factors(cases, horizon_days=60, member_weight=1.0)
     summary = assign_lanes(cases, capacity_hours=40, harm_capacity_share=0.35, evidence_min=0.4, max_slots=20)
     by_id = {c["case_id"]: c["lane"] for c in cases}
-    assert by_id == {"O1": "harm_priority", "H1": "harm_priority", "S1": "overflow"}
+    # Slots still fill today's queue from overflow when override hours already spent.
+    assert by_id == {"O1": "harm_priority", "H1": "harm_priority", "S1": "selected"}
     assert summary["priority_override_hours"] == 50.0
-    assert summary["capacity_used_hours"] == 50.0
-    assert summary["over_capacity_hours"] == 10.0
+    assert summary["capacity_used_hours"] == 54.0
+    assert summary["over_capacity_hours"] == 14.0
     assert summary["override_share_warning"] is True
 
     roomy = assign_lanes(cases, capacity_hours=60, harm_capacity_share=0.35, evidence_min=0.4, max_slots=20)

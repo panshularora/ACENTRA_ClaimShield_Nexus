@@ -146,8 +146,8 @@ export function screeningLabel(days: number | null | undefined): string {
 
 export function screeningShort(days: number | null | undefined): string {
   if (days === null || days === undefined) return "—";
-  if (days < 0) return `${Math.abs(days)}d past`;
-  return `${days}d`;
+  if (days < 0) return `${Math.abs(days)} days past`;
+  return `${days} days`;
 }
 
 export function screeningTone(days: number | null | undefined): "ok" | "warn" | "hot" | "none" {

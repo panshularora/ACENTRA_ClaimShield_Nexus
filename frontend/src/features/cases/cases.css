@@ -1,4 +1,29 @@
-/* Investigator worklist: stacked cards with the six SIU axes. */
+/* Investigator worklist: claims-style table, same SIU fields. */
+.work-wrap {
+  max-height: 36rem;
+}
+
+.work-grid .work-card-name {
+  display: inline-block;
+  font-size: var(--font-size-14);
+  font-weight: 700;
+}
+
+.work-grid .work-card-meta,
+.work-grid .work-card-scores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.7rem;
+  margin: 0.2rem 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+  font-weight: 500;
+}
+
+.work-grid .chip-row {
+  margin-top: 0.3rem;
+}
+
 .worklist-cards {
   display: grid;
   gap: var(--space-3);
@@ -72,17 +97,16 @@
   font-size: var(--font-size-13);
 }
 
-.work-card .case-axes {
-  grid-column: 1 / -1;
-  margin-top: var(--space-1);
-}
-
-.work-card .stat {
-  padding: var(--space-3);
-}
-
-.work-card .stat dd {
-  font-size: var(--font-size-16);
+.work-card-scores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border-subtle);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  font-variant-numeric: tabular-nums;
 }
 
 .work-card-action {

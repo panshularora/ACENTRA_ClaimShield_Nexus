@@ -1,228 +1,282 @@
+import { useGSAP } from "@gsap/react";
 import { Link } from "@tanstack/react-router";
-import { StoryScene } from "../../three/StoryScene";
-import { usePrefersReducedMotion, useScrollProgress } from "../../three/useScrollProgress";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { Component, type ErrorInfo, type ReactNode, Suspense, useCallback, useRef, useState } from "react";
+import { AppLogo } from "../../components/ui/AppLogo";
+import { PipelineScene } from "../../three/PipelineScene";
 import "./landing.css";
 
-const CHAPTERS = [
+gsap.registerPlugin(useGSAP, ScrollTrigger);
+
+const STEPS = [
   {
-    kicker: "Acentra Health code-a-thon · Problem 3",
-    title: "ClaimShield Nexus",
-    body: "Post-adjudication program integrity for Medicaid-like claims. Designed to sit downstream of a claims system such as eCAMS and feed an SIU — not to label anyone as fraud. No eCAMS integration exists in this prototype.",
-    points: [
-      "Lives after adjudication. It does not recode or deny a claim.",
-      "Ranks suspicion for scarce investigator hours. A flag is a queue position.",
-      "Due process stays with the state: humans decide, models cite.",
-    ],
-    facts: [
-      { value: "Downstream", label: "Designed to sit after a claims engine such as eCAMS" },
-      { value: "SIU", label: "Built for special investigations, not pay-and-chase noise" },
-      { value: "Recommend", label: "Never prints fraud on a provider" },
-    ],
+    name: "Rules",
+    detail: "Known billing patterns on paid lines: duplicates, after-death DME, EVV gaps, LEIE, unbundling.",
   },
   {
-    kicker: "The scarce resource",
-    title: "Investigators have hours, not infinities.",
-    body: "CMS estimated Medicaid improper payments at 6.12% ($37.39B) in FY2025. Most of that is documentation, not fraud. The SIU still has to find the few patterns that warrant human review before the 45-day screening clock runs out.",
-    points: [
-      "Improper payment is not a fraud rate. Documentation errors swamp true schemes.",
-      "Monday-morning work is takeable suspicion, not a wall of alerts.",
-      "Capacity is the control: 40 investigator hours, not infinite review.",
-    ],
-    facts: [
-      { value: "6.12%", label: "Medicaid improper payments, FY2025" },
-      { value: "$37.39B", label: "Estimated dollars in that rate" },
-      { value: "45 days", label: "Screening clock the SIU is racing" },
-    ],
+    name: "Peers",
+    detail: "Same specialty, geography, and provider type. Volume alone is a reason to look.",
   },
   {
-    kicker: "Alerts are not cases",
-    title: "A case is a network.",
-    body: "Duplicate lines, EVV gaps, and peer outliers are signals. Shared TIN, owner, and contact edges turn them into rings. ClaimShield groups alerts the way a ring actually bills — across NPIs — so G1-style telefraud is one case, not twelve tickets.",
-    points: [
-      "Rules catch known billing patterns. Anomaly catches like-with-like peers.",
-      "Identity graph ties TIN, owner, facility, and contact — the ring, not the NPI.",
-      "Rural small-n peers show limited confidence. They do not auto-flag.",
-    ],
-    facts: [
-      { value: "Rules + anomaly", label: "Both fire. Neither is a verdict." },
-      { value: "One ring", label: "G1-style telefraud is one case, not twelve tickets" },
-      { value: "Peers", label: "Specialty, geography, provider type, population" },
-    ],
+    name: "Graph",
+    detail: "Shared TIN, owner, contact, or referral. One ring becomes one case.",
   },
   {
-    kicker: "CMS harm first",
-    title: "Beneficiary harm never waits in line.",
-    body: "A thousand cases do not become a dollar sort. ClaimShield combines scheme severity, financial exposure, member impact, evidence strength, and urgency, then packs the result into investigator hours and a top-N desk. The ranking proposes today's 20. Investigators decide. The rest stay open on a tracked backlog.",
-    points: [
-      "Harm-priority cases jump the dollar queue. Vulnerable members come first.",
-      "Today's queue is multi-factor inside capacity. Dollars or evidence alone never pick the set.",
-      "Needs-evidence gathers records. Overflow stays tracked. Nothing auto-labels fraud.",
-    ],
-    facts: [
-      { value: "Five factors", label: "Severity, exposure, members, evidence, urgency" },
-      { value: "Top N + hours", label: "Capacity knapsack, then a 20-case desk cap" },
-      { value: "Human loop", label: "Promote or defer with a reason. Backlog is not a close." },
-    ],
-  },
-  {
-    kicker: "30 / 60 / 90",
-    title: "Risk is a clock, not a scoreboard.",
-    body: "Each case carries a cumulative probability by each horizon: the chance the escalation event has already happened by day 30, 60, and 90. The queue sorts by expected value inside the hours you actually have.",
-    points: [
-      "F30 / F60 / F90 are cumulative probabilities by the horizon, not a guilt score.",
-      "Managers set horizon and capacity. The queue recomputes lanes.",
-      "A longer horizon raises expected value. It does not invent new evidence.",
-    ],
-    facts: [
-      { value: "F30", label: "Cumulative probability by day 30" },
-      { value: "F60", label: "Cumulative probability by day 60" },
-      { value: "F90", label: "Cumulative probability by day 90" },
-    ],
-  },
-  {
-    kicker: "Recommend only",
-    title: "Humans decide. Models cite.",
-    body: "The investigation brief is grounded in claim lines, rule IDs, and statistics. Payment suspension stays with the state. Every decision writes a hash-chained audit event and can become a precedent page.",
-    points: [
-      "The brief names the line, the detector, and the peer group — not a fraud stamp.",
-      "Disposition is a human act: monitor, refer, or close with a reason.",
-      "Audit events hash in sequence. Approved reasons can become wiki precedent.",
-    ],
-    facts: [
-      { value: "Cite", label: "Lines, rule IDs, and peer stats in the brief" },
-      { value: "Decide", label: "State SIU keeps payment-suspension authority" },
-      { value: "Record", label: "Hash-chained audit, optional precedent" },
-    ],
+    name: "Rank",
+    detail: "Five factors packed into the hours you actually have. Harm goes first. A person still decides.",
   },
 ];
 
+const FACTORS = [
+  { name: "Scheme severity", weight: "22%", detail: "How serious the billed pattern looks." },
+  { name: "Financial exposure", weight: "22%", detail: "Dollars already paid on flagged lines." },
+  { name: "Member impact", weight: "22%", detail: "People on those lines, and harm level." },
+  { name: "Evidence strength", weight: "18%", detail: "How complete the packet is." },
+  { name: "Urgency", weight: "16%", detail: "Days left on the 45-day screening clock." },
+];
+
+function prefersReducedMotion(): boolean {
+  return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+class SceneGate extends Component<{ children: ReactNode; fallback: ReactNode; onError: () => void }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(_error: Error, _info: ErrorInfo) {
+    this.props.onError();
+    this.setState({ failed: true });
+  }
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
+function StaticCore() {
+  return (
+    <svg className="scene-static" viewBox="0 0 200 200" aria-hidden="true" focusable="false">
+      {Array.from({ length: 42 }, (_, i) => {
+        const h = Math.sin((i + 1) * 12.9898) * 43758.5453;
+        const u = h - Math.floor(h);
+        const h2 = Math.sin((i + 101) * 12.9898) * 43758.5453;
+        const u2 = h2 - Math.floor(h2);
+        const angle = u * Math.PI * 2;
+        const r = 30 + u2 * 62;
+        return (
+          <circle
+            key={i}
+            cx={100 + r * Math.cos(angle)}
+            cy={100 + r * Math.sin(angle) * 0.62}
+            r={i < 6 ? 2.2 : 1.4}
+            fill={i < 6 ? "#d46568" : "#c5d0c8"}
+            opacity={0.75}
+          />
+        );
+      })}
+      <circle cx={100} cy={100} r={58} fill="none" stroke="#5c6b72" strokeWidth={1} strokeDasharray="3 3" />
+      <circle cx={100} cy={100} r={40} fill="none" stroke="#e6ebe4" strokeWidth={1.25} />
+      <circle cx={100} cy={100} r={22} fill="#c5d0c8" opacity={0.28} />
+      <circle cx={100} cy={100} r={15} fill="#c5d0c8" />
+    </svg>
+  );
+}
+
 export function LandingPage() {
-  const progress = useScrollProgress();
-  const reduced = usePrefersReducedMotion();
-  const chapter = Math.min(CHAPTERS.length - 1, Math.floor(progress * CHAPTERS.length));
+  const root = useRef<HTMLDivElement>(null);
+  const progressRef = useRef(0);
+  const reduce = prefersReducedMotion();
+  const [failed, setFailed] = useState(false);
+  const fail = useCallback(() => setFailed(true), []);
+
+  useGSAP(
+    () => {
+      if (reduce) return;
+      gsap.utils.toArray<HTMLElement>(".reveal").forEach((el) => {
+        gsap.fromTo(
+          el,
+          { y: 28, autoAlpha: 0 },
+          {
+            y: 0,
+            autoAlpha: 1,
+            duration: 0.7,
+            ease: "power3.out",
+            scrollTrigger: { trigger: el, start: "top 86%", once: true },
+          },
+        );
+      });
+      ScrollTrigger.create({
+        trigger: ".landing-hero",
+        start: "top top",
+        end: "bottom top",
+        onUpdate: (self) => {
+          progressRef.current = self.progress;
+        },
+      });
+    },
+    { scope: root },
+  );
+
+  const stage = failed || reduce ? (
+    <StaticCore />
+  ) : (
+    <SceneGate fallback={<StaticCore />} onError={fail}>
+      <Suspense fallback={<StaticCore />}>
+        <PipelineScene progressRef={progressRef} reducedMotion={reduce} onContextLost={fail} />
+      </Suspense>
+    </SceneGate>
+  );
 
   return (
-    <div className="landing">
-      <div className="landing-stage" aria-hidden="true">
-        <StoryScene progress={progress} reduced={reduced} />
-        <div className="landing-veil" />
-      </div>
-
+    <div className="landing" ref={root}>
       <header className="landing-nav">
         <div className="brand-lockup">
-          <span className="brand-mark" aria-hidden="true" />
-          <div>
-            <strong>ClaimShield Nexus</strong>
-            <em>Acentra Health code-a-thon prototype</em>
-          </div>
+          <AppLogo />
         </div>
         <nav>
-          <a href="#story">The problem</a>
-          <a href="#method">The method</a>
+          <a href="#method">How it works</a>
+          <a href="#demo">Demo</a>
           <Link to="/login">Enter SIU</Link>
         </nav>
       </header>
 
       <section className="landing-hero" id="story">
-        <p className="kicker">Program integrity · post-adjudication</p>
-        <h1>Turn a flood of claim alerts into a few cases an SIU can actually work.</h1>
-        <p className="lede">
-          Rules, peer anomalies, and identity graphs collapse into capacity-ranked cases.
-          Harm goes first. Evidence is cited. A human still decides.
-        </p>
-        <div className="landing-cta">
-          <Link to="/login" className="btn solid">
-            Open the SIU
-          </Link>
-          <a className="btn ghost" href="#method">
-            Scroll the story
-          </a>
+        <div className="hero-copy">
+          <p className="kicker">Post-adjudication SIU desk</p>
+          <h1>Paid-claim noise becomes a desk an investigator can finish today.</h1>
+          <p className="lede">
+            Claim lines fall into the rank core. Four checks fire. The dashed ring is desk
+            capacity. ClaimShield recommends. A human still decides.
+          </p>
+          <div className="landing-cta">
+            <Link to="/login" className="btn solid">
+              Open the SIU
+            </Link>
+            <a className="btn ghost" href="#method">
+              How the desk is built
+            </a>
+          </div>
+          <dl className="stat-row">
+            <div>
+              <dt>Medicaid FY2025</dt>
+              <dd>6.12% improper payments</dd>
+            </div>
+            <div>
+              <dt>Screening clock</dt>
+              <dd>45 days</dd>
+            </div>
+            <div>
+              <dt>Today&apos;s control</dt>
+              <dd>Hours, not infinite review</dd>
+            </div>
+          </dl>
         </div>
-        <dl className="stat-row">
-          <div>
-            <dt>Improper payments ≠ fraud</dt>
-            <dd>6.12% Medicaid FY2025</dd>
-          </div>
-          <div>
-            <dt>Screening clock</dt>
-            <dd>45 calendar days</dd>
-          </div>
-          <div>
-            <dt>Queue math</dt>
-            <dd>Five factors + capacity + human override</dd>
-          </div>
-        </dl>
+        <aside className="hero-stage" aria-label="Live 3D claim detector">
+          <div className="stage-canvas">{stage}</div>
+          <ul className="scene-legend" aria-label="How to read the detector">
+            <li>
+              <span className="scene-key scene-key-line" aria-hidden="true" />
+              Claim line
+            </li>
+            <li>
+              <span className="scene-key scene-key-flag" aria-hidden="true" />
+              Flagged line
+            </li>
+            <li>
+              <span className="scene-key scene-key-band" aria-hidden="true" />
+              Desk capacity
+            </li>
+            <li>
+              <span className="scene-key scene-key-rate" aria-hidden="true" />
+              Packed hours
+            </li>
+          </ul>
+        </aside>
       </section>
 
-      <div id="method">
-        {CHAPTERS.map((ch, i) => (
-          <section
-            key={ch.title}
-            className={`landing-chapter ${i === chapter ? "is-active" : ""}`}
-            data-chapter={i}
-          >
-            <div className="chapter-shell">
-              <div className="chapter-panel">
-                <div className="chapter-meta">
-                  <p className="kicker">{ch.kicker}</p>
-                  <span className="chapter-index">
-                    {String(i + 1).padStart(2, "0")} / {String(CHAPTERS.length).padStart(2, "0")}
-                  </span>
-                </div>
-                <h2>{ch.title}</h2>
-                <p className="chapter-body">{ch.body}</p>
-                <ul className="chapter-points">
-                  {ch.points.map((point) => (
-                    <li key={point}>{point}</li>
-                  ))}
-                </ul>
-              </div>
-              <aside className="chapter-aside">
-                {ch.facts.map((fact) => (
-                  <div className="chapter-fact" key={fact.value}>
-                    <strong>{fact.value}</strong>
-                    <span>{fact.label}</span>
-                  </div>
-                ))}
-              </aside>
-            </div>
-          </section>
-        ))}
-      </div>
-
-      <section className="landing-end">
-        <div className="chapter-shell">
-          <div className="chapter-panel">
-            <p className="kicker">Demo path</p>
-            <h2>Manager loads the tiny extract. Investigator works a ring.</h2>
-            <p className="chapter-body">
-              Sign in as manager, run seed 7, watch harm / selected / needs-evidence fill 40 hours,
-              then open a multi-NPI case. The product never prints the word fraud on a provider.
-              Demo: <span className="mono">investigator@demo.claimshield</span> / demo-investigator
-              · <span className="mono">manager@demo.claimshield</span> / demo-manager.
-            </p>
-            <ol className="demo-steps">
-              <li>
-                <strong>Manager</strong>
-                <span>Load tiny, seed 7. Set hours. Recompute the queue. Harm-priority jumps the dollar sort.</span>
-              </li>
-              <li>
-                <strong>Investigator</strong>
-                <span>
-                  Open Anthony Mcgee (CASE-OSERDENZID). Evidence tab: each finding is a packet — what happened,
-                  what to check, then the detector, rule id, and tables.
-                </span>
-              </li>
-              <li>
-                <strong>Decide</strong>
-                <span>Read the cited brief. Record a next step with a reason. The product never prints fraud.</span>
-              </li>
-            </ol>
-            <Link to="/login" className="btn solid">
-              Sign in to the live API
-            </Link>
-          </div>
+      <section className="landing-band" id="method">
+        <div className="band-head reveal">
+          <p className="kicker">How it works</p>
+          <h2>Four checks, then a capacity-ranked desk.</h2>
+          <p>
+            Rules catch known billing patterns. Peers catch outliers. The identity graph catches a
+            ring that bills clean on each NPI. Rank packs the result into the hours you have.
+          </p>
         </div>
+        <ol className="process-rail">
+          {STEPS.map((step, i) => (
+            <li key={step.name} className="reveal">
+              <span className="process-index">{i + 1}</span>
+              <strong>{step.name}</strong>
+              <span>{step.detail}</span>
+            </li>
+          ))}
+        </ol>
+        <div className="rank-ledger reveal">
+          <p className="kicker">Desk rank uses these five — not suspicion alone</p>
+          <p className="ledger-note">
+            Suspicion is a separate review score. It never prints as 100%, and it is not a finding.
+          </p>
+          <ul>
+            {FACTORS.map((factor) => (
+              <li key={factor.name}>
+                <span className="factor-weight">{factor.weight}</span>
+                <strong>{factor.name}</strong>
+                <span>{factor.detail}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <section className="landing-band split">
+        <div className="reveal">
+          <p className="kicker">Recommend only</p>
+          <h2>The packet says what fired, where, and why to look.</h2>
+          <p>
+            Each finding names the problem in SIU English, the claim lines it sits on, and what a
+            person should verify. Payment suspension stays with the state. The product never prints
+            fraud on a provider.
+          </p>
+        </div>
+        <ul className="promise-list">
+          <li className="reveal">A case is a network of NPIs, not a single ticket.</li>
+          <li className="reveal">Harm-priority work jumps the dollar sort.</li>
+          <li className="reveal">Every decision writes a hash-chained audit event.</li>
+        </ul>
+      </section>
+
+      <section className="landing-end" id="demo">
+        <div className="reveal">
+          <p className="kicker">Four-minute walkthrough</p>
+          <h2>Manager loads the extract. Investigator opens a packet.</h2>
+        </div>
+        <ol className="demo-steps">
+          <li className="reveal">
+            <strong>Manager</strong>
+            <span>Sign in, confirm the desk filled, set hours if you want, then hand off.</span>
+          </li>
+          <li className="reveal">
+            <strong>Investigator</strong>
+            <span>Open a harm-priority case. Read the finding: problem, where it sits, why it fired.</span>
+          </li>
+          <li className="reveal">
+            <strong>Decide</strong>
+            <span>Record escalate, monitor, dismiss, or gather records — with a reason of 20+ characters.</span>
+          </li>
+        </ol>
+        <p className="demo-creds reveal">
+          <span>
+            Manager <code>manager@demo.claimshield</code> / <code>demo-manager</code>
+          </span>
+          <span>
+            Investigator <code>investigator@demo.claimshield</code> / <code>demo-investigator</code>
+          </span>
+        </p>
+        <Link to="/login" className="btn solid reveal">
+          Sign in
+        </Link>
       </section>
     </div>
   );

@@ -1,12 +1,11 @@
-import type { AlertLineage, CaseProvenance } from "../../api/types";
+import type { CaseProvenance } from "../../api/types";
 import { findingCopy } from "../../lib/plainLanguage";
 import { SourceList } from "./EvidenceStory";
 
 export function CaseLineage({ provenance }: { provenance: CaseProvenance }) {
   const grouping = provenance.grouping;
   return (
-    <section className="lineage" aria-labelledby="lineage-title">
-      <h3 id="lineage-title">How this case was built</h3>
+    <section className="lineage">
       <p>
         Paid claims were checked, similar providers were compared, and linked NPIs were grouped. The
         scores only rank work for a person.
@@ -34,39 +33,17 @@ export function CaseLineage({ provenance }: { provenance: CaseProvenance }) {
       <ol className="lineage-steps">
         {provenance.steps.map((step) => (
           <li key={step.step}>
-            <strong>
-              {step.step}. {step.name}
-            </strong>
+            <strong>{step.name}</strong>
             <p>{step.detail}</p>
           </li>
         ))}
       </ol>
-      <details className="ev-tech">
-        <summary>Technical — extract and tables</summary>
-        <p className="mono muted">{provenance.extract}</p>
-        <h4>Where the numbers came from</h4>
-        <SourceList tables={provenance.data_sources} />
-        <p className="note">Scores rank work for a person to review. They do not close the case.</p>
-      </details>
-    </section>
-  );
-}
-
-export function AlertLineageBlock({ lineage }: { lineage: AlertLineage }) {
-  return (
-    <div className="alert-lineage">
-      <p>{lineage.method}</p>
-      {lineage.how ? <p>{lineage.how}</p> : null}
-      {lineage.tables.length > 0 ? (
-        <SourceList tables={lineage.tables} compact />
-      ) : (
-        <p className="muted">We did not record which files fed this pattern.</p>
-      )}
-      {lineage.line_ids && lineage.line_ids.length ? (
-        <p className="muted">
-          {lineage.line_ids.length} paid claim line{lineage.line_ids.length === 1 ? "" : "s"}
-        </p>
+      {provenance.data_sources?.length ? (
+        <>
+          <p className="muted">Files used</p>
+          <SourceList tables={provenance.data_sources} />
+        </>
       ) : null}
-    </div>
+    </section>
   );
 }

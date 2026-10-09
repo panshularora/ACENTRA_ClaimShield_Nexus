@@ -72,21 +72,28 @@ def assign_lanes(
 
 
 def _apply_slot_cap(cases: list[dict[str, Any]], *, max_slots: int) -> None:
-    """Keep harm-priority cases; trim selected so today's recommended set fits max_slots."""
+    """Today's recommended set is exactly max_slots cases: harm first, then rank.
+
+    Hours packing may leave the desk short of the slot cap (override hours already
+    spent). Pull the next-highest composite from overflow so the slider count matches
+    the table. Harm-priority is kept first; leftover harm beyond the cap goes to overflow.
+    """
     cap = max(1, int(max_slots))
-    harm = [c for c in cases if c["lane"] == "harm_priority"]
-    selected = [c for c in cases if c["lane"] == "selected"]
-    leftover = cap - len(harm)
-    if leftover >= len(selected):
-        return
-    if leftover <= 0:
-        for case in selected:
-            case["lane"] = "overflow"
-        return
-    ranked = sorted(selected, key=lambda c: float(c.get("composite") or 0.0), reverse=True)
-    keep = {c["case_id"] for c in ranked[:leftover]}
-    for case in selected:
-        if case["case_id"] not in keep:
+
+    def score(case: dict[str, Any]) -> float:
+        return float(case.get("composite") or 0.0)
+
+    harm = sorted([c for c in cases if c["lane"] == "harm_priority"], key=score, reverse=True)
+    selected = sorted([c for c in cases if c["lane"] == "selected"], key=score, reverse=True)
+    overflow = sorted([c for c in cases if c["lane"] == "overflow"], key=score, reverse=True)
+    pool = harm + selected + overflow
+    today = pool[:cap]
+    today_ids = {c["case_id"] for c in today}
+    harm_ids = {c["case_id"] for c in harm}
+    for case in pool:
+        if case["case_id"] in today_ids:
+            case["lane"] = "harm_priority" if case["case_id"] in harm_ids else "selected"
+        else:
             case["lane"] = "overflow"
 
 

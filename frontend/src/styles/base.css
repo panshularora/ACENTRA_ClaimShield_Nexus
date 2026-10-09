@@ -7,7 +7,7 @@
 
 /* Legacy family for the landing and login pages only (landing.css and login.css read it). */
 :root {
-  --sans: "Outfit", "IBM Plex Sans", "Segoe UI", sans-serif;
+  --sans: "IBM Plex Sans", "Segoe UI", sans-serif;
 }
 
 html,

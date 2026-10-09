@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Panel } from "../../components/ui/Panel";
 import { hours } from "../../lib/format";
 
@@ -18,6 +19,7 @@ interface DeskSettingsProps {
   pending: boolean;
   onChange: (draft: DeskDraft) => void;
   onRun: (draft: DeskDraft) => void;
+  children?: ReactNode;
 }
 
 interface SliderProps {
@@ -67,7 +69,18 @@ function sameDesk(a: DeskDraft, b: DeskDraft): boolean {
 }
 
 /** Capacity, horizon, member weight and slot cap that drive the next queue recompute. */
-export function DeskSettings({ draft, applied, deskHours, disabled, canRun, hasExtract, pending, onChange, onRun }: DeskSettingsProps) {
+export function DeskSettings({
+  draft,
+  applied,
+  deskHours,
+  disabled,
+  canRun,
+  hasExtract,
+  pending,
+  onChange,
+  onRun,
+  children,
+}: DeskSettingsProps) {
   const set = (patch: Partial<DeskDraft>) => {
     const next = { ...draft, ...patch };
     onChange(next);
@@ -117,7 +130,7 @@ export function DeskSettings({ draft, applied, deskHours, disabled, canRun, hasE
           min={3}
           max={20}
           step={1}
-          hint={`Applied cap ${applied.slots}. Extra cases stay on the tracked backlog.`}
+          hint={`Today's queue lists ${draft.slots} ranked cases. Extra stay on the tracked backlog.`}
           disabled={disabled}
           onChange={(slots) => set({ slots })}
           onCommit={(slots) => {
@@ -160,6 +173,7 @@ export function DeskSettings({ draft, applied, deskHours, disabled, canRun, hasE
                 : "Load tiny run"}
           </button>
         ) : null}
+        {children}
       </div>
     </Panel>
   );

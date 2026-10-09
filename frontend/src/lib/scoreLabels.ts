@@ -13,11 +13,11 @@ export const SCORE_LABELS = {
     hintFor: (row: { score_kind?: string; calibrated?: boolean }) =>
       row.score_kind === "trained_model"
         ? row.calibrated
-          ? "Learned suspicion score, adjusted to past reviews. Not desk rank. A person still decides."
-          : "Learned suspicion score, not yet adjusted to past reviews. Not desk rank."
+          ? "Learned review score"
+          : "Learned review score, unadjusted"
         : row.score_kind === "uncalibrated_heuristic"
-          ? "Simple suspicion score. Not desk rank."
-          : "Suspicion score from the case file. Not desk rank.",
+          ? "Simple review score"
+          : "Review score",
   },
   expectedValue: {
     short: "Value",

@@ -25,12 +25,6 @@ export function PeerCompare({ evidence }: { evidence: Record<string, unknown> })
       </p>
       {group.limitation ? <p className="muted">{group.limitation}</p> : null}
       <p className="muted">Looking different from similar providers is a reason to open the claims, not a conclusion.</p>
-      <p className="muted mono">
-        peer_group n={group.n_peers}
-        {group.confidence ? ` · confidence=${group.confidence}` : ""}
-        {group.rural ? " · rural=true" : ""}
-        {group.relaxed ? " · relaxed match" : ""}
-      </p>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import type { CaseAlert } from "../../api/types";
 import { EmptyState } from "../../components/ui/States";
 import { findingCopy } from "../../lib/plainLanguage";
-import { APPROACH_PLAIN, EvidenceStory, storyFromAlert } from "./EvidenceStory";
+import { APPROACH_PLAIN, EvidenceStory, storyFromAlert, whereSummary } from "./EvidenceStory";
 import { PeerCompare } from "./PeerCompare";
 
 function collapseAlerts(alerts: CaseAlert[]): { alert: CaseAlert; alertIds: string[]; lineIds: string[] }[] {
@@ -26,7 +26,7 @@ interface FindingsPanelProps {
   onOpen: (alertId: string) => void;
 }
 
-/** Detector findings as packets: plain words first, technical method under a fold. */
+/** Open packets: problem, where, and why are on the page. Cite lines in the drawer. */
 export function FindingsPanel({ alerts, focusAlertIds, focusLabel, onOpen }: FindingsPanelProps) {
   const all = collapseAlerts(alerts);
   const rows = focusAlertIds ? all.filter((f) => f.alertIds.some((id) => focusAlertIds.has(id))) : all;
@@ -45,33 +45,35 @@ export function FindingsPanel({ alerts, focusAlertIds, focusLabel, onOpen }: Fin
           {focusAlertIds ? "Clear the network selection to see every pattern on this case." : null}
         </EmptyState>
       ) : (
-        <ul className="finding-list">
-          {rows.map(({ alert, lineIds }) => {
-            const approachKey = alert.approach ?? alert.detector ?? "";
-            const approach = APPROACH_PLAIN[approachKey] ?? { label: "Paid-claim check", tech: "" };
-            const story = storyFromAlert(alert);
-            const copy = findingCopy(story.kind, story.fallbackTitle);
-            return (
-              <li key={alert.alert_id} className="finding">
-                <div className="finding-head">
-                  <span className={`badge ${toneFor(approachKey)}`}>{approach.label}</span>
-                  <span className="muted">{copy.source}</span>
-                </div>
-                <h4>{copy.title}</h4>
-                <EvidenceStory
-                  {...story}
-                  lineIds={lineIds}
-                  peer={alert.evidence?.peer_group ? <PeerCompare evidence={alert.evidence} /> : null}
-                />
-                <div className="finding-actions">
-                  <button type="button" className="btn small" onClick={() => onOpen(alert.alert_id)}>
-                    Open the evidence item
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="findings-scroll">
+          <ul className="finding-list">
+            {rows.map(({ alert, lineIds }) => {
+              const approachKey = alert.approach ?? alert.detector ?? "";
+              const approach = APPROACH_PLAIN[approachKey] ?? { label: "Paid-claim check", tech: "" };
+              const story = storyFromAlert({ ...alert, line_ids: lineIds });
+              const copy = findingCopy(story.kind, story.fallbackTitle);
+              const where = whereSummary(alert.evidence, lineIds);
+              return (
+                <li key={alert.alert_id} className="finding is-open">
+                  <div className="finding-head">
+                    <span className={`badge ${toneFor(approachKey)}`}>{approach.label}</span>
+                    {where ? <span className="finding-where">{where}</span> : null}
+                  </div>
+                  <h4>{copy.title}</h4>
+                  <EvidenceStory
+                    {...story}
+                    peer={alert.evidence?.peer_group ? <PeerCompare evidence={alert.evidence} /> : null}
+                  />
+                  <div className="finding-actions">
+                    <button type="button" className="btn small ghost" onClick={() => onOpen(alert.alert_id)}>
+                      Cited claim lines
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
     </section>
   );

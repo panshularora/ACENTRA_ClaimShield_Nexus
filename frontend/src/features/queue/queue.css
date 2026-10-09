@@ -3,6 +3,100 @@
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.desk-more {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.desk-more > summary {
+  cursor: pointer;
+  font-weight: 650;
+  font-size: var(--font-size-14);
+}
+
+.lane-pills {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.lane-pills button {
+  width: 100%;
+  display: grid;
+  gap: 0.15rem;
+  text-align: left;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.lane-pills button strong {
+  font-size: var(--font-size-13);
+}
+
+.lane-pills button span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+  font-variant-numeric: tabular-nums;
+}
+
+.lane-pills button[aria-pressed="true"] {
+  border-color: var(--color-brand);
+  box-shadow: inset 0 0 0 1px var(--color-brand);
+}
+
+.queue-page #queue > .panel-head {
+  position: sticky;
+  top: 4.25rem;
+  z-index: 15;
+  background: #fff;
+}
+
+.queue-page #queue .toolbar {
+  position: sticky;
+  top: 9.35rem;
+  z-index: 14;
+  background: #fff;
+  padding-top: 0.35rem;
+  padding-bottom: 0.55rem;
+}
+
+.queue-page .queue-wrap {
+  overflow: auto;
+}
+
+.queue-page .queue-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff;
+}
+
+.queue-grid td.why-cell {
+  width: 22rem;
+  min-width: 16rem;
+  max-width: 28rem;
+  font-size: var(--font-size-13);
+  line-height: 1.4;
+  color: var(--color-text);
+  text-align: left;
+  vertical-align: top;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.queue-grid td.why-cell span {
+  display: block;
+  text-align: left;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 .aws-status {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
@@ -42,7 +136,7 @@
 
 .queue-top {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(18rem, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-5);
   align-items: start;
 }
@@ -50,6 +144,14 @@
 .desk-settings {
   display: grid;
   gap: var(--space-4);
+}
+
+.desk-settings .chart,
+.desk-settings .chart-frame,
+.desk-settings .chart-wrap,
+.desk-settings [class*="chart"] {
+  min-width: 0;
+  grid-column: 1 / -1;
 }
 
 .slider {
@@ -112,7 +214,7 @@
 .queue-grid {
   table-layout: fixed;
   width: 100%;
-  min-width: 68rem;
+  min-width: 86rem;
   border-collapse: separate;
   border-spacing: 0;
 }
@@ -138,7 +240,7 @@
 }
 
 .queue-grid col.col-suspicion {
-  width: 9.5rem;
+  width: 5.2rem;
 }
 
 .queue-grid col.col-money {
@@ -154,7 +256,7 @@
 }
 
 .queue-grid col.col-why {
-  width: 4.8rem;
+  width: 22rem;
 }
 
 .queue-grid col.col-move {
@@ -184,6 +286,10 @@
   border-radius: 0 var(--radius-md) var(--radius-md) 0;
 }
 
+.queue-grid thead th.why-head {
+  text-align: left;
+}
+
 .queue-grid tbody td,
 .queue-grid tbody th[scope="row"] {
   height: auto;
@@ -196,8 +302,10 @@
   white-space: normal;
 }
 
-.queue-grid tbody th.case-cell {
+.queue-grid tbody th.case-cell,
+.queue-grid tbody td.why-cell {
   white-space: normal;
+  vertical-align: top;
 }
 
 .queue-grid .case-cell {
@@ -287,5 +395,8 @@
 @media (max-width: 720px) {
   .kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .lane-pills {
+    grid-template-columns: 1fr 1fr;
   }
 }

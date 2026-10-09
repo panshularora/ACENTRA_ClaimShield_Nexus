@@ -16,7 +16,7 @@ export function LaneBadge({ lane }: { lane: Lane }) {
 }
 
 export function StatusBadge({ status }: { status: string }) {
-  return <span className="badge status">{status}</span>;
+  return <span className="badge status">{status.replaceAll("_", " ")}</span>;
 }
 
 /** Case risk level from API severity (1–4): glyph + label + colour, never colour alone. */
@@ -26,10 +26,9 @@ export function RiskBadge({ severity }: { severity: number }) {
 
 export function RiskLevelBadge({ level, title }: { level: RiskLevel; title?: string }) {
   return (
-    <span className={`badge risk-${level}`} title={title}>
+    <span className={`badge risk-${level}`} title={title ?? `${RISK_LABEL[level]} severity`}>
       <span aria-hidden="true">{RISK_GLYPH[level]}</span>
       {RISK_LABEL[level]}
-      <span className="sr-only"> risk</span>
     </span>
   );
 }
@@ -38,7 +37,7 @@ export function RiskLevelBadge({ level, title }: { level: RiskLevel; title?: str
 export function ConfirmBandBadge({ p }: { p: number }) {
   const band: ConfirmBand = confirmBand(p);
   return (
-    <span className={`badge confirm-${band}`} title="Suspicion score for review. A person still decides.">
+    <span className={`badge confirm-${band}`} title="Suspicion score for review">
       {CONFIRM_BAND_LABEL[band]}
     </span>
   );

@@ -87,8 +87,8 @@ function LineBody({ payload }: { payload: Record<string, unknown> }) {
         ) : null}
       </dl>
       <details className="ev-tech">
-        <summary>Technical — claim-line fields</summary>
-        <p>Table <span className="mono">claim_line</span> joined to the paid claim header.</p>
+        <summary>Line identifiers</summary>
+        <p>This row is one service on a paid claim header.</p>
         {str(payload.line_id) ? (
           <p className="mono muted">{str(payload.line_id)}</p>
         ) : null}
@@ -129,10 +129,9 @@ function MetricBody({ payload }: { payload: Record<string, unknown> }) {
         </div>
       </dl>
       <details className="ev-tech">
-        <summary>Technical — score field</summary>
+        <summary>How these scores are stored</summary>
         <p>
-          Cited field <span className="mono">{str(payload.field) ?? "metric"}</span>. Suspicion is a model score.
-          Desk rank is a separate five-factor mix.
+          Suspicion is a model score. Desk rank is a separate five-factor mix. Neither is a finding.
         </p>
       </details>
     </div>
@@ -163,19 +162,11 @@ function ProviderBody({ payload }: { payload: Record<string, unknown> }) {
           </div>
         ) : null}
       </dl>
-      <details className="ev-tech">
-        <summary>Technical — enrollment row</summary>
-        <p>
-          Table <span className="mono">provider</span>
-          {str(payload.provider_id) ? (
-            <>
-              {" "}
-              · id <span className="mono">{str(payload.provider_id)}</span>
-            </>
-          ) : null}
-          .
+      {str(payload.provider_id) ? (
+        <p className="muted">
+          Provider id <span className="mono">{str(payload.provider_id)}</span>
         </p>
-      </details>
+      ) : null}
     </div>
   );
 }
@@ -194,7 +185,7 @@ export function EvidenceDrawer({ caseId, itemId, onClose }: { caseId: string; it
       : kindTitle(kind);
 
   return (
-    <Drawer titleId="ev-title" eyebrow="Evidence item" title={title} subtitle={itemId} onClose={onClose}>
+    <Drawer titleId="ev-title" eyebrow="Evidence item" title={title} subtitle={kindTitle(kind)} onClose={onClose}>
       {query.isLoading ? <LoadingState label="Loading…" /> : null}
       {query.error ? <ErrorState title="Could not load this item" error={query.error} /> : null}
       {query.data && payload && isRecord(payload) ? (
@@ -207,19 +198,11 @@ export function EvidenceDrawer({ caseId, itemId, onClose }: { caseId: string; it
               {Array.isArray(payload.lines) ? (
                 <p>{payload.lines.length} line{payload.lines.length === 1 ? "" : "s"} on this claim in the case extract.</p>
               ) : null}
-              <details className="ev-tech">
-                <summary>Technical — claim header</summary>
-                <p>
-                  Table <span className="mono">claim</span>
-                  {str(payload.claim_id) ? (
-                    <>
-                      {" "}
-                      · <span className="mono">{str(payload.claim_id)}</span>
-                    </>
-                  ) : null}
-                  .
+              {str(payload.claim_id) ? (
+                <p className="muted">
+                  Claim <span className="mono">{str(payload.claim_id)}</span>
                 </p>
-              </details>
+              ) : null}
             </div>
           ) : null}
           {kind === "metric" ? <MetricBody payload={payload} /> : null}
@@ -230,19 +213,22 @@ export function EvidenceDrawer({ caseId, itemId, onClose }: { caseId: string; it
               <p>
                 <strong>What to check.</strong> Confirm the shared identifier and which NPI billed the flagged lines.
               </p>
-              <details className="ev-tech" open>
-                <summary>Technical — graph edge</summary>
+              <dl className="facts dense">
                 {str(payload.kind) ? (
-                  <p>
-                    Edge kind <span className="mono">{str(payload.kind)}</span>
-                  </p>
+                  <div>
+                    <dt>Link type</dt>
+                    <dd>{str(payload.kind)?.replaceAll("_", " ")}</dd>
+                  </div>
                 ) : null}
                 {str(payload.source) && str(payload.target) ? (
-                  <p className="mono">
-                    {str(payload.source)} → {str(payload.target)}
-                  </p>
+                  <div>
+                    <dt>Parties</dt>
+                    <dd className="mono">
+                      {str(payload.source)} → {str(payload.target)}
+                    </dd>
+                  </div>
                 ) : null}
-              </details>
+              </dl>
             </div>
           ) : null}
           {kind === "precedent" ? (

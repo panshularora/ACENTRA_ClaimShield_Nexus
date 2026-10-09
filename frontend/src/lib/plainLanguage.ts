@@ -169,7 +169,7 @@ export function findingCopy(kind: string | undefined, fallbackTitle: string): Fi
   if (kind && FINDING_PLAIN[kind]) return FINDING_PLAIN[kind];
   return {
     title: fallbackTitle,
-    what: "A detector flagged this pattern on paid claims. A person still has to review it.",
+    what: "A paid-claim check flagged this pattern. A person still has to review it.",
     check: "Open the supporting claim lines and see whether a simple explanation fits.",
     source: "Paid claims",
   };

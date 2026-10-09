@@ -20,9 +20,9 @@ export function AwsIngestPanel() {
   return (
     <Panel
       id="aws-ingest"
-      eyebrow="AWS ingest"
-      title="S3 drop to SIU run"
-      description="CSV land in incoming/. Lambda claimshield-s3-processor posts to FastAPI with a shared internal token. Detection stays in the API."
+      eyebrow="AWS"
+      title="S3 drop"
+      description={`${data?.region ?? "ap-south-1"} · ${data?.bucket ?? "claimshield-nexus-data-2026"} / ${data?.incoming_prefix ?? "incoming/"}`}
     >
       {query.error ? <ErrorState title="AWS status could not be loaded" error={query.error} /> : null}
       {data ? (

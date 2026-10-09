@@ -1,8 +1,7 @@
 import type { QueueCase } from "../../api/types";
-import { ConfirmBandBadge, HarmFlag, LaneBadge, RiskBadge, StatusBadge } from "../../components/Badge";
+import { LaneBadge, StatusBadge } from "../../components/Badge";
 import { EvidenceBar } from "../../components/EvidenceBar";
 import { money, pct, screeningLabel, screeningShort, screeningTone, whyPriority } from "../../lib/format";
-import { FactorStrip } from "./FactorBars";
 import { DASH_LABEL, SCORE_LABELS } from "../../lib/scoreLabels";
 import type { OverrideTarget } from "./OverrideForm";
 
@@ -64,7 +63,9 @@ export function QueueTable({ rows, openId, compareIds, canOverride, onOpen, onCo
             <th scope="col" className="num" title="Days left on the 45-day screening clock">
               {DASH_LABEL.time}
             </th>
-            <th scope="col">{DASH_LABEL.why}</th>
+            <th scope="col" className="why-head">
+              {DASH_LABEL.why}
+            </th>
             {canOverride ? <th scope="col">{DASH_LABEL.move}</th> : null}
           </tr>
         </thead>
@@ -139,21 +140,15 @@ function QueueRow({ row, open, compared, canOverride, onOpen, onCompare, onOverr
       <td>
         <StatusBadge status={row.status} />
       </td>
-      <td title={SCORE_LABELS.pConfirm.hint}>
-        <span className="axis-pair">
-          <ConfirmBandBadge p={row.p_confirm} />
-          <span className="num">{pct(row.p_confirm)}</span>
-        </span>
+      <td className="num" title={SCORE_LABELS.pConfirm.hint}>
+        {pct(row.p_confirm)}
       </td>
-      <td>
-        <RiskBadge severity={row.severity} />
+      <td className="num" title={`Severity ${row.severity} of 4`}>
+        {row.severity}/4
       </td>
       <td className="num dollars">{money(row.flagged_dollars)}</td>
-      <td>
-        <span className="axis-pair">
-          <HarmFlag harm={row.harm} />
-          <span className="muted">{row.members_affected} people</span>
-        </span>
+      <td className="num" title={`Harm level ${row.harm}`}>
+        {row.members_affected}
       </td>
       <td>
         <EvidenceBar value={row.evidence_strength} label={DASH_LABEL.proof} />
@@ -163,8 +158,8 @@ function QueueRow({ row, open, compared, canOverride, onOpen, onCompare, onOverr
           {screeningShort(row.screening_days_left)}
         </span>
       </td>
-      <td className="factors-cell">
-        <FactorStrip factors={row.rank_factors} />
+      <td className="why-cell" title={whyPriority(row)}>
+        <span>{row.why_rank?.text ?? whyPriority(row)}</span>
       </td>
       {canOverride ? (
         <td>

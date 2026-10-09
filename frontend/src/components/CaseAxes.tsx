@@ -1,55 +1,38 @@
 import type { CaseDetail, QueueCase } from "../api/types";
-import { ConfirmBandBadge, HarmFlag, RiskBadge } from "./Badge";
-import { EvidenceBar } from "./EvidenceBar";
 import { StatTile } from "./ui/StatTile";
-import { hours, money, pct, screeningLabel, screeningShort } from "../lib/format";
-import { SCORE_LABELS } from "../lib/scoreLabels";
+import { hours, money, pct, screeningShort } from "../lib/format";
+import { CONFIRM_BAND_LABEL, confirmBand, RISK_LABEL, riskLevel } from "../lib/risk";
 
 type AxesCase = Pick<
   CaseDetail,
-  "p_confirm" | "severity" | "flagged_dollars" | "harm" | "members_affected" | "evidence_strength" | "screening_days_left" | "estimated_hours" | "score_kind" | "calibrated"
+  | "p_confirm"
+  | "severity"
+  | "flagged_dollars"
+  | "harm"
+  | "members_affected"
+  | "evidence_strength"
+  | "screening_days_left"
+  | "estimated_hours"
 >;
 
-/** The six scores an SIU reviewer should read on every case. */
+/** Six scores, one number each. Hints do not repeat the value. */
 export function CaseAxes({ data }: { data: AxesCase | QueueCase }) {
+  const band = CONFIRM_BAND_LABEL[confirmBand(data.p_confirm)];
+  const severityName = RISK_LABEL[riskLevel(data.severity)];
+  const days = screeningShort(data.screening_days_left);
   return (
     <dl className="stat-grid case-axes">
-      <StatTile
-        label="Suspicion"
-        value={
-          <span className="axis-pair">
-            <ConfirmBandBadge p={data.p_confirm} />
-            <span className="num">{pct(data.p_confirm)}</span>
-          </span>
-        }
-        hint={SCORE_LABELS.pConfirm.hintFor(data)}
-      />
-      <StatTile
-        label="Scheme severity"
-        value={<RiskBadge severity={data.severity} />}
-        hint={`${data.severity} of 4`}
-      />
-      <StatTile
-        label="Financial exposure"
-        value={money(data.flagged_dollars)}
-        hint="Already paid on flagged claims"
-      />
+      <StatTile label="Suspicion" value={pct(data.p_confirm)} hint={band} />
+      <StatTile label="Scheme severity" value={`${data.severity} / 4`} hint={severityName} />
+      <StatTile label="Financial exposure" value={money(data.flagged_dollars)} hint="Paid on flagged lines" />
       <StatTile
         label="Member impact"
-        value={<HarmFlag harm={data.harm} />}
-        hint={`${data.members_affected} people on flagged claims. Desk rank uses this, not the suspicion score.`}
+        value={String(data.members_affected)}
+        hint={`Harm level ${data.harm}`}
         tone={data.harm >= 3 ? "harm" : "default"}
       />
-      <StatTile
-        label="Evidence strength"
-        value={<EvidenceBar value={data.evidence_strength} label="Evidence strength" />}
-        hint={pct(data.evidence_strength)}
-      />
-      <StatTile
-        label="Urgency"
-        value={screeningShort(data.screening_days_left)}
-        hint={screeningLabel(data.screening_days_left) + ` · ${hours(data.estimated_hours)} to review`}
-      />
+      <StatTile label="Evidence strength" value={pct(data.evidence_strength)} hint="Packet completeness" />
+      <StatTile label="Urgency" value={days} hint={`${hours(data.estimated_hours)} to review`} />
     </dl>
   );
 }

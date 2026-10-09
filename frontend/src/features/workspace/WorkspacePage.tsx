@@ -10,10 +10,9 @@ import { PageHeader } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Panel";
 import { NotFound } from "../../components/ui/NotFound";
 import { ErrorState, LoadingState } from "../../components/ui/States";
-import { pct } from "../../lib/format";
 import { FactorBars } from "../queue/FactorBars";
 import { BriefPanel } from "./BriefPanel";
-import { CaseHeader, FactorList } from "./CaseHeader";
+import { CaseHeader } from "./CaseHeader";
 import { ClaimsTable } from "./ClaimsTable";
 import { DecisionBar } from "./DecisionBar";
 import { configsFromOptions, type DecisionAction } from "./decisionConfig";
@@ -25,7 +24,7 @@ import { CaseLineage } from "./ProvenancePanel";
 import { TimelinePanel } from "./TimelinePanel";
 import "./workspace.css";
 
-/** Tabs 2–6; ids double as URL hashes. */
+/** Case-file tabs; ids double as URL hashes. */
 const SECTIONS = [
   { id: "evidence", label: "Evidence" },
   { id: "network", label: "Network" },
@@ -262,7 +261,7 @@ export function WorkspacePage() {
 
           <nav className="section-nav" aria-label="Case file">
             <div className="section-tabs" role="tablist">
-              {SECTIONS.map((section, i) => (
+              {SECTIONS.map((section) => (
                 <button
                   key={section.id}
                   type="button"
@@ -273,9 +272,6 @@ export function WorkspacePage() {
                   className={tab === section.id ? "is-active" : undefined}
                   onClick={() => openTab(section.id)}
                 >
-                  <span className="section-index" aria-hidden="true">
-                    {i + 2}
-                  </span>
                   {section.label}
                 </button>
               ))}
@@ -294,67 +290,29 @@ export function WorkspacePage() {
             <Panel
               id="evidence"
               className="workspace-tab"
-              eyebrow="2 · Evidence"
+              eyebrow="Evidence"
               title="Why this case is on the desk"
               description={data.why_rank?.text}
             >
-              <dl className="evidence-dossier facts dense">
-                <div>
-                  <dt>Patterns on this file</dt>
-                  <dd>{data.alerts.length}</dd>
-                </div>
-                <div>
-                  <dt>Paid claim lines cited</dt>
-                  <dd>{new Set(data.alerts.flatMap((alert) => alert.line_ids)).size}</dd>
-                </div>
-                <div>
-                  <dt>Evidence strength</dt>
-                  <dd>{pct(data.evidence_strength)}</dd>
-                </div>
-                <div>
-                  <dt>Tables behind the packet</dt>
-                  <dd>{data.provenance?.data_sources.length ?? "—"}</dd>
-                </div>
-              </dl>
-              <p className="note">
-                Each card below is a suspicion to verify: plain words first, then the detector, rule id, and
-                tables. This packet is not a fraud label.
+              <p className="evidence-lede">
+                {data.alerts.length} pattern{data.alerts.length === 1 ? "" : "s"} on{" "}
+                {new Set(data.alerts.flatMap((alert) => alert.line_ids)).size} cited claim lines
+                {data.grouping ? ` · ${data.grouping.entity_ids.length} provider(s) grouped` : ""}.
               </p>
-              <div className="evidence-grid">
-                <FactorBars factors={data.rank_factors} suspicion={data.p_confirm} title="How desk rank is built" />
+              {data.evidence_gaps && data.evidence_gaps.length > 0 ? (
                 <div className="evidence-summary subpanel">
-                  {data.grouping ? (
-                    <>
-                      <h3>Why these patterns sit together</h3>
-                      <p>{data.grouping.text}</p>
-                      <p className="muted">
-                        {data.grouping.alert_count} pattern{data.grouping.alert_count === 1 ? "" : "s"} across{" "}
-                        {data.grouping.entity_ids.length} provider{data.grouping.entity_ids.length === 1 ? "" : "s"}
-                      </p>
-                    </>
-                  ) : null}
-                  {data.evidence_gaps && data.evidence_gaps.length > 0 ? (
-                    <>
-                      <h3>What to collect next</h3>
-                      <ul className="compact-list">
-                        {data.evidence_gaps.map((gap) => (
-                          <li key={gap}>{gap}</li>
-                        ))}
-                      </ul>
-                    </>
-                  ) : null}
-                  <p className="note">
-                    Ranked for a person to review. Scores do not close the case.
-                  </p>
-                </div>
-              </div>
-              {(data.risk_factors && data.risk_factors.length > 0) ||
-              (data.p_confirm_factors && data.p_confirm_factors.length > 0) ? (
-                <div className="case-model-factors">
-                  <FactorList title="What is pushing 30-day suspicion" factors={data.risk_factors} />
-                  <FactorList title="What is pushing the suspicion score" factors={data.p_confirm_factors} />
+                  <h3>Still needed</h3>
+                  <ul className="compact-list">
+                    {data.evidence_gaps.map((gap) => (
+                      <li key={gap}>{gap}</li>
+                    ))}
+                  </ul>
                 </div>
               ) : null}
+              <section className="rank-open">
+                <h3>How today&apos;s desk rank was built</h3>
+                <FactorBars factors={data.rank_factors} suspicion={data.p_confirm} title="Desk rank" />
+              </section>
               <FindingsPanel
                 alerts={data.alerts}
                 focusAlertIds={matches?.alertIds ?? null}
@@ -393,7 +351,7 @@ export function WorkspacePage() {
             <Panel
               id="claims"
               className="workspace-tab"
-              eyebrow="4 · Claims"
+              eyebrow="Claims"
               title="Flagged claims and billing over time"
               description="Claim lines attached to this case's alerts, from the adjudicated extract."
             >
@@ -421,7 +379,7 @@ export function WorkspacePage() {
             <Panel
               id="brief"
               className="workspace-tab"
-              eyebrow="5 · Brief"
+              eyebrow="Brief"
               title="Investigation brief"
               description="Every sentence cites the alert, claim or metric it came from. Select a citation to trace it."
             >
@@ -439,7 +397,7 @@ export function WorkspacePage() {
           {tab === "decide" ? (
             <Panel
               id="decide"
-              eyebrow="6 · Decision · human only"
+              eyebrow="Decision · human only"
               title="Record the next step"
               description="Write what you checked and why. Another reviewer should be able to follow the same claims."
               className="decision-panel workspace-tab"

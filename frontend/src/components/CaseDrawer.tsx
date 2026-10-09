@@ -6,7 +6,6 @@ import { findingCopy } from "../lib/plainLanguage";
 import { CaseAxes } from "./CaseAxes";
 import { LaneBadge, StatusBadge } from "./Badge";
 import { Drawer } from "./ui/Drawer";
-import { SCORE_LABELS } from "../lib/scoreLabels";
 import { ErrorState, LoadingState } from "./ui/States";
 
 /** Quick case summary opened from the manager queue. */
@@ -33,12 +32,6 @@ export function CaseDrawer({ caseId, onClose }: { caseId: string; onClose: () =>
             <LaneBadge lane={detail.lane} />
             <StatusBadge status={detail.status} />
           </div>
-          {detail.model_version ? (
-            <p className="muted">
-              {SCORE_LABELS.pConfirm.hintFor(detail)}
-              {detail.model_version ? ` · ${detail.model_version}` : ""}
-            </p>
-          ) : null}
           <p>{whyPriority(detail)}</p>
           <CaseAxes data={detail} />
           <p className="muted">
