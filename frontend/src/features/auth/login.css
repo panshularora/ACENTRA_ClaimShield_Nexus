@@ -17,6 +17,7 @@ body:has(.login-screen) {
   max-width: 40rem;
   margin: 0 auto;
   padding: 3.5rem 8vw 4rem;
+  background: radial-gradient(ellipse at 50% 36%, rgba(10, 16, 22, 0.88) 0%, rgba(10, 16, 22, 0.55) 55%, rgba(10, 16, 22, 0.12) 100%);
 }
 
 .login-screen h1 {

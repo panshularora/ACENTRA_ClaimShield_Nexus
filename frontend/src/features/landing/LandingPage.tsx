@@ -5,6 +5,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { Component, type ErrorInfo, type ReactNode, Suspense, useCallback, useRef, useState } from "react";
 import { AppLogo } from "../../components/ui/AppLogo";
 import { PipelineScene } from "../../three/PipelineScene";
+import { PublicBackdrop } from "../../three/PublicBackdrop";
 import "./landing.css";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
@@ -130,6 +131,7 @@ export function LandingPage() {
 
   return (
     <div className="landing" ref={root}>
+      <PublicBackdrop holdUntilScroll />
       <header className="landing-nav">
         <div className="brand-lockup">
           <AppLogo />

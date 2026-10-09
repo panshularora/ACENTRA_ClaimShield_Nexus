@@ -2,25 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError } from "../../api/client";
+import { homeFor } from "../../auth/access";
 import { useAuth } from "../../auth/AuthProvider";
-import type { SessionUser } from "../../api/types";
 import { AppLogo } from "../../components/ui/AppLogo";
+import { PublicBackdrop } from "../../three/PublicBackdrop";
 import "../landing/landing.css";
 import "./login.css";
-
-function homeFor(user: SessionUser): string {
-  if (user.role === "auditor") return "/audit";
-  if (user.permissions.includes("queue:read") || user.permissions.includes("admin:*")) {
-    if (user.role === "investigator") return "/investigator/cases";
-    return "/manager/queue";
-  }
-  if (user.permissions.includes("case:read")) return "/investigator/cases";
-  if (user.permissions.includes("wiki:read") || user.permissions.includes("wiki:approve")) {
-    return "/wiki/proposals";
-  }
-  if (user.permissions.includes("audit:read")) return "/audit";
-  return "/manager/queue";
-}
 
 export function LoginPage() {
   const { user, login } = useAuth();
@@ -52,6 +39,7 @@ export function LoginPage() {
 
   return (
     <div className="landing login-screen">
+      <PublicBackdrop />
       <header className="landing-nav">
         <Link to="/" className="brand-lockup">
           <AppLogo />
