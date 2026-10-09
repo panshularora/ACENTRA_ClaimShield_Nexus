@@ -54,6 +54,9 @@ A working SIU application, not a slide deck:
 | Precedents `/wiki/proposals` | Analyst / manager | Human-approved wiki pages from closed work |
 | Audit `/audit` | Auditor | Hash-chained append-only log |
 
+**Live demo:** [https://claimshield-nexus-api.onrender.com/login](https://claimshield-nexus-api.onrender.com/login)  
+(Free Render can sleep; first hit after idle may take ~30s.)
+
 **Demo logins** (password matches `demo-<role>`):
 
 | Email | Role |
@@ -209,7 +212,7 @@ Correct lines:
 
 ## 9. 90-second demo script
 
-**Prep:** backend `:8000`, frontend `:5173`. Manager login already filled.
+**Prep:** open [https://claimshield-nexus-api.onrender.com](https://claimshield-nexus-api.onrender.com) (or local backend `:8000` + frontend `:5173`). Manager login already filled.
 
 1. **Landing (10s).** Scroll: “Improper payments are not fraud. Cases are networks. Harm goes first.” Click **Enter SIU**.
 2. **Sign in (5s).** `manager@demo.claimshield` / `demo-manager`.

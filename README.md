@@ -4,6 +4,16 @@ Post-adjudication SIU platform for Medicaid-like FWA: synthetic extract, hash-ch
 
 This repository contains the backend, auth, product docs, and the SIU frontend (queue, worklist, investigation workspace).
 
+## Live demo
+
+Hosted SIU desk (app + API on one origin): [https://claimshield-nexus-api.onrender.com](https://claimshield-nexus-api.onrender.com)
+
+- Login: [https://claimshield-nexus-api.onrender.com/login](https://claimshield-nexus-api.onrender.com/login)
+- Manager: `manager@demo.claimshield` / `demo-manager`
+- Investigator: `investigator@demo.claimshield` / `demo-investigator`
+
+Free Render can sleep; the first request after idle may take about 30 seconds. CDN copy of the UI: [https://claimshield-nexus-qwsc.onrender.com](https://claimshield-nexus-qwsc.onrender.com).
+
 ## Docs
 
 | File | What it is |

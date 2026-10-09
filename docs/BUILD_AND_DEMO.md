@@ -4,10 +4,10 @@ Acentra Health code-a-thon, Problem 3. Product: post-adjudication SIU workbench 
 
 Live demo:
 
-- App: https://claimshield-nexus.vercel.app
-- API: https://claimshield-nexus-api.vercel.app
+- Desk (app + API): https://claimshield-nexus-api.onrender.com
+- Login: https://claimshield-nexus-api.onrender.com/login
+- CDN UI copy: https://claimshield-nexus-qwsc.onrender.com
 - Repo: https://github.com/panshularora/ACENTRA_ClaimShield_Nexus
-- Branch with this slice: `feature/frontend-backend-wiring`
 
 Demo logins (demo mode only):
 

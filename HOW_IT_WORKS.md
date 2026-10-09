@@ -229,7 +229,8 @@ Nothing here is a courtroom exhibit generator. It is so an investigator (and a j
 
 ## 8. Where to *see* each idea in the app
 
-Start backend `:8000`, frontend `:5173`.  
+Live desk: [https://claimshield-nexus-api.onrender.com/login](https://claimshield-nexus-api.onrender.com/login)  
+(or local backend `:8000`, frontend `:5173`).  
 Login `manager@demo.claimshield` / `demo-manager`. Load **tiny seed 7**.
 
 | Idea | Where |
