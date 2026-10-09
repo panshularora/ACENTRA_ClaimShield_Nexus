@@ -1,7 +1,7 @@
 # How ClaimShield Nexus actually works
 
 This is the from-scratch explainer for Team SE7EN.  
-`JUDGING.md` is how to present. This file is how to **understand**.
+The 10-slide pitch is `ClaimShield_Nexus_10slide.pptx`. This file is how to **understand**.
 
 If you only remember one chain:
 
@@ -283,7 +283,7 @@ Lambda is **not** the fraud engine.
 | `backend/src/claimshield/api/routers/aws.py` | Machine ingest |
 | `frontend/src/features/queue/ManagerQueuePage.tsx` | Desk |
 | `frontend/src/features/workspace/*` | Case, lineage, decide |
-| `JUDGING.md` | Pitch and Q&A |
+| `ClaimShield_Nexus_10slide.pptx` | Pitch deck |
 
 ---
 
