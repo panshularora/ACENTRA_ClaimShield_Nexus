@@ -19,6 +19,7 @@ from claimshield.api.routers import entities as entities_router
 from claimshield.api.routers import health as health_router
 from claimshield.api.routers import models as models_router
 from claimshield.api.routers import wiki as wiki_router
+from claimshield.api.spa import attach_spa
 from claimshield.auth.service import seed_demo_users, seed_system_user
 from claimshield.core.config import Settings, get_settings
 from claimshield.core.errors import ClaimShieldError
@@ -93,6 +94,7 @@ def create_app() -> FastAPI:
     app.include_router(entities_router.router)
     app.include_router(aws_router.router)
     app.include_router(models_router.router)
+    attach_spa(app, settings)
     return app
 
 

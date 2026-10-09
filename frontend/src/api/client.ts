@@ -63,13 +63,15 @@ function captureCsrf(payload: unknown): void {
   if (typeof body.user?.csrf_token === "string") rememberCsrf(body.user.csrf_token);
 }
 
-const PROD_API = "https://claimshield-nexus-api.vercel.app";
+const PROD_API = "https://claimshield-nexus-api.onrender.com";
 
 /** Local Vite uses the /api proxy. Production talks to the public FastAPI origin. */
 function apiUrl(path: string): string {
   if (import.meta.env.DEV) return path;
-  const raw = (import.meta.env.VITE_API_BASE as string | undefined) || PROD_API;
-  return `${raw.replace(/\/$/, "")}${path}`;
+  const raw = import.meta.env.VITE_API_BASE as string | undefined;
+  if (raw === "" || raw === "/") return path;
+  const base = (raw || PROD_API).replace(/\/$/, "");
+  return `${base}${path}`;
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {

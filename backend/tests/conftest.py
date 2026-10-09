@@ -36,6 +36,7 @@ def client(tmp_path, monkeypatch) -> TestClient:
     monkeypatch.setenv("CLAIMSHIELD_JWT_SIGNING_KEY", "test-signing-key-at-least-32-bytes-long")
     monkeypatch.setenv("CLAIMSHIELD_COOKIE_SECURE", "false")
     monkeypatch.setenv("CLAIMSHIELD_DEMO_MODE", "true")
+    monkeypatch.setenv("CLAIMSHIELD_SPA_DIR", str(tmp_path / "no-spa"))
     get_settings.cache_clear()
     reset_engine()
     from claimshield.api.main import create_app

@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_model: str = "grok-4.7"
     data_dir: Path = Path(__file__).resolve().parents[4] / "data"
+    # Optional Vite dist directory. Empty discovery uses backend/spa then frontend/dist.
+    spa_dir: Path | None = None
     # Trained risk-model artifact; defaults to data_dir/models/risk_model.json when unset.
     risk_model_path: Path | None = None
     # Shared with Lambda. Empty disables POST /api/v1/aws/ingest. Never log or return this value.
