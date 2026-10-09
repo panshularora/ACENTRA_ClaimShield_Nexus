@@ -1,7 +1,7 @@
-/* Signed-in shell: Revora-style pill header on a cool canvas. */
+/* Signed-in shell: paper desk with a faint case-file blotter. Cards stay opaque. */
 .app {
-  --dash-bg: #f8f9fc;
-  --dash-card: #ffffff;
+  --dash-bg: #e6ebe8;
+  --dash-card: #f3f5f3;
   --dash-line: #eef0f5;
   --dash-ink: #0f172a;
   --dash-muted: #64748b;
@@ -10,7 +10,17 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: var(--dash-bg);
+  background-color: var(--dash-bg);
+  background-image:
+    radial-gradient(1100px 480px at 6% -8%, rgba(4, 33, 38, 0.05), transparent 58%),
+    radial-gradient(900px 420px at 100% 0%, rgba(28, 135, 62, 0.055), transparent 54%),
+    repeating-linear-gradient(
+      180deg,
+      transparent 0 47px,
+      rgba(4, 33, 38, 0.028) 47px 48px
+    ),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 900' preserveAspectRatio='xMidYMid slice'%3E%3Cg fill='none' stroke='%23042126' stroke-linecap='round'%3E%3Cpath d='M-40 90 C 280 20, 560 210, 900 70 S 1520 140, 1520 140' stroke-width='1.1' opacity='.07'/%3E%3Cpath d='M-40 190 C 300 110, 620 300, 980 160 S 1520 230, 1520 230' stroke-width='1' opacity='.055'/%3E%3Cpath d='M-40 310 C 260 250, 640 430, 1020 280 S 1520 360, 1520 360' stroke-width='1' opacity='.05'/%3E%3Cpath d='M-40 470 C 340 390, 700 580, 1100 430 S 1520 510, 1520 510' stroke-width='1.05' opacity='.06'/%3E%3Cpath d='M-40 640 C 280 580, 720 760, 1140 600 S 1520 690, 1520 690' stroke-width='1' opacity='.045'/%3E%3Cpath d='M220 -20 C 260 200, 180 480, 340 920' stroke-width='1' opacity='.04'/%3E%3Cpath d='M980 -20 C 1040 240, 900 520, 1120 940' stroke-width='1' opacity='.035'/%3E%3C/g%3E%3C/svg%3E");
+  background-attachment: fixed;
 }
 
 .app-main {
@@ -29,7 +39,7 @@
   min-height: 4.25rem;
   padding: 0.75rem 1.5rem;
   border: 0;
-  background: color-mix(in srgb, var(--dash-bg) 92%, white);
+  background: color-mix(in srgb, var(--dash-bg) 82%, var(--dash-card));
   backdrop-filter: blur(10px);
   color: var(--dash-ink);
 }
@@ -92,7 +102,7 @@
 }
 
 .app .mast-nav a[aria-current="page"] {
-  background: #fff;
+  background: var(--dash-card);
   color: var(--dash-ink);
   font-weight: 600;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
@@ -105,7 +115,7 @@
   padding: 0.2rem 0.35rem 0.2rem 0.85rem;
   border: 1px solid #e2e8f0;
   border-radius: 999px;
-  background: #fff;
+  background: var(--dash-card);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 

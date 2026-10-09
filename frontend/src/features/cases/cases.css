@@ -1,27 +1,135 @@
-/* Investigator worklist: claims-style table, same SIU fields. */
-.work-wrap {
+/* Investigator worklist: same compact desk table as the manager queue. */
+.cases-page.page {
+  max-width: none;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.cases-page #worklist.dash-panel {
+  background: #f3f8f4;
+  border-color: #d7eadc;
+}
+
+.cases-page #worklist .panel-body {
+  padding-left: 0.85rem;
+  padding-right: 0.85rem;
+}
+
+.cases-page .work-wrap {
+  overflow-x: hidden;
+  overflow-y: auto;
   max-height: 36rem;
+  background: var(--dash-card);
+  border: 1px solid #d7eadc;
+  border-radius: 0.9rem;
+}
+
+.app .cases-page .work-grid thead th,
+.cases-page .work-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 2.15rem;
+  padding: 0 0.4rem;
+  border-bottom: 0;
+  background: #042126;
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 2.15rem;
+  text-transform: uppercase;
+}
+
+.work-grid col.col-provider {
+  width: 22%;
+}
+
+.work-grid col.col-case {
+  width: 13%;
+}
+
+.work-grid col.col-lane {
+  width: 11%;
+}
+
+.work-grid col.col-status {
+  width: 7%;
+}
+
+.work-grid col.col-clock {
+  width: 7%;
+}
+
+.work-grid col.col-money {
+  width: 9%;
+}
+
+.work-grid col.col-suspicion {
+  width: 12%;
+}
+
+.work-grid col.col-harm {
+  width: 9%;
+}
+
+.work-grid col.col-move {
+  width: 10%;
+}
+
+.app .cases-page .work-grid tbody td,
+.app .cases-page .work-grid tbody th {
+  padding: 0.45rem 0.4rem;
+  font-size: 0.75rem;
 }
 
 .work-grid .work-card-name {
-  display: inline-block;
-  font-size: var(--font-size-14);
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.75rem;
   font-weight: 700;
+  color: var(--color-link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
-.work-grid .work-card-meta,
-.work-grid .work-card-scores {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.15rem 0.7rem;
-  margin: 0.2rem 0 0;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-12);
-  font-weight: 500;
+.app .work-grid .work-card-name:hover {
+  color: var(--color-link);
 }
 
-.work-grid .chip-row {
-  margin-top: 0.3rem;
+.work-grid .risk-cell {
+  gap: 0.35rem;
+}
+
+.work-grid .risk-n {
+  font-size: 0.7rem;
+  min-width: 1.8rem;
+}
+
+.work-grid .risk-track {
+  width: 2.8rem;
+  height: 4px;
+  background: #dce7dc;
+}
+
+.work-grid .risk-track i {
+  display: block;
+  height: 100%;
+  background: #1c873e;
+}
+
+.work-grid .move-cell .btn.ghost {
+  min-width: 0;
+  width: 100%;
+  max-width: 4.4rem;
+  height: 1.5rem;
+  padding: 0 0.4rem;
+  font-size: 0.7rem;
+  border: 1px solid #c5d4c8;
+  background: var(--dash-card);
+  color: #174c21;
 }
 
 .worklist-cards {

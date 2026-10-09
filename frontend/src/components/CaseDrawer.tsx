@@ -37,7 +37,7 @@ export function CaseDrawer({ caseId, onClose }: { caseId: string; onClose: () =>
           <p className="muted">
             Owner {detail.assignee_id ?? "Unassigned"} · {detail.primary_entity_type} {detail.primary_entity_id}
           </p>
-          <div>
+          <div className="drawer-file">
             <p className="kicker">What we noticed</p>
             {detail.alerts.length === 0 ? (
               <p className="muted">No patterns attached.</p>

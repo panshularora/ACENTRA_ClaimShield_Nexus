@@ -96,9 +96,9 @@
      --------------------------------------------------------------------------- */
 
   /* Surfaces */
-  --color-bg:             var(--neutral-50);   /* app canvas behind cards */
-  --color-surface:        var(--neutral-0);    /* cards, tables, panels, graph canvas */
-  --color-surface-raised: var(--neutral-0);    /* menus, tooltips, drawers, modals (paired with --shadow-overlay) */
+  --color-bg:             #e8ece9;             /* app canvas: off-white paper, eases the jump from the dark public pages */
+  --color-surface:        #f3f5f3;             /* cards, tables, panels, graph canvas */
+  --color-surface-raised: #f4f6f4;             /* menus, tooltips, drawers, modals (paired with --shadow-overlay) */
   --color-surface-sunken: var(--neutral-100);  /* table header, inset metric strips, code/evidence blocks */
   --color-surface-hover:  #f4f8f8;             /* row/list hover tint (neutral, OKLCH L .975) */
   --color-overlay-scrim:  rgb(4 33 38 / 0.32); /* modal/drawer scrim, ink at 32% */

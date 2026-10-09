@@ -46,7 +46,10 @@ export function ConfirmBandBadge({ p }: { p: number }) {
 export function HarmFlag({ harm }: { harm: number }) {
   const tone = harm >= 4 ? "harm" : harm >= 3 ? "tone-warning" : "status";
   return (
-    <span className={`badge ${tone}`} title="Patient-harm level (separate from money risk)">
+    <span
+      className={`badge ${tone} harm-level-${harm}`}
+      title="Patient-harm level (separate from money risk)"
+    >
       Harm {harm}
     </span>
   );
