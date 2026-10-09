@@ -1,8 +1,8 @@
 import type { QueueCase, RankingPolicy } from "../../api/types";
 import { LaneBadge } from "../../components/Badge";
+import { CaseAxes } from "../../components/CaseAxes";
 import { Panel } from "../../components/ui/Panel";
-import { hours, money, screeningLabel, whyPriority } from "../../lib/format";
-import { SCORE_LABELS } from "../../lib/scoreLabels";
+import { whyPriority } from "../../lib/format";
 import { FactorBars } from "./FactorBars";
 
 /** Side-by-side rank breakdown for up to two queued cases. */
@@ -11,7 +11,7 @@ export function CompareStrip({ rows, policy, onClear }: { rows: QueueCase[]; pol
     <Panel
       id="compare"
       eyebrow="Compare"
-      title="Rank factors side by side"
+      title="Why these cases rank this way"
       actions={
         <button type="button" className="btn small" onClick={onClear}>
           Clear
@@ -26,25 +26,13 @@ export function CompareStrip({ rows, policy, onClear }: { rows: QueueCase[]; pol
               <LaneBadge lane={row.lane} />
             </div>
             <p className="mono muted">{row.primary_entity_id}</p>
-            <dl className="facts">
-              <div>
-                <dt>{SCORE_LABELS.expectedValue.label}</dt>
-                <dd className="num">{money(row.expected_value ?? 0)}</dd>
-              </div>
-              <div>
-                <dt>Harm</dt>
-                <dd className="num">{row.harm}</dd>
-              </div>
-              <div>
-                <dt>Hours</dt>
-                <dd className="num">{hours(row.estimated_hours)}</dd>
-              </div>
-              <div>
-                <dt>45-day screen</dt>
-                <dd>{screeningLabel(row.screening_days_left)}</dd>
-              </div>
-            </dl>
-            <FactorBars factors={row.rank_factors} policy={policy} title={`Rank drivers · ${row.case_id}`} />
+            <CaseAxes data={row} />
+            <FactorBars
+              factors={row.rank_factors}
+              policy={policy}
+              suspicion={row.p_confirm}
+              title={`Desk rank · ${row.case_id}`}
+            />
             <p className="muted">{whyPriority(row)}</p>
           </article>
         ))}

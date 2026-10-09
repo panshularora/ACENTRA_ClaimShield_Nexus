@@ -8,15 +8,17 @@ import { LaneHoursChart } from "../../components/charts/LaneHoursChart";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Panel } from "../../components/ui/Panel";
 import { EmptyState, ErrorState, LoadingState } from "../../components/ui/States";
-import { StatTile } from "../../components/ui/StatTile";
 import { hours, LANE_ORDER, laneLabel } from "../../lib/format";
+import { rankedToday } from "../../lib/queueSlots";
 import { readStoredRun, writeStoredRun } from "../../lib/runStore";
+import { HistoryPanel } from "../cases/HistoryPanel";
+import { AwsIngestPanel } from "./AwsIngestPanel";
 import { CompareStrip } from "./CompareStrip";
 import { DeskSettings, type DeskDraft } from "./DeskSettings";
-import { FactorStripLegend } from "./FactorBars";
 import { OverrideForm, type OverrideTarget } from "./OverrideForm";
+import { KpiCard, LaneMixCard, SlotFillCard } from "./DashWidgets";
 import { QueueTable, type SortKey } from "./QueueTable";
-import { SCORE_LABELS } from "../../lib/scoreLabels";
+import { DASH_LABEL } from "../../lib/scoreLabels";
 import "./queue.css";
 
 function sumHours(rows: QueueCase[], lane: Lane): number {
@@ -27,12 +29,12 @@ function sortRows(rows: QueueCase[], key: SortKey): QueueCase[] {
   const laneIndex = (row: QueueCase) => LANE_ORDER.indexOf(row.lane);
   const by: Record<SortKey, (a: QueueCase, b: QueueCase) => number> = {
     rank: (a, b) => laneIndex(a) - laneIndex(b) || (b.rank_factors?.composite ?? 0) - (a.rank_factors?.composite ?? 0),
-    ev: (a, b) => (b.expected_value ?? 0) - (a.expected_value ?? 0),
-    dollars: (a, b) => b.flagged_dollars - a.flagged_dollars,
-    harm: (a, b) => b.harm - a.harm,
-    hours: (a, b) => b.estimated_hours - a.estimated_hours,
-    evidence: (a, b) => b.evidence_strength - a.evidence_strength,
     p: (a, b) => b.p_confirm - a.p_confirm,
+    severity: (a, b) => b.severity - a.severity,
+    dollars: (a, b) => b.flagged_dollars - a.flagged_dollars,
+    harm: (a, b) => b.harm - a.harm || b.members_affected - a.members_affected,
+    hours: (a, b) => (a.screening_days_left ?? 99) - (b.screening_days_left ?? 99),
+    evidence: (a, b) => b.evidence_strength - a.evidence_strength,
   };
   return [...rows].sort(by[key]);
 }
@@ -56,6 +58,7 @@ export function ManagerQueuePage() {
   const [edits, setEdits] = useState<Partial<DeskDraft>>({});
   const [overrideTarget, setOverrideTarget] = useState<OverrideTarget | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
 
   const stored = readStoredRun();
 
@@ -77,7 +80,8 @@ export function ManagerQueuePage() {
     enabled: canQueue,
     retry: false,
   });
-  const runId = batchQuery.data?.runs[0]?.run_id ?? stored?.runId ?? currentRunQuery.data?.run_id ?? null;
+  const runId =
+    activeRunId ?? currentRunQuery.data?.run_id ?? batchQuery.data?.runs[0]?.run_id ?? stored?.runId ?? null;
   const runQuery = useQuery({
     queryKey: ["run", runId],
     queryFn: () => api.getRun(runId!),
@@ -129,6 +133,8 @@ export function ManagerQueuePage() {
     onSuccess: (payload, vars) => {
       setEdits({});
       if (payload.kind === "run") {
+        setActiveRunId(payload.run.run_id);
+        queryClient.setQueryData(["run", payload.run.run_id], payload.run);
         writeStoredRun({
           runId: payload.run.run_id,
           batchId: payload.run.batch_id,
@@ -137,8 +143,11 @@ export function ManagerQueuePage() {
           capacityHours: payload.run.capacity_hours ?? payload.run.summary.capacity_hours ?? vars.capacity,
           horizonDays: payload.run.horizon_days ?? payload.run.summary.horizon_days ?? vars.horizon,
         });
-        setNotice("Queue re-laned with the current hours, member-impact weight, and top-N cap. Backlog stays open.");
+        setNotice(
+          `Queue re-laned on a ${vars.horizon}-day window with ${vars.capacity.toFixed(0)} h, ${vars.slots} slots, people weight ${vars.member.toFixed(1)}×.`,
+        );
       } else if (payload.data.run) {
+        setActiveRunId(payload.data.run.run_id);
         writeStoredRun({
           runId: payload.data.run.run_id,
           batchId: payload.data.batch_id,
@@ -153,6 +162,7 @@ export function ManagerQueuePage() {
       void queryClient.invalidateQueries({ queryKey: ["run"] });
       void queryClient.invalidateQueries({ queryKey: ["queue"] });
       void queryClient.invalidateQueries({ queryKey: ["batch"] });
+      void queryClient.invalidateQueries({ queryKey: ["case-history"] });
     },
   });
 
@@ -169,16 +179,25 @@ export function ManagerQueuePage() {
 
   const closeDrawer = useCallback(() => setOpenId(null), []);
   const rows = useMemo(() => queueQuery.data ?? [], [queueQuery.data]);
+  const todayRows = useMemo(() => rankedToday(rows, draft.slots), [rows, draft.slots]);
+  const todayIds = useMemo(() => new Set(todayRows.map((row) => row.case_id)), [todayRows]);
   const filtered = useMemo(() => {
     const q = queryText.trim().toLowerCase();
-    const list = rows.filter((row) => {
-      if (laneFilter !== "all" && row.lane !== laneFilter) return false;
+    const source =
+      laneFilter === "all"
+        ? todayRows
+        : rows.filter((row) => {
+            if (row.lane !== laneFilter) return false;
+            if (laneFilter === "harm_priority" || laneFilter === "selected") return todayIds.has(row.case_id);
+            return true;
+          });
+    const list = source.filter((row) => {
       if (statusFilter !== "all" && row.status !== statusFilter) return false;
       if (!q) return true;
       return [row.case_id, row.primary_entity_id, row.status, row.lane].some((v) => v.toLowerCase().includes(q));
     });
     return sortRows(list, sortKey);
-  }, [rows, queryText, laneFilter, statusFilter, sortKey]);
+  }, [rows, todayRows, todayIds, queryText, laneFilter, statusFilter, sortKey]);
 
   if (!user) return null;
   if (!canQueue) {
@@ -194,11 +213,15 @@ export function ManagerQueuePage() {
   const casesByLane = Object.fromEntries(
     LANE_ORDER.map((lane) => [lane, rows.filter((r) => r.lane === lane).length]),
   ) as Record<Lane, number>;
-  const deskHours = hoursByLane.harm_priority + hoursByLane.selected;
-  const overCapacity = Math.max(0, deskHours - applied.capacity);
+  const capacityPack = runQuery.data?.summary.capacity ?? runQuery.data?.capacity;
+  const capacityHours = capacityPack?.capacity_hours ?? applied.capacity;
+  const overrideHours = capacityPack?.priority_override_hours ?? hoursByLane.harm_priority;
+  const selectedHours = capacityPack?.selected_hours ?? hoursByLane.selected;
+  const deskHours = capacityPack?.capacity_used_hours ?? overrideHours + selectedHours;
+  const overCapacity = capacityPack?.over_capacity_hours ?? Math.max(0, deskHours - capacityHours);
+  const overrideWarn = capacityPack?.override_share_warning ?? false;
   const nAlerts = runQuery.data?.n_alerts ?? runQuery.data?.summary.n_alerts ?? 0;
-  const nCases = rows.length || runQuery.data?.n_cases || 0;
-  const nToday = casesByLane.harm_priority + casesByLane.selected || runQuery.data?.summary.n_selected || 0;
+  const nCases = todayRows.length;
 
   const currentErr = currentRunQuery.error as ApiError | undefined;
   const error =
@@ -216,7 +239,7 @@ export function ManagerQueuePage() {
       <PageHeader
         eyebrow="Manager desk"
         title="SIU queue"
-        description="Cases ranked by combined factors inside investigator capacity. Harm goes first; humans decide what is worked."
+        description="Harm goes first. Rank packs the rest into investigator hours. A person still decides."
       />
 
       {!canRunDesk ? (
@@ -239,53 +262,78 @@ export function ManagerQueuePage() {
       {error ? <ErrorState title="The queue could not be updated" error={error} /> : null}
 
       {runId ? (
-        <dl className="stat-grid kpis">
-          <StatTile label="Alerts" value={nAlerts} hint="Raw detector hits" />
-          <StatTile label="Cases" value={nCases} hint="After grouping" />
-          <StatTile
-            label="Today's desk"
-            value={nToday}
-            hint={`${hours(deskHours)} queued · ${hours(applied.capacity)} capacity`}
+        <section className="dash-top" aria-label="Desk snapshot">
+          <KpiCard
+            label="Patterns"
+            hint="Hits grouped into cases"
+            value={nAlerts}
+            tone="blue"
+            spark={rows.slice(0, 12).map((r) => r.alert_group?.n_alerts ?? 1)}
           />
-          <StatTile label="Harm priority" value={casesByLane.harm_priority} tone="harm" />
-          <StatTile label="Tracked backlog" value={casesByLane.overflow} hint="Still open, not dismissed" />
-        </dl>
+          <KpiCard
+            label="Cases"
+            hint={`${draft.slots} slots today`}
+            value={nCases}
+            tone="amber"
+            spark={todayRows.slice(0, 12).map((r) => r.rank_factors?.composite ?? 0)}
+          />
+          <KpiCard
+            label="Hours packed"
+            hint={`of ${hours(capacityHours)} capacity`}
+            value={hours(deskHours)}
+            tone="orange"
+            spark={todayRows.slice(0, 12).map((r) => r.estimated_hours)}
+          />
+          <KpiCard
+            label="Harm first"
+            hint="Member-safety first"
+            value={todayRows.filter((r) => r.lane === "harm_priority").length}
+            tone="plum"
+            spark={todayRows.slice(0, 12).map((r) => r.harm)}
+          />
+          <LaneMixCard casesByLane={casesByLane} selected={laneFilter} onSelect={toggleLane} />
+          <SlotFillCard filled={todayRows.length} slots={draft.slots} />
+        </section>
+      ) : null}
+      {overCapacity > 0 ? (
+        <p className="banner warn">
+          Today&apos;s desk uses {hours(deskHours)} against {hours(capacityHours)} of capacity, {hours(overCapacity)}{" "}
+          over.
+        </p>
+      ) : null}
+      {overrideWarn ? (
+        <p className="banner warn">
+          Harm-priority hours are more than 35% of capacity.
+        </p>
       ) : null}
 
-      <div className="queue-top">
+      <DeskSettings
+        draft={draft}
+        applied={applied}
+        deskHours={deskHours}
+        disabled={!canRunDesk || loadMut.isPending}
+        canRun={canRunDesk}
+        hasExtract={hasExtract}
+        pending={loadMut.isPending}
+        onChange={(next) => setEdits(next)}
+        onRun={(next) => {
+          if (!loadMut.isPending) loadMut.mutate(next);
+        }}
+      >
         {runId ? (
-          <Panel id="capacity" eyebrow="Capacity" title="Hours by lane">
-            {overCapacity > 0 ? (
-              <p className="banner warn">
-                Today&apos;s desk fills {hours(deskHours)} against {hours(applied.capacity)} of capacity, {hours(overCapacity)}{" "}
-                over. Harm-priority cases are always queued and only part of their hours count against capacity.
-              </p>
-            ) : null}
-            {queueQuery.isLoading ? (
-              <LoadingState label="Loading lanes…" />
-            ) : (
-              <LaneHoursChart
-                hoursByLane={hoursByLane}
-                casesByLane={casesByLane}
-                capacityHours={applied.capacity}
-                selected={laneFilter}
-                onSelect={toggleLane}
-              />
-            )}
-          </Panel>
+          queueQuery.isLoading ? (
+            <LoadingState label="Loading lanes…" />
+          ) : (
+            <LaneHoursChart
+              hoursByLane={hoursByLane}
+              casesByLane={casesByLane}
+              capacityHours={capacityHours}
+              selected={laneFilter}
+              onSelect={toggleLane}
+            />
+          )
         ) : null}
-        <DeskSettings
-          draft={draft}
-          applied={applied}
-          deskHours={deskHours}
-          disabled={!canRunDesk || loadMut.isPending}
-          canRun={canRunDesk}
-          hasExtract={hasExtract}
-          pending={loadMut.isPending}
-          onChange={(next) => setEdits(next)}
-          onRun={() => loadMut.mutate(draft)}
-        />
-      </div>
+      </DeskSettings>
 
       {!runId && !loadMut.isPending ? (
         <EmptyState title="No detection run yet">
@@ -311,15 +359,16 @@ export function ManagerQueuePage() {
       {runId ? (
         <Panel
           id="queue"
+          className="dash-panel"
           eyebrow="Queue"
           title="Ranked cases"
-          description="Select a case to open its file. Tick two cases to compare their rank factors."
-          actions={<span className="badge">{filtered.length} shown</span>}
+          description="Open a case for the packet. Tick two cases to compare rank."
+          actions={<span className="badge">{filtered.length} of {draft.slots} slots</span>}
         >
           <div className="toolbar">
-            <div className="segmented" role="group" aria-label="Filter by lane">
+            <div className="segmented" role="group" aria-label="Filter by priority">
               <button type="button" aria-pressed={laneFilter === "all"} onClick={() => setLaneFilter("all")}>
-                All <span className="count">{rows.length}</span>
+                Today <span className="count">{todayRows.length}</span>
               </button>
               {LANE_ORDER.map((lane) => (
                 <button key={lane} type="button" aria-pressed={laneFilter === lane} onClick={() => toggleLane(lane)}>
@@ -351,16 +400,15 @@ export function ManagerQueuePage() {
               Sort
               <select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)}>
                 <option value="rank">Lane, then rank</option>
-                <option value="ev">{SCORE_LABELS.expectedValue.label}</option>
-                <option value="dollars">Flagged $</option>
-                <option value="harm">Harm</option>
-                <option value="p">{SCORE_LABELS.pConfirm.label}</option>
-                <option value="evidence">Evidence</option>
-                <option value="hours">Hours</option>
+                <option value="p">{DASH_LABEL.chance}</option>
+                <option value="severity">{DASH_LABEL.severity}</option>
+                <option value="dollars">{DASH_LABEL.paid}</option>
+                <option value="harm">{DASH_LABEL.harm}</option>
+                <option value="evidence">{DASH_LABEL.proof}</option>
+                <option value="hours">{DASH_LABEL.time}</option>
               </select>
             </label>
           </div>
-          <FactorStripLegend />
           {queueQuery.isLoading ? <LoadingState label="Loading queue…" /> : null}
           {!queueQuery.isLoading && filtered.length === 0 ? (
             <EmptyState title="No cases match" compact>
@@ -370,7 +418,6 @@ export function ManagerQueuePage() {
           {filtered.length > 0 ? (
             <QueueTable
               rows={filtered}
-              horizon={applied.horizon}
               openId={openId}
               compareIds={compareIds}
               canOverride={canOverride}
@@ -404,6 +451,17 @@ export function ManagerQueuePage() {
             </ol>
           </details>
         </Panel>
+      ) : null}
+
+      {canQueue ? (
+        <details className="desk-more">
+          <summary>AWS ingest and case history</summary>
+          <AwsIngestPanel />
+          <HistoryPanel
+            title="Case history"
+            description="Ten rows per page. Outcomes are substantiated, education, referred, or unsubstantiated."
+          />
+        </details>
       ) : null}
 
       {openId ? <CaseDrawer caseId={openId} onClose={closeDrawer} /> : null}

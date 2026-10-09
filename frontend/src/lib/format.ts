@@ -12,9 +12,16 @@ export function hours(value: number): string {
   return `${value.toFixed(1)}h`;
 }
 
+/** 0–1 score as a 0–99 integer. Never 100 — scores are not certainty. */
+export function pctNumber(value: number | null | undefined): number | null {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return null;
+  return Math.min(99, Math.max(0, Math.round(Number(value) * 100)));
+}
+
+/** Percent for display. Never prints 100% — scores are not certainty. */
 export function pct(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "—";
-  return `${Math.round(value * 100)}%`;
+  const n = pctNumber(value);
+  return n === null ? "—" : `${n}%`;
 }
 
 /** Queue lanes in desk order: harm first, then selected, evidence, backlog. */
@@ -120,27 +127,27 @@ export function whyPriority(row: {
 }): string {
   if (row.why_rank?.text) return row.why_rank.text;
   if (row.lane === "harm_priority") {
-    return `Harm ${row.harm} overrides capacity — always queued.`;
+    return `Harm ${row.harm} jumps the line for member safety — always on the desk.`;
   }
   if (row.lane === "needs_evidence") {
-    return `Evidence ${pct(row.evidence_strength)} is below the 0.40 floor.`;
+    return `Evidence ${pct(row.evidence_strength)} is below the 40% floor, so this waits for more records.`;
   }
   if (row.lane === "overflow") {
-    return "Outside remaining investigator hours after knapsack fill.";
+    return "Outside remaining investigator hours after the desk is filled.";
   }
-  return `Selected: P(confirm) ${pct(row.p_confirm)} on ${money(row.flagged_dollars)} flagged.`;
+  return `On today's desk: suspicion ${pct(row.p_confirm)} on ${money(row.flagged_dollars)} already paid.`;
 }
 
 export function screeningLabel(days: number | null | undefined): string {
   if (days === null || days === undefined) return "No screening clock";
-  if (days < 0) return `${Math.abs(days)}d past 45-day screen`;
-  return `${days}d left on 45-day screen`;
+  if (days < 0) return `${Math.abs(days)}d past the 45-day screening clock`;
+  return `${days}d left on the 45-day screening clock`;
 }
 
 export function screeningShort(days: number | null | undefined): string {
   if (days === null || days === undefined) return "—";
-  if (days < 0) return `${Math.abs(days)}d past`;
-  return `${days}d`;
+  if (days < 0) return `${Math.abs(days)} days past`;
+  return `${days} days`;
 }
 
 export function screeningTone(days: number | null | undefined): "ok" | "warn" | "hot" | "none" {

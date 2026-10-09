@@ -10,6 +10,7 @@ __pycache__/
 .env
 *.db
 backend/claimshield.db
+backend/data/
 
 # Frontend build artifacts
 node_modules/

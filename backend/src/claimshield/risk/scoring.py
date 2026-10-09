@@ -28,15 +28,23 @@ from claimshield.risk.snapshot import as_of, data_cutoff
 TOP_FACTORS = 5
 # Shown probabilities are clipped so the API never claims certainty; clipping is monotone, so
 # 30 <= 60 <= 90 still holds.
-PROB_FLOOR, PROB_CEIL = 0.001, 0.999
+PROB_FLOOR, PROB_CEIL = 0.001, 0.99
 HEURISTIC_NOTE = (
-    "No trained risk artifact was loaded. P(confirm) and 30/60/90 are the hand-set heuristic "
-    "formulas: uncalibrated, not probabilities."
+    "No trained risk artifact was loaded. Suspicion and 30/60/90 are simple scores, "
+    "not probabilities."
 )
 
 
 def shown(p: float) -> float:
     return round(min(PROB_CEIL, max(PROB_FLOOR, float(p))), 3)
+
+
+def display_pct(p: float | None) -> str:
+    """Human percent that never prints 100% — scores are not certainty."""
+    if p is None:
+        return "—"
+    n = min(99, max(0, round(float(p) * 100)))
+    return f"{n}%"
 
 
 def heuristic_summary() -> dict[str, Any]:

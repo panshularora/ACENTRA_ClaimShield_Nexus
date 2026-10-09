@@ -9,6 +9,9 @@ export interface EntityFocus {
   id: string;
   type: string;
   label: string;
+  evidenceIds?: string[];
+  extraLineIds?: string[];
+  extraAlertIds?: string[];
 }
 
 export interface FocusMatches {
@@ -46,6 +49,7 @@ export function focusMatches(
 ): FocusMatches {
   const entityIds = new Set([focus.id, ...(focus.type === "owner" ? ownedProviders(model, focus.id) : [])]);
   const lineIds = new Set(rows.filter((row) => rowTouches(row, entityIds)).map((row) => row.line_id));
+  for (const id of focus.extraLineIds ?? []) lineIds.add(id);
   const alertIds = new Set(
     alerts
       .filter(
@@ -56,10 +60,12 @@ export function focusMatches(
       )
       .map((alert) => alert.alert_id),
   );
+  for (const id of focus.extraAlertIds ?? []) alertIds.add(id);
   const citeIds = new Set([
     ...[...entityIds].map((id) => `provider:${id}`),
     ...[...lineIds].map((id) => `line:${id}`),
     ...[...alertIds].map((id) => `alert:${id}`),
+    ...(focus.evidenceIds ?? []),
   ]);
   return { entityIds, lineIds, alertIds, citeIds };
 }

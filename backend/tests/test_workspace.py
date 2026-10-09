@@ -62,13 +62,24 @@ def test_workspace_pack_and_decision(client: TestClient) -> None:
         "Why this case was surfaced",
         "Key evidence",
         "Timeline",
-        "Risk / confidence",
+        "Case scores",
         "Limitations",
         "Recommended human-review action",
     ]
     assert all(s["sentences"][0]["cites"] for s in packed["sections"])
-    assert "potential fwa" in packed["action"].lower() or "needs more evidence" in packed["action"].lower()
-    assert "is fraud" not in packed["action"].lower()
+    action = packed["action"].lower()
+    assert any(
+        bit in action
+        for bit in (
+            "needs more",
+            "collect more",
+            "keep on the desk",
+            "escalate",
+            "care-coordination",
+            "lock-in",
+        )
+    )
+    assert "is fraud" not in action
 
     claims = client.get(f"/api/v1/cases/{case_id}/claims")
     assert claims.status_code == 200

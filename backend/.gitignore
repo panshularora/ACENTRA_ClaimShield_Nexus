@@ -7,3 +7,5 @@ __pycache__/
 claimshield.db
 *.db
 .env
+
+.vercel

@@ -9,21 +9,21 @@ from claimshield.db.models import Alert, Batch, Case, PipelineRun
 from claimshield.rules.catalog import rule_title as catalog_title
 
 TABLE_ROLES: dict[str, str] = {
-    "claim": "Adjudicated claim header: member, billing provider, received and paid dates",
-    "claim_line": "Line codes, units, minutes, charges, paid amounts, rendering NPI",
-    "member": "Member demographics and date of death used by after-death checks",
-    "provider": "Enrollment, specialty, rural flag, TIN used for peer grouping and graph",
-    "eligibility_span": "Coverage windows",
-    "evv_visit": "Electronic visit verification timestamps for home-health lines",
-    "inpatient_stay": "Admit and discharge used for overlap and stay-compression rules",
-    "rx_fill": "Pharmacy fills used for doctor-shopping patterns",
-    "exclusion_record": "Exclusion list matched on NPI plus name, or on name, DOB and address",
-    "referral": "Referring-to-receiving links for concentration",
-    "ownership_link": "Owner-to-NPI shares used for identity rings and excluded owners",
-    "owner": "Owner names matched to the exclusion list",
-    "contact_point": "Shared contact hashes used as a strong graph edge",
-    "location": "Practice location used for peer geography, not as a case-join key",
-    "investigation": "Prior SIU outcomes used as a confirmation prior",
+    "claim": "Paid claim header (who billed, which member, when it was paid)",
+    "claim_line": "Each service on a paid claim (code, units, dollars, date)",
+    "member": "Member file (including date of death when it is on record)",
+    "provider": "Provider enrollment (specialty, type, location)",
+    "eligibility_span": "Coverage dates",
+    "evv_visit": "Home-visit check-in records",
+    "inpatient_stay": "Hospital admit and discharge dates",
+    "rx_fill": "Pharmacy fills",
+    "exclusion_record": "Exclusion list (matched on NPI and name)",
+    "referral": "Who referred whom",
+    "ownership_link": "Who owns which NPI",
+    "owner": "Owner names on file",
+    "contact_point": "Shared phone, email, or bank details",
+    "location": "Practice address",
+    "investigation": "Earlier SIU outcomes on this provider",
 }
 
 KIND_TABLES: dict[str, tuple[str, ...]] = {
@@ -50,12 +50,12 @@ KIND_TABLES: dict[str, tuple[str, ...]] = {
 }
 
 DETECTOR_METHOD: dict[str, str] = {
-    "rules": ("Deterministic catalog rule on claim lines. A hit is a suspicion to verify, not a finding of fraud."),
+    "rules": "A check on paid claim lines. It flags a pattern for a person to review.",
     "anomaly": (
-        "Like-with-like peer comparison (specialty, type, rural). "
-        "Peers are a baseline for the score; they are not co-subjects of this case."
+        "This provider looks different from similar ones (same specialty and setting). "
+        "That is a reason to look at the claims, not a conclusion."
     ),
-    "graph": "Shared owner, TIN, or contact component, referral concentration, or excluded owner.",
+    "graph": "This provider is linked to others by ownership, shared contact, or referrals.",
 }
 
 APPROACH_BY_DETECTOR = {
@@ -192,36 +192,39 @@ def case_provenance(
     steps = [
         {
             "step": 1,
-            "name": "Extract",
-            "detail": f"Loaded {extract}. Ground-truth labels are not features.",
+            "name": "Paid claims",
+            "detail": f"Loaded {extract}.",
         },
         {
             "step": 2,
-            "name": "Rules",
-            "detail": f"{by_detector.get('rules', 0)} catalog rule alert(s) on claim lines.",
+            "name": "Claim checks",
+            "detail": f"{by_detector.get('rules', 0)} claim-line check(s) flagged a pattern.",
         },
         {
             "step": 3,
-            "name": "Peer anomaly",
+            "name": "Similar providers",
             "detail": (
-                f"{by_detector.get('anomaly', 0)} like-with-like peer alert(s). "
-                "Comparison peers are a baseline, not co-subjects."
+                f"{by_detector.get('anomaly', 0)} comparison(s) with similar providers. "
+                "Those providers are a baseline, not parties to this case."
             ),
         },
         {
             "step": 4,
-            "name": "Network",
-            "detail": (f"{by_detector.get('graph', 0)} graph alert(s) on owner, TIN, contact, or referral links."),
+            "name": "Linked providers",
+            "detail": (
+                f"{by_detector.get('graph', 0)} link(s) by ownership, shared contact, or referrals."
+            ),
         },
         {
             "step": 5,
-            "name": "Case builder",
+            "name": "Case file",
             "detail": grouping["text"],
         },
         {
             "step": 6,
             "name": "Rank",
-            "detail": why_rank_text or "Composite of severity, exposure, member impact, evidence, and urgency.",
+            "detail": why_rank_text
+            or "Combined rank of scheme severity, financial exposure, member impact, evidence, and urgency.",
         },
     ]
     if run is not None:

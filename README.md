@@ -14,6 +14,8 @@ This repository contains the backend, auth, product docs, and the SIU frontend (
 | [data/reference/PAPERS.md](data/reference/PAPERS.md) | Research map for detectors and schemes |
 | [backend/README.md](backend/README.md) | Backend runbook |
 | [docs/MODEL_CARD.md](docs/MODEL_CARD.md) | Risk models: labels, backtest, calibration, limits |
+| [docs/BUILD_AND_DEMO.md](docs/BUILD_AND_DEMO.md) | What we built, judging map, demo script, AWS ingest |
+| [docs/AWS_INGEST.md](docs/AWS_INGEST.md) | S3 → Lambda → FastAPI ingest |
 
 ## Backend
 

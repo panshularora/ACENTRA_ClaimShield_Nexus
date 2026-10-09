@@ -50,7 +50,7 @@ def login(
         password=body.password,
         ip=ip,
     )
-    csrf = set_auth_cookies(response, settings, access=access, refresh=refresh)
+    csrf = set_auth_cookies(response, settings, access=access, refresh=refresh, request=request)
     return UserOut(
         id=user.id,
         email=user.email,
@@ -72,7 +72,7 @@ def refresh_session(
     if not token:
         raise Unauthorized("missing refresh token")
     user, _sess, access, refresh = rotate_refresh(session, settings, refresh_token=token)
-    csrf = set_auth_cookies(response, settings, access=access, refresh=refresh)
+    csrf = set_auth_cookies(response, settings, access=access, refresh=refresh, request=request)
     return UserOut(
         id=user.id,
         email=user.email,
@@ -94,7 +94,7 @@ def logout_session(
     token = request.cookies.get(settings.refresh_cookie_name)
     if token:
         logout(session, refresh_token=token)
-    clear_auth_cookies(response, settings)
+    clear_auth_cookies(response, settings, request=request)
     return {"status": "logged_out"}
 
 
@@ -148,5 +148,6 @@ def session_status(
             role=user.role,
             display_name=user.display_name,
             permissions=_permissions(user.role),
+            csrf_token=request.cookies.get(settings.csrf_cookie_name),
         ),
     )

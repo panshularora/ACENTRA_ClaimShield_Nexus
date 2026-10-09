@@ -16,7 +16,7 @@ export function ProposalCard({
   const evidence = body.key_evidence ?? [];
   const sources = body.sources ?? [];
   const changes = body.changes ?? [];
-  const pattern = body.confirmed_pattern ?? [];
+  const pattern = body.observed_pattern ?? body.confirmed_pattern ?? [];
 
   return (
     <article className={`panel proposal-card status-${proposal.status}`}>
@@ -48,8 +48,17 @@ export function ProposalCard({
         </div>
         <div>
           <dt>Pattern</dt>
-          <dd>{pattern.length ? pattern.join(", ") : "Not recorded"}</dd>
+          <dd>
+            {pattern.length ? pattern.join(", ") : "Not recorded"}
+            {body.pattern_status ? ` (${body.pattern_status})` : ""}
+          </dd>
         </div>
+        {body.decision_context ? (
+          <div>
+            <dt>Decision context</dt>
+            <dd>{body.decision_context}</dd>
+          </div>
+        ) : null}
       </dl>
       {!compact && (
         <>

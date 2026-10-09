@@ -16,11 +16,11 @@ DEFAULT_WEIGHTS: dict[str, float] = {
 }
 
 FACTOR_LABELS: dict[str, str] = {
-    "severity": "Risk / scheme severity",
-    "exposure": "Potential financial exposure",
+    "severity": "Scheme severity",
+    "exposure": "Financial exposure",
     "member": "Member impact",
     "evidence": "Evidence strength",
-    "urgency": "Urgency (horizon + 45-day clock)",
+    "urgency": "Urgency",
 }
 
 RECOMMEND_TODAY = "today_queue"
@@ -28,11 +28,10 @@ RECOMMEND_EVIDENCE = "gather_evidence"
 RECOMMEND_BACKLOG = "tracked_backlog"
 
 RANKING_NOTE = (
-    "Today's queue is a fixed-weight policy over exposure, member impact, evidence "
-    "and urgency, filled inside investigator capacity. P(confirm) and 30/60/90-day "
-    "risk come from models trained and backtested on synthetic data. It does not rank "
-    "on dollars or evidence alone. Investigators decide what to work. Cases outside "
-    "today's slots stay open on a tracked backlog."
+    "Today's queue is a fixed-weight mix of scheme severity, financial exposure, "
+    "member impact, evidence strength and urgency, filled inside investigator hours. "
+    "Suspicion and 30/60/90-day scores come from models trained on synthetic data. "
+    "They rank work for a person. Cases outside today's slots stay open on a tracked backlog."
 )
 
 

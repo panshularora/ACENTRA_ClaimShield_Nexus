@@ -11,6 +11,13 @@ export interface SessionUser {
   csrf_token?: string | null;
 }
 
+/** GET /auth/session always returns 200, including before login. */
+export interface AuthSession {
+  authenticated: boolean;
+  user: SessionUser | null;
+  refresh_available: boolean;
+}
+
 export interface DemoUser {
   email: string;
   role: string;
@@ -57,7 +64,21 @@ export interface RunSummary {
     ranking_policy?: RankingPolicy;
     lanes?: Partial<Record<Lane, number>>;
     risk_model?: RiskModelInfo;
+    /** Hours actually packed against capacity (override hours count). */
+    capacity?: CapacitySummary;
   };
+}
+
+/** `run.summary.capacity`: investigator hours vs the desk budget. */
+export interface CapacitySummary {
+  capacity_hours: number;
+  priority_override_hours: number;
+  selected_hours: number;
+  capacity_used_hours: number;
+  over_capacity_hours: number;
+  override_share: number | null;
+  override_share_warning: boolean;
+  needs_evidence_hours: number;
 }
 
 export interface BatchDetail {
@@ -127,6 +148,7 @@ export interface PipelineRun {
   max_slots?: number;
   member_weight?: number;
   ranking_policy?: RankingPolicy;
+  capacity?: CapacitySummary;
 }
 
 /** Which scorer produced p_confirm and f30/f60/f90 for a run. */
@@ -170,6 +192,68 @@ export interface RiskScoreFields {
   p_confirm_factors?: RiskFactor[];
 }
 
+export type HistoryKind = "case" | "investigation";
+export type HistoryOutcome = "substantiated" | "education" | "referred" | "unsubstantiated";
+
+export interface HistoryItem {
+  kind: HistoryKind;
+  id: string;
+  case_id: string | null;
+  investigation_id: string | null;
+  provider_id: string | null;
+  provider_name: string;
+  npi: string | null;
+  specialty: string | null;
+  status: string;
+  lane: Lane | null;
+  outcome: HistoryOutcome | null;
+  outcome_label: string;
+  action: string | null;
+  reason: string | null;
+  opened_at: string | null;
+  closed_at: string | null;
+  run_id: string | null;
+  current_run: boolean;
+  flagged_dollars: number | null;
+  amount_identified: number | null;
+  amount_recovered: number | null;
+  harm: number | null;
+  scheme_tag: string | null;
+  lead_source: string | null;
+  n_subjects: number;
+  source: "siu_case" | "prior_investigation";
+}
+
+export interface HistoryResponse {
+  items: HistoryItem[];
+  counts: { total: number; cases: number; investigations: number };
+  current_run_id: string | null;
+  note: string;
+}
+
+export interface AwsIngestReceipt {
+  status: string;
+  batch_id: string | null;
+  run_id: string | null;
+  bucket: string;
+  trigger_key: string;
+  updated_at: string | null;
+}
+
+export interface AwsStatus {
+  region: string;
+  bucket: string;
+  incoming_prefix: string;
+  processed_prefix: string;
+  results_prefix: string;
+  lambda_function: string;
+  token_configured: boolean;
+  credentials_configured: boolean;
+  store: "s3" | "local_dir";
+  ingest_path: string;
+  recent_ingests: AwsIngestReceipt[];
+}
+
 export interface QueueCase extends RiskScoreFields {
   case_id: string;
   lane: Lane;
@@ -196,6 +280,9 @@ export interface QueueCase extends RiskScoreFields {
   override?: QueueOverride | null;
   suspicion_only?: boolean;
   alert_group?: { n_entities: number; n_alerts?: number; urgent?: boolean; text: string };
+  lane_label?: string;
+  priority_override?: boolean;
+  override_kinds?: string[];
 }
 
 export interface PeerGroup {
@@ -378,61 +465,125 @@ export interface TimelineEvent {
   entity_id: string;
 }
 
-/**
- * Network node from GET /cases/{id}/network. Fields marked "newer API" are being added on the
- * backend branch fix/backend-p0; they are optional so the UI works with both shapes
- * (components/network/graphModel.ts normalises them).
- */
+/** Node from GET /cases/{id}/network (schema v2). */
 export interface NetworkNode {
   id: string;
   type: string;
   label: string;
   primary?: boolean;
   masked?: boolean;
-  /** Case p_confirm, on the primary node only. */
+  /** Case priority score, primary node only. */
   risk?: number;
   specialty?: string;
   facility_type?: string;
   owner_kind?: string;
-  /** Newer API: true for the case subject. */
   is_subject?: boolean;
-  /** Newer API: true when the entity belongs to the case (vs surrounding context). */
   in_case?: boolean;
-  /** Newer API: alerts on this case that involve the entity. */
   alert_ids?: string[];
-  /** Newer API: flagged paid dollars on this case attributable to the entity. */
-  flagged_dollars?: number;
+  rule_ids?: string[];
+  /** Paid $ on this case's flagged lines touching the node. Queue rows still use flagged_dollars. */
   flagged_paid?: number;
-  /** Newer API: flagged claim lines on this case attributable to the entity. */
   n_flagged_lines?: number;
-  /** Newer API: hop distance from the subject (capped at 2). */
   hop?: number;
-  /** Newer API: patient-harm level for the entity. */
   harm?: number;
+  /** Case severity 1–4, subject nodes only. */
+  severity?: number;
+  detail_path?: string;
+}
+
+export interface SharedAttribute {
+  kind: string;
+  value_masked: string;
+}
+
+export interface EdgeEvidence {
+  alert_ids: string[];
+  rule_ids: string[];
+  claim_ids: string[];
+  line_ids: string[];
+  referral_ids: number[];
+  attribute?: SharedAttribute | null;
+  ownership_pct?: number | null;
+  first_date?: string | null;
+  last_date?: string | null;
+  paid?: number | null;
 }
 
 export interface NetworkEdge {
   source: string;
   target: string;
   kind: string;
-  /** Newer API: stable edge id. */
   id?: string;
-  /** Newer API: "out" (source → target), "in", or "none". */
+  directed?: boolean;
+  /** "out" (source → target) or "none". Schema v2 never sends "in". */
   direction?: "out" | "in" | "none";
-  /** Newer API: number of underlying records (referrals, shared claims). */
   count?: number;
-  /** Newer API: evidence ids (alerts, contact hashes, ownership links) behind the edge. */
+  weight?: number;
+  label?: string;
+  in_case?: boolean;
   evidence_ids?: string[];
-  /** Newer API: inferred / weak link. */
   inferred?: boolean;
+  evidence?: EdgeEvidence;
+}
+
+export interface NetworkLimits {
+  hops: number;
+  referral_top_n: number;
+  max_providers: number;
+  max_members: number;
+  providers_shown: number;
+  providers_dropped: number;
+  members_total: number;
+  members_shown: number;
 }
 
 export interface NetworkPack {
+  schema_version?: number;
   case_id: string;
   hops: number;
   primary_entity_id: string;
+  subject_ids?: string[];
+  masked?: boolean;
   nodes: NetworkNode[];
   edges: NetworkEdge[];
+  limits?: NetworkLimits;
+}
+
+export interface ClaimVolume {
+  n_lines: number;
+  paid: number;
+  first_dos: string | null;
+  last_dos: string | null;
+  sample: ClaimRow[];
+}
+
+export interface RelatedCase {
+  case_id: string;
+  status: string;
+  lane: string;
+  primary_entity_id: string;
+  is_primary: boolean;
+}
+
+export interface NodeDetail {
+  case_id: string;
+  node: NetworkNode;
+  profile: Record<string, unknown>;
+  alerts: CaseAlert[];
+  claim_lines: ClaimRow[];
+  connections: NetworkEdge[];
+}
+
+export interface EntitySummary {
+  entity_id: string;
+  case_id: string;
+  node: NetworkNode;
+  profile: Record<string, unknown>;
+  claims: ClaimVolume;
+  alerts: CaseAlert[];
+  cases: RelatedCase[];
+  case_claim_lines: ClaimRow[];
+  connections: NetworkEdge[];
 }
 
 export interface DecisionRecord {
@@ -440,12 +591,52 @@ export interface DecisionRecord {
   case_id: string;
   actor_id: string;
   action: string;
+  status?: string;
   ladder_step: string | null;
   ladder_label?: string | null;
   reason: string;
   evidence_refs: string[];
+  requires_approval?: boolean;
   approved_by?: string | null;
+  approved_at?: string | null;
+  review_note?: string | null;
   created_at: string | null;
+}
+
+export type DecisionAction = "escalate" | "monitor" | "dismiss" | "needs_evidence";
+
+export interface LadderStepOption {
+  step: string;
+  label: string;
+  default: boolean;
+  requires_basis_on_approval: boolean;
+}
+
+export interface DecisionOption {
+  id: DecisionAction;
+  label: string;
+  hint: string;
+  requires_approval: boolean;
+  closes_case: boolean;
+  resulting_status: string;
+  default_step: string | null;
+  ladder: LadderStepOption[];
+  enabled: boolean;
+}
+
+export interface DecisionOptions {
+  case_id: string;
+  status: string;
+  role: string;
+  can_decide: boolean;
+  blocked_reason: string | null;
+  allowed_actions: string[];
+  can_approve: boolean;
+  can_reopen: boolean;
+  pending_decision: DecisionRecord | null;
+  min_reason_chars: number;
+  max_reason_chars: number;
+  options: DecisionOption[];
 }
 
 export interface AuditReceipt {
@@ -474,6 +665,9 @@ export interface WikiProposal {
     decision?: string;
     outcome?: string;
     confirmed_pattern?: string[];
+    observed_pattern?: string[];
+    pattern_status?: string;
+    decision_context?: string;
     scheme_tags?: string[];
     rules?: { rule_id: string; title: string }[];
     key_evidence?: { alert_id: string; rule_id: string | null; label: string; line_count: number }[];
@@ -518,14 +712,12 @@ export interface LabelRecord {
   approved_at: string | null;
 }
 
-/** Actions POST /cases/{id}/decisions accepts today (being revised on the backend). */
-export type DecisionAction = "escalate" | "monitor" | "dismiss" | "needs_evidence";
-
 export interface DecisionResult {
   decision_id: string;
   case_id: string;
   action: string;
   status: string;
+  decision_status?: string;
   reason: string;
   ladder_step: string | null;
   ladder_label?: string | null;
@@ -535,6 +727,17 @@ export interface DecisionResult {
   proposal?: WikiProposal;
   label?: LabelRecord;
   note: string;
+}
+
+/** POST /decisions/{id}:approve and :reject. */
+export interface DecisionReviewResult {
+  decision: DecisionRecord;
+  case_id: string;
+  status: string;
+  audit: AuditReceipt;
+  proposal?: WikiProposal;
+  label?: LabelRecord;
+  note?: string;
 }
 
 export interface AuditEvent {
@@ -598,6 +801,11 @@ export interface CaseDetail extends RiskScoreFields {
   alerts: CaseAlert[];
   evidence_gaps?: string[];
   latest_decision?: DecisionRecord | null;
+  pending_decision?: DecisionRecord | null;
+  allowed_actions?: string[];
+  can_decide?: boolean;
+  decision_blocked_reason?: string | null;
+  decision_options?: DecisionOption[];
   latest_proposal?: WikiProposal | null;
   latest_label?: LabelRecord | null;
   member_unmask_permitted?: boolean;
@@ -605,4 +813,7 @@ export interface CaseDetail extends RiskScoreFields {
   suspicion_only?: boolean;
   grouping?: CaseGrouping;
   provenance?: CaseProvenance;
+  lane_label?: string;
+  priority_override?: boolean;
+  override_kinds?: string[];
 }

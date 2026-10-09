@@ -1,0 +1,496 @@
+/* Dashboard canvas: Revora rounded cards. Content stays ClaimShield. */
+
+.app .page {
+  max-width: 1520px;
+  padding: 1.25rem 1.5rem 3rem;
+  gap: 1.15rem;
+}
+
+.app .page-head h1 {
+  letter-spacing: -0.03em;
+  color: #0f172a;
+}
+
+.app .page-head .lede,
+.app .kicker,
+.app .page-head .kicker {
+  color: #64748b;
+}
+
+.app .kicker {
+  letter-spacing: 0.08em;
+}
+
+.app .panel,
+.app .subpanel {
+  border: 1px solid #eef0f5;
+  border-radius: 1.25rem;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.03);
+}
+
+.app .banner {
+  border-radius: 1rem;
+}
+
+.app .btn {
+  border-radius: 999px;
+}
+
+.app .btn.solid {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #fff;
+}
+
+.app .btn.solid:hover {
+  background: #1e293b;
+  border-color: #1e293b;
+  color: #fff;
+}
+
+.app .field input,
+.app .field select,
+.app .field textarea {
+  border-radius: 0.75rem;
+  border-color: #e2e8f0;
+  background: #f8f9fc;
+}
+
+.dash-top {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-areas:
+    "a b mix fill"
+    "c d mix fill";
+  gap: 1rem;
+}
+
+.dash-kpi:nth-child(1) {
+  grid-area: a;
+}
+.dash-kpi:nth-child(2) {
+  grid-area: b;
+}
+.dash-kpi:nth-child(3) {
+  grid-area: c;
+}
+.dash-kpi:nth-child(4) {
+  grid-area: d;
+}
+.dash-wide:nth-child(5) {
+  grid-area: mix;
+}
+.dash-wide:nth-child(6) {
+  grid-area: fill;
+}
+
+.dash-kpi,
+.dash-wide {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  min-width: 0;
+  padding: 1.15rem 1.2rem 1.2rem;
+  border: 1px solid #eef0f5;
+  border-radius: 1.25rem;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.03);
+}
+
+.dash-kpi-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+}
+
+.dash-kpi-head h3 {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 650;
+  color: #0f172a;
+}
+
+.dash-kpi-head p,
+.dash-kpi-sub {
+  margin: 0;
+  font-size: 0.7rem;
+  color: #94a3b8;
+}
+
+.dash-kpi-mark {
+  position: relative;
+  width: 2.15rem;
+  height: 2.15rem;
+  flex: 0 0 auto;
+  border-radius: 0.7rem;
+  background: #eff6ff;
+}
+
+.dash-kpi-mark::after {
+  content: "";
+  position: absolute;
+  inset: 0.55rem;
+  border: 1.6px solid currentColor;
+  border-radius: 0.2rem;
+  color: #3b82f6;
+}
+
+.tone-amber .dash-kpi-mark::after {
+  color: #d97706;
+  border-radius: 99px;
+}
+
+.tone-orange .dash-kpi-mark::after {
+  color: #ea580c;
+  border-radius: 99px 99px 4px 99px;
+}
+
+.tone-plum .dash-kpi-mark::after {
+  color: #be185d;
+  border: 0;
+  background: currentColor;
+  clip-path: polygon(50% 8%, 100% 38%, 82% 100%, 18% 100%, 0 38%);
+}
+
+.tone-blue .dash-kpi-mark {
+  background: #eff6ff;
+}
+.tone-amber .dash-kpi-mark {
+  background: #fff7ed;
+}
+.tone-orange .dash-kpi-mark {
+  background: #fff1e8;
+}
+.tone-plum .dash-kpi-mark {
+  background: #fde8f3;
+}
+.dash-kpi-mark.tone-mix {
+  background: #eef2ff;
+}
+.dash-kpi-mark.tone-mix::after {
+  color: #6366f1;
+  border-radius: 99px;
+}
+.dash-kpi-mark.tone-fill {
+  background: #f3e8ff;
+}
+.dash-kpi-mark.tone-fill::after {
+  color: #7c3aed;
+  border: 0;
+  background: currentColor;
+  clip-path: polygon(20% 0, 80% 0, 100% 50%, 80% 100%, 20% 100%, 0 50%);
+}
+
+.dash-kpi.is-btn {
+  appearance: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.dash-kpi.is-btn[aria-pressed="true"] {
+  box-shadow: 0 0 0 1px #0f172a inset, 0 2px 10px rgba(15, 23, 42, 0.03);
+}
+
+.dash-kpi-foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: auto;
+}
+
+.dash-kpi-value {
+  margin: 0;
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-spark {
+  width: 5.6rem;
+  height: 2.2rem;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.lane-mix {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+  gap: 0.8rem;
+  align-items: center;
+  flex: 1;
+}
+
+.lane-mix-chart {
+  position: relative;
+  width: 8.5rem;
+  height: 8.5rem;
+}
+
+.lane-mix-chart svg {
+  width: 100%;
+  height: 100%;
+}
+
+.lane-mix-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  pointer-events: none;
+}
+
+.lane-mix-center strong {
+  font-size: 1.15rem;
+  letter-spacing: -0.03em;
+}
+
+.lane-mix-center span {
+  font-size: 0.65rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.lane-mix-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.lane-mix-legend button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 0.55rem minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.28rem 0.2rem;
+  border: 0;
+  background: transparent;
+  color: #475569;
+  font-size: 0.75rem;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 0.4rem;
+}
+
+.lane-mix-legend button[aria-pressed="true"] {
+  background: #f8f9fc;
+  color: #0f172a;
+  font-weight: 650;
+}
+
+.lane-mix-legend i {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+}
+
+.dash-fill-chip {
+  margin-left: auto;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #f3e8ff;
+  color: #6d28d9;
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.dash-fill-chip.is-over {
+  background: #ffe4e6;
+  color: #be123c;
+}
+
+.dash-dots {
+  display: grid;
+  grid-template-columns: repeat(16, 1fr);
+  gap: 5px;
+  margin-top: auto;
+}
+
+.dash-dots span {
+  aspect-ratio: 1;
+  border-radius: 3px;
+  background: #eef0f5;
+}
+
+.dash-dots span.is-on {
+  background: #c084fc;
+}
+
+.dash-fill-foot {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: #94a3b8;
+}
+
+.app .queue-grid thead th {
+  background: transparent;
+  color: #94a3b8;
+  letter-spacing: 0.04em;
+  height: 2.2rem;
+  border-radius: 0;
+}
+
+.app .queue-grid thead th:first-child,
+.app .queue-grid thead th:last-child {
+  border-radius: 0;
+}
+
+.app .queue-wrap {
+  max-height: calc(100vh - 18rem);
+  overflow: auto;
+}
+
+.app .queue-grid thead th {
+  background: #fff;
+}
+
+.dash-dots.is-slots {
+  grid-template-columns: repeat(auto-fill, minmax(0.72rem, 1fr));
+}
+
+.app .badge {
+  border-radius: 999px;
+}
+
+.app .page-head {
+  margin-bottom: 0.15rem;
+}
+
+.app .page-head h1 {
+  font-size: 1.55rem;
+}
+
+.app .toolbar {
+  gap: 0.7rem;
+}
+
+.app .segmented {
+  padding: 0.22rem;
+  border: 0;
+  border-radius: 999px;
+  background: #eaecf0;
+}
+
+.app .segmented button {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #475569;
+}
+
+.app .segmented button[aria-pressed="true"] {
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.app .table-wrap {
+  border: 0;
+  border-radius: 0;
+}
+
+.app .grid thead th {
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.app .grid tbody tr:hover {
+  background: #f8f9fc;
+}
+
+.app .queue-grid td,
+.app .queue-grid th,
+.app .work-grid td,
+.app .work-grid th {
+  padding: 0.85rem 0.7rem;
+}
+
+.risk-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.risk-n {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  color: #475569;
+  min-width: 2.2rem;
+}
+
+.risk-track {
+  display: block;
+  width: 3.6rem;
+  height: 6px;
+  border-radius: 99px;
+  background: #eef0f5;
+  overflow: hidden;
+}
+
+.risk-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #3b82f6;
+}
+
+.app input[type="range"],
+.app .slider input[type="range"] {
+  accent-color: #0f172a;
+}
+
+.app .desk-more {
+  border: 1px solid #eef0f5;
+  border-radius: 1.25rem;
+  background: #fff;
+  padding: 0.85rem 1.1rem;
+}
+
+.app .policy {
+  border-top: 1px solid #eef0f5;
+  padding-top: 0.75rem;
+}
+
+@media (max-width: 1100px) {
+  .dash-top {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "a b"
+      "c d"
+      "mix mix"
+      "fill fill";
+  }
+}
+
+@media (max-width: 640px) {
+  .app .page {
+    padding: 1rem;
+  }
+  .dash-top {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "a"
+      "b"
+      "c"
+      "d"
+      "mix"
+      "fill";
+  }
+  .lane-mix {
+    grid-template-columns: 1fr;
+  }
+}

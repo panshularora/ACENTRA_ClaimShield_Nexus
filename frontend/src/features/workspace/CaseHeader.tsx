@@ -1,11 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import type { CaseDetail, SessionUser } from "../../api/types";
-import { HarmFlag, LaneBadge, RiskBadge, StatusBadge } from "../../components/Badge";
-import { EvidenceBar } from "../../components/EvidenceBar";
+import { CaseAxes } from "../../components/CaseAxes";
+import { LaneBadge, StatusBadge } from "../../components/Badge";
 import { RiskHorizonChart } from "../../components/charts/RiskHorizonChart";
-import { StatTile } from "../../components/ui/StatTile";
-import { SCORE_LABELS } from "../../lib/scoreLabels";
-import { hours, money, pct, screeningLabel, screeningTone } from "../../lib/format";
 
 interface CaseHeaderProps {
   data: CaseDetail;
@@ -13,19 +10,31 @@ interface CaseHeaderProps {
   canAssign: boolean;
   assigning: boolean;
   onAssign: () => void;
+  onDecide: () => void;
   unmask: boolean;
   onUnmaskChange: (value: boolean) => void;
 }
 
-/** 1 · Who is under review, how risky, and how urgent. */
-export function CaseHeader({ data, user, canAssign, assigning, onAssign, unmask, onUnmaskChange }: CaseHeaderProps) {
+/** Who is under review. Stays on screen while the rest of the file is tabbed. */
+export function CaseHeader({
+  data,
+  user,
+  canAssign,
+  assigning,
+  onAssign,
+  onDecide,
+  unmask,
+  onUnmaskChange,
+}: CaseHeaderProps) {
   const subject = data.primary_entity;
   const owner = data.assignee_id === user.id ? "You" : (data.assignee_id ?? "Unassigned");
   return (
     <header className="case-header panel" aria-labelledby="case-title">
       <div className="case-header-main">
         <div className="case-identity">
-          <p className="kicker">1 · Case subject · suspicion only</p>
+          <p className="kicker">
+            {data.primary_entity_type === "member" ? "Member" : "Provider"} under review
+          </p>
           <h1 id="case-title">{subject?.name ?? data.primary_entity_id}</h1>
           <p className="case-ids">
             <span className="mono">{data.case_id}</span>
@@ -37,13 +46,8 @@ export function CaseHeader({ data, user, canAssign, assigning, onAssign, unmask,
           <div className="chip-row">
             <LaneBadge lane={data.lane} />
             <StatusBadge status={data.status} />
-            <RiskBadge severity={data.severity} />
-            <HarmFlag harm={data.harm} />
-            <span className={`sla-chip sla-${screeningTone(data.screening_days_left)}`}>
-              {screeningLabel(data.screening_days_left)}
-            </span>
             {data.provenance && data.provenance.urgent.length > 0 ? (
-              <span className="badge tone-danger">Urgent signal in group</span>
+              <span className="badge tone-danger">Urgent in group</span>
             ) : null}
             <span className="badge">Owner: {owner}</span>
           </div>
@@ -57,9 +61,9 @@ export function CaseHeader({ data, user, canAssign, assigning, onAssign, unmask,
               {assigning ? "Taking…" : "Take ownership"}
             </button>
           ) : null}
-          <a href="#decide" className="btn solid">
+          <button type="button" className="btn solid" onClick={onDecide}>
             Record next step
-          </a>
+          </button>
           {data.member_unmask_permitted ? (
             <label className="unmask-toggle">
               <input type="checkbox" checked={unmask} onChange={(event) => onUnmaskChange(event.target.checked)} />
@@ -71,19 +75,11 @@ export function CaseHeader({ data, user, canAssign, assigning, onAssign, unmask,
         </div>
       </div>
       <div className="case-header-metrics">
-        <dl className="stat-grid">
-          <StatTile label={SCORE_LABELS.pConfirm.label} value={pct(data.p_confirm)} hint={SCORE_LABELS.pConfirm.hintFor(data)} />
-          <StatTile label="Flagged paid" value={money(data.flagged_dollars)} />
-          <StatTile
-            label={SCORE_LABELS.expectedValue.label}
-            value={money(data.expected_value ?? 0)}
-            hint={SCORE_LABELS.expectedValue.hint}
-          />
-          <StatTile label="Members" value={data.members_affected} tone={data.harm >= 3 ? "harm" : "default"} />
-          <StatTile label="Est. hours" value={hours(data.estimated_hours)} />
-          <StatTile label="Evidence" value={<EvidenceBar value={data.evidence_strength} />} />
-        </dl>
-        <RiskHorizonChart f30={data.f30} f60={data.f60} f90={data.f90} />
+        <CaseAxes data={data} />
+        <details className="horizon-fold">
+          <summary>30 / 60 / 90-day suspicion</summary>
+          <RiskHorizonChart f30={data.f30} f60={data.f60} f90={data.f90} />
+        </details>
       </div>
     </header>
   );

@@ -18,12 +18,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const me = useQuery({
     queryKey: ["auth", "me"],
     queryFn: async () => {
-      try {
-        return await api.me();
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 401) return null;
-        throw err;
+      const session = await api.session();
+      if (session.authenticated && session.user) return session.user;
+      if (session.refresh_available) {
+        try {
+          return await api.refresh();
+        } catch (err) {
+          if (err instanceof ApiError && err.status === 401) return null;
+          throw err;
+        }
       }
+      return null;
     },
     retry: false,
   });

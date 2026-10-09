@@ -1,5 +1,12 @@
-import type { CaseAlert, ClaimRow, NetworkEdge, NetworkNode, NetworkPack } from "../../api/types";
-import { riskLevel, type RiskLevel } from "../../lib/risk";
+import type {
+  CaseAlert,
+  ClaimRow,
+  EdgeEvidence,
+  NetworkEdge,
+  NetworkNode,
+  NetworkPack,
+} from "../../api/types";
+import { riskLevel, riskLevelFromConfirm, type RiskLevel } from "../../lib/risk";
 
 /**
  * One adapter for both network shapes: today's /cases/{id}/network (untyped cliques, no
@@ -38,10 +45,13 @@ export interface GraphEdge {
   target: string;
   kind: string;
   directed: boolean;
-  /** Underlying records merged into this edge (duplicates in today's API, `count` in the newer one). */
+  /** Underlying records merged into this edge. */
   count: number;
   evidenceIds: string[];
   inferred: boolean;
+  inCase: boolean;
+  label?: string;
+  evidence?: EdgeEvidence;
 }
 
 export interface GraphModel {
@@ -68,8 +78,17 @@ const TYPE_ALIASES: Record<string, string> = {
   bank_account: "bank",
 };
 
-/** Edge kinds whose direction is meaningful (owner → provider, referrer → receiver). */
-const DIRECTED_KINDS = new Set(["owns", "referral"]);
+/** Edge kinds whose direction is meaningful. */
+const DIRECTED_KINDS = new Set([
+  "owns",
+  "referral",
+  "billed",
+  "rendered",
+  "at_facility",
+  "located_at",
+  "prescribed",
+  "dispensed",
+]);
 
 const MAX_LABEL = 22;
 
@@ -112,12 +131,19 @@ function normaliseNode(node: NetworkNode, subjectId: string, ctx: GraphContext, 
     .filter((alert) => alert.entity_id === node.id || peerIds(alert).includes(node.id))
     .map((alert) => alert.alert_id);
   const total = totals.get(node.id);
-  const flaggedPaid = node.flagged_paid ?? node.flagged_dollars ?? total?.paid ?? null;
+  const flaggedPaid = node.flagged_paid ?? total?.paid ?? null;
   const flaggedLines = node.n_flagged_lines ?? total?.lines ?? null;
   const inCase =
     node.in_case ??
     (isSubject || (ctx.caseEntityIds ?? []).includes(node.id) || (node.type !== "member" && total !== undefined));
   const harmLevel = node.harm ?? (isSubject ? ctx.subjectHarm : undefined);
+  const severity = node.severity ?? (isSubject ? ctx.subjectSeverity : undefined);
+  const ring =
+    severity !== undefined
+      ? riskLevel(severity)
+      : node.risk !== undefined
+        ? riskLevelFromConfirm(node.risk)
+        : undefined;
   return {
     id: node.id,
     type: TYPE_ALIASES[node.type] ?? node.type,
@@ -127,7 +153,7 @@ function normaliseNode(node: NetworkNode, subjectId: string, ctx: GraphContext, 
     inCase,
     masked: node.masked === true,
     specialty: node.specialty,
-    riskLevel: isSubject && ctx.subjectSeverity !== undefined ? riskLevel(ctx.subjectSeverity) : undefined,
+    riskLevel: ring,
     harm: harmLevel ?? null,
     alertIds: node.alert_ids ?? derivedAlerts,
     flaggedPaid,
@@ -163,6 +189,9 @@ function normaliseEdges(edges: NetworkEdge[], known: Set<string>): GraphEdge[] {
         count: edge.count ?? 1,
         evidenceIds: evidence,
         inferred: edge.inferred === true,
+        inCase: edge.in_case === true,
+        label: edge.label,
+        evidence: edge.evidence,
       });
     }
   }

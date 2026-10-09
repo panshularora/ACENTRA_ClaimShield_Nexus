@@ -1,5 +1,3 @@
-import "@fontsource-variable/inter";
-import "@fontsource/roboto-mono/400.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
@@ -12,6 +10,7 @@ import "./styles/base.css";
 import "./styles/public.css";
 import "./styles/components.css";
 import "./styles/shell.css";
+import "./styles/dash.css";
 
 // 4xx answers (not found, forbidden, invalid) will not change on retry; retry other failures once.
 const retryOnce = (failureCount: number, error: Error) =>

@@ -1,7 +1,10 @@
+import { useQuery } from "@tanstack/react-query";
 import { Suspense, lazy, useCallback, useMemo, useState } from "react";
+import { api } from "../../api/client";
+import type { EntitySummary } from "../../api/types";
 import type { GraphControls } from "../../components/network/CaseNetworkGraph";
 import { EdgeKindFilter, GraphLegend } from "../../components/network/GraphLegend";
-import type { GraphModel } from "../../components/network/graphModel";
+import type { GraphEdge, GraphModel } from "../../components/network/graphModel";
 import { LinkedEntityList } from "../../components/network/LinkedEntityList";
 import {
   edgeMeta,
@@ -30,6 +33,8 @@ export interface FocusCounts {
 export type JumpTarget = "evidence" | "claims" | "brief";
 
 interface NetworkPanelProps {
+  caseId: string;
+  unmask: boolean;
   model: GraphModel | undefined;
   loading: boolean;
   error: unknown;
@@ -39,6 +44,7 @@ interface NetworkPanelProps {
   focusCounts: FocusCounts | null;
   onJump: (target: JumpTarget) => void;
   onOpenProfile: (providerId: string) => void;
+  onOpenEvidence: (itemId: string) => void;
 }
 
 export function NetworkPanel(props: NetworkPanelProps) {
@@ -46,9 +52,10 @@ export function NetworkPanel(props: NetworkPanelProps) {
   return (
     <Panel
       id="network"
+      className="workspace-tab"
       eyebrow="3 · Network"
-      title="Who this provider is linked to"
-      description="Two-hop neighbourhood from the extract: ownership, shared TIN and address, referrals, and the members and facilities on flagged claims."
+      title="Who this subject is linked to"
+      description="Everyone linked to this subject within two steps: owners, shared tax IDs and contact details, shared addresses, referrals, and billed or rendered claims."
       actions={
         model ? (
           <span className="badge">
@@ -70,12 +77,15 @@ export function NetworkPanel(props: NetworkPanelProps) {
 }
 
 function NetworkExplorer({
+  caseId,
+  unmask,
   model,
   selection,
   onSelect,
   focusCounts,
   onJump,
   onOpenProfile,
+  onOpenEvidence,
 }: NetworkPanelProps & { model: GraphModel }) {
   const [enabled, setEnabled] = useState<Record<string, boolean>>({});
   const [layout, setLayout] = useState<GraphLayout>("organic");
@@ -192,13 +202,17 @@ function NetworkExplorer({
         <aside className="graph-side" aria-label="Network details">
           {selection ? (
             <SelectionCard
+              caseId={caseId}
+              unmask={unmask}
               selection={selection}
+              edges={edges}
               entities={entities}
               subjectId={model.subjectId}
               focusCounts={focusCounts}
               onSelect={onSelect}
               onJump={onJump}
               onOpenProfile={onOpenProfile}
+              onOpenEvidence={onOpenEvidence}
             />
           ) : (
             <p className="note">
@@ -220,34 +234,67 @@ function NetworkExplorer({
 }
 
 interface SelectionCardProps {
+  caseId: string;
+  unmask: boolean;
   selection: GraphSelection;
+  edges: GraphEdge[];
   entities: LinkedEntity[];
   subjectId: string;
   focusCounts: FocusCounts | null;
   onSelect: (selection: GraphSelection | null) => void;
   onJump: (target: JumpTarget) => void;
   onOpenProfile: (providerId: string) => void;
+  onOpenEvidence: (itemId: string) => void;
 }
 
-function SelectionCard({ selection, entities, subjectId, focusCounts, onSelect, onJump, onOpenProfile }: SelectionCardProps) {
+function SelectionCard({
+  caseId,
+  unmask,
+  selection,
+  edges,
+  entities,
+  subjectId,
+  focusCounts,
+  onSelect,
+  onJump,
+  onOpenProfile,
+  onOpenEvidence,
+}: SelectionCardProps) {
   const byId = new Map(entities.map((e) => [e.node.id, e]));
   const focusId = selection.kind === "node" ? selection.id : selection.source === subjectId ? selection.target : selection.source;
   const entity = byId.get(focusId);
+  const selectedEdge =
+    selection.kind === "edge"
+      ? edges.find((edge) => edge.id === selection.key) ??
+        edges.find(
+          (edge) =>
+            edge.kind === selection.edgeKind &&
+            ((edge.source === selection.source && edge.target === selection.target) ||
+              (!selection.directed && edge.source === selection.target && edge.target === selection.source)),
+        )
+      : undefined;
+  const nodeId = selection.kind === "node" ? selection.id : focusId;
+  const summaryQuery = useQuery({
+    queryKey: ["entity-summary", caseId, nodeId, unmask],
+    queryFn: () => api.getEntitySummary(nodeId, caseId, unmask),
+    enabled: Boolean(nodeId),
+    retry: false,
+  });
   if (!entity) return null;
   const node = entity.node;
+  const summary = summaryQuery.data;
 
   return (
     <section className="selection-card" aria-live="polite" aria-labelledby="selection-title">
-      {selection.kind === "edge" ? (
-        <div>
-          <p className="kicker">{edgeMeta(selection.edgeKind).label} link</p>
-          <p>{edgeMeta(selection.edgeKind).meaning}</p>
-          <p className="muted">
-            {byId.get(selection.source)?.node.label ?? selection.source}
-            {selection.directed ? " → " : " ↔ "}
-            {byId.get(selection.target)?.node.label ?? selection.target}
-          </p>
-        </div>
+      {selection.kind === "edge" && selectedEdge ? (
+        <EdgeEvidenceBlock
+          edge={selectedEdge}
+          sourceLabel={byId.get(selection.source)?.node.label ?? selection.source}
+          targetLabel={byId.get(selection.target)?.node.label ?? selection.target}
+          directed={selection.directed}
+          onOpenEvidence={onOpenEvidence}
+          onJump={onJump}
+        />
       ) : null}
       <div>
         <p className="kicker">
@@ -283,6 +330,17 @@ function SelectionCard({ selection, entities, subjectId, focusCounts, onSelect, 
           ) : null}
         </dl>
       ) : null}
+      {node.alertIds.length > 0 ? (
+        <ul className="relation-list">
+          {node.alertIds.slice(0, 6).map((alertId) => (
+            <li key={alertId}>
+              <button type="button" className="link-button" onClick={() => onOpenEvidence(`alert:${alertId}`)}>
+                {alertId}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {entity.relations.length > 0 ? <ConnectionCounts entity={entity} /> : null}
       {entity.relations.length > 0 ? (
         <ul className="relation-list">
@@ -298,6 +356,7 @@ function SelectionCard({ selection, entities, subjectId, focusCounts, onSelect, 
           {entity.relations.length > 6 ? <li className="muted">+{entity.relations.length - 6} more links</li> : null}
         </ul>
       ) : null}
+      <EntitySummaryBlock summary={summary} loading={summaryQuery.isLoading} onOpenEvidence={onOpenEvidence} onJump={onJump} />
       {focusCounts ? (
         <div className="selection-actions">
           <button type="button" className="btn small solid" disabled={focusCounts.lines === 0} onClick={() => onJump("claims")}>
@@ -316,16 +375,152 @@ function SelectionCard({ selection, entities, subjectId, focusCounts, onSelect, 
           ) : null}
         </div>
       ) : null}
-      {focusCounts && focusCounts.lines === 0 && focusCounts.findings === 0 ? (
-        <p className="muted">
-          No flagged claim lines or findings on this case involve this entity. The API does not yet return claims for
-          linked providers outside the case.
-        </p>
-      ) : null}
       <button type="button" className="link-button" onClick={() => onSelect(null)}>
         Clear selection
       </button>
     </section>
+  );
+}
+
+function EdgeEvidenceBlock({
+  edge,
+  sourceLabel,
+  targetLabel,
+  directed,
+  onOpenEvidence,
+  onJump,
+}: {
+  edge: GraphEdge;
+  sourceLabel: string;
+  targetLabel: string;
+  directed: boolean;
+  onOpenEvidence: (itemId: string) => void;
+  onJump: (target: JumpTarget) => void;
+}) {
+  const evidence = edge.evidence;
+  return (
+    <div>
+      <p className="kicker">{edgeMeta(edge.kind).label} link{edge.inCase ? " · in this case" : ""}</p>
+      <p>{edge.label ?? edgeMeta(edge.kind).meaning}</p>
+      <p className="muted">
+        {sourceLabel}
+        {directed ? " → " : " ↔ "}
+        {targetLabel}
+        {edge.count > 1 ? ` · ${edge.count} records` : ""}
+        {edge.inferred ? " · inferred" : ""}
+      </p>
+      {evidence?.attribute ? (
+        <p className="muted">
+          Shared {evidence.attribute.kind}: <span className="mono">{evidence.attribute.value_masked}</span>
+        </p>
+      ) : null}
+      {evidence?.ownership_pct != null ? <p className="muted">Ownership {evidence.ownership_pct}%</p> : null}
+      {evidence?.paid != null ? <p className="muted">Paid {money(evidence.paid)}</p> : null}
+      {evidence?.first_date ? (
+        <p className="muted">
+          {evidence.first_date}
+          {evidence.last_date && evidence.last_date !== evidence.first_date ? ` – ${evidence.last_date}` : ""}
+        </p>
+      ) : null}
+      {edge.evidenceIds.length > 0 ? (
+        <ul className="relation-list">
+          {edge.evidenceIds.slice(0, 8).map((id) => (
+            <li key={id}>
+              <button type="button" className="link-button" onClick={() => onOpenEvidence(id)}>
+                {id}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {evidence && (evidence.line_ids.length > 0 || evidence.alert_ids.length > 0) ? (
+        <div className="selection-actions">
+          {evidence.line_ids.length > 0 ? (
+            <button type="button" className="btn small solid" onClick={() => onJump("claims")}>
+              {count(evidence.line_ids.length, "claim line")}
+            </button>
+          ) : null}
+          {evidence.alert_ids.length > 0 ? (
+            <button type="button" className="btn small" onClick={() => onJump("evidence")}>
+              {count(evidence.alert_ids.length, "finding")}
+            </button>
+          ) : null}
+          <button type="button" className="btn small ghost" onClick={() => onOpenEvidence(`edge:${edge.id}`)}>
+            Edge evidence
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function EntitySummaryBlock({
+  summary,
+  loading,
+  onOpenEvidence,
+  onJump,
+}: {
+  summary: EntitySummary | undefined;
+  loading: boolean;
+  onOpenEvidence: (itemId: string) => void;
+  onJump: (target: JumpTarget) => void;
+}) {
+  if (loading) return <p className="muted">Loading claims and findings for this entity…</p>;
+  if (!summary) return null;
+  const sample = summary.claims.sample.slice(0, 3);
+  return (
+    <div className="entity-summary">
+      <dl className="facts compact">
+        <div>
+          <dt>All claims on file</dt>
+          <dd className="num">
+            {count(summary.claims.n_lines, "line")} · {money(summary.claims.paid)}
+          </dd>
+        </div>
+        {summary.claims.first_dos ? (
+          <div>
+            <dt>Dates of service</dt>
+            <dd>
+              {summary.claims.first_dos}
+              {summary.claims.last_dos ? ` – ${summary.claims.last_dos}` : ""}
+            </dd>
+          </div>
+        ) : null}
+        <div>
+          <dt>Related cases</dt>
+          <dd className="num">{summary.cases.length}</dd>
+        </div>
+      </dl>
+      {sample.length > 0 ? (
+        <ul className="relation-list">
+          {sample.map((row) => (
+            <li key={row.line_id}>
+              <button type="button" className="link-button" onClick={() => onOpenEvidence(`line:${row.line_id}`)}>
+                {row.code} · {row.dos_from} · {money(row.paid)}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {summary.alerts.length > 0 ? (
+        <ul className="relation-list">
+          {summary.alerts.slice(0, 4).map((alert) => (
+            <li key={alert.alert_id}>
+              <button type="button" className="link-button" onClick={() => onOpenEvidence(`alert:${alert.alert_id}`)}>
+                {alert.alert_id}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {summary.claims.n_lines > 0 ? (
+        <button type="button" className="btn small" onClick={() => onJump("claims")}>
+          Open claims for this entity
+        </button>
+      ) : (
+        <p className="muted">No claim lines on file for this entity in the extract.</p>
+      )}
+    </div>
   );
 }
 

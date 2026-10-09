@@ -17,6 +17,7 @@ from claimshield.cases.decisions import (
     record_decision,
     reopen_case,
 )
+from claimshield.cases.history import list_history
 from claimshield.cases.network import DEFAULT_REFERRAL_TOP_N, network_pack, node_detail
 from claimshield.cases.network_models import NetworkPack, NodeDetail
 from claimshield.cases.workspace import (
@@ -54,6 +55,16 @@ class RankOverrideBody(BaseModel):
 
 class ReopenBody(BaseModel):
     reason: str = Field(max_length=MAX_REASON)
+
+
+@router.get("/history")
+def get_case_history(
+    session: Session = Depends(get_db),
+    _: User = Depends(require("case:read")),
+    limit: int = Query(default=200, ge=1, le=500),
+) -> dict[str, Any]:
+    """Decided and earlier-run cases plus prior investigations. Declare before /{case_id}."""
+    return list_history(session, limit=limit)
 
 
 @router.get("/{case_id}")

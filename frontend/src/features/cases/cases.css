@@ -1,73 +1,215 @@
-/* Investigator worklist. */
-.worklist .subject-cell {
-  display: grid;
-  justify-items: start;
-  gap: 2px;
-  min-width: 16rem;
-  font-size: var(--font-size-13);
-  font-weight: 400;
-  text-align: left;
+/* Investigator worklist: claims-style table, same SIU fields. */
+.work-wrap {
+  max-height: 36rem;
 }
 
-.worklist .row-title {
+.work-grid .work-card-name {
+  display: inline-block;
   font-size: var(--font-size-14);
+  font-weight: 700;
 }
 
+.work-grid .work-card-meta,
+.work-grid .work-card-scores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.7rem;
+  margin: 0.2rem 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+  font-weight: 500;
+}
 
+.work-grid .chip-row {
+  margin-top: 0.3rem;
+}
+
+.worklist-cards {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.work-card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.work-card-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.work-card-id {
+  font-size: var(--font-size-12);
+  letter-spacing: 0.02em;
+}
+
+.work-card-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-4) var(--space-6);
+  align-items: center;
+}
+
+.work-card-main {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.work-card-name {
+  color: var(--color-text);
+  font-size: var(--font-size-16);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.app .work-card-name:hover {
+  color: var(--color-link);
+}
+
+.work-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  text-transform: capitalize;
+}
+
+.work-card-meta .mono {
+  text-transform: none;
+}
+
+.work-card-group {
+  margin: 0;
+  font-size: var(--font-size-13);
+}
+
+.work-card-scores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border-subtle);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-13);
+  font-variant-numeric: tabular-nums;
+}
+
+.work-card-action {
+  align-self: center;
+  justify-self: end;
+}
+
+.history-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.history-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-4);
+  align-items: start;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.history-row:last-child {
+  border-bottom: 0;
+}
+
+.history-main {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.history-reason {
+  margin: 0.2rem 0 0;
+  font-size: var(--font-size-13);
+}
+
+.history-side {
+  display: grid;
+  justify-items: end;
+  gap: 0.25rem;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-size-13);
+}
+
+.history-dollars {
+  font-weight: 700;
+}
+
+.history-list.compact .history-row {
+  padding: var(--space-3) var(--space-4);
+}
+
+.history-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.history-pager-status {
+  margin: 0;
+  font-size: var(--font-size-13);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .work-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 
 @media (max-width: 720px) {
-  .worklist-wrap {
-    overflow: visible;
-    border: 0;
+  .history-row {
+    grid-template-columns: 1fr;
   }
 
-  .worklist thead {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
+  .history-side {
+    justify-items: start;
   }
 
-  .worklist,
-  .worklist tbody {
-    display: block;
+  .work-card {
+    padding: var(--space-4);
   }
 
-  .worklist tr {
-    display: grid;
+  .work-card-body {
+    grid-template-columns: 1fr;
+  }
+
+  .work-card-action {
+    justify-self: start;
+  }
+
+  .work-metrics {
     grid-template-columns: 1fr 1fr;
-    gap: var(--space-2) var(--space-3);
-    margin-bottom: var(--space-3);
-    padding: var(--space-3);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
-  }
-
-  .worklist tr > * {
-    padding: 0;
-    border: 0;
-    background: none;
-  }
-
-  .worklist .subject-cell,
-  .worklist .action-cell {
-    grid-column: 1 / -1;
-    min-width: 0;
-  }
-
-  .worklist td[data-label]::before {
-    content: attr(data-label);
-    display: block;
-    color: var(--color-text-muted);
-    font-size: var(--font-size-12);
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-
-  .worklist td.num {
-    text-align: left;
   }
 }

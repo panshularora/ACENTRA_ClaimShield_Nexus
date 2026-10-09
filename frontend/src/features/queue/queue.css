@@ -3,9 +3,140 @@
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.desk-more {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.desk-more > summary {
+  cursor: pointer;
+  font-weight: 650;
+  font-size: var(--font-size-14);
+}
+
+.lane-pills {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.lane-pills button {
+  width: 100%;
+  display: grid;
+  gap: 0.15rem;
+  text-align: left;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.lane-pills button strong {
+  font-size: var(--font-size-13);
+}
+
+.lane-pills button span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-12);
+  font-variant-numeric: tabular-nums;
+}
+
+.lane-pills button[aria-pressed="true"] {
+  border-color: var(--color-brand);
+  box-shadow: inset 0 0 0 1px var(--color-brand);
+}
+
+.queue-page #queue > .panel-head {
+  position: sticky;
+  top: 4.25rem;
+  z-index: 15;
+  background: #fff;
+}
+
+.queue-page #queue .toolbar {
+  position: sticky;
+  top: 9.35rem;
+  z-index: 14;
+  background: #fff;
+  padding-top: 0.35rem;
+  padding-bottom: 0.55rem;
+}
+
+.queue-page .queue-wrap {
+  overflow: auto;
+}
+
+.queue-page .queue-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff;
+}
+
+.queue-grid td.why-cell {
+  width: 22rem;
+  min-width: 16rem;
+  max-width: 28rem;
+  font-size: var(--font-size-13);
+  line-height: 1.4;
+  color: var(--color-text);
+  text-align: left;
+  vertical-align: top;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.queue-grid td.why-cell span {
+  display: block;
+  text-align: left;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.aws-status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-3) var(--space-4);
+  margin: 0;
+}
+
+.aws-status div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.aws-status dt {
+  font-size: var(--font-size-13);
+  color: var(--color-text-muted);
+}
+
+.aws-status dd {
+  margin: 0;
+  font-size: var(--font-size-13);
+}
+
+.aws-receipts {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.aws-receipts li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: var(--font-size-13);
+}
+
 .queue-top {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(18rem, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-5);
   align-items: start;
 }
@@ -13,6 +144,14 @@
 .desk-settings {
   display: grid;
   gap: var(--space-4);
+}
+
+.desk-settings .chart,
+.desk-settings .chart-frame,
+.desk-settings .chart-wrap,
+.desk-settings [class*="chart"] {
+  min-width: 0;
+  grid-column: 1 / -1;
 }
 
 .slider {
@@ -67,15 +206,123 @@
 
 .queue-wrap {
   max-height: 44rem;
+  overflow: auto;
+  border: 0;
+  background: transparent;
+}
+
+.queue-grid {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 86rem;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.queue-grid col.col-check {
+  width: 2.1rem;
+}
+
+.queue-grid col.col-case {
+  width: 12.5rem;
+}
+
+.queue-grid col.col-lane {
+  width: 7.6rem;
+}
+
+.queue-grid col.col-status {
+  width: 4.2rem;
+}
+
+.queue-grid col.col-num {
+  width: 3.8rem;
+}
+
+.queue-grid col.col-suspicion {
+  width: 5.2rem;
+}
+
+.queue-grid col.col-money {
+  width: 4.6rem;
+}
+
+.queue-grid col.col-harm {
+  width: 5rem;
+}
+
+.queue-grid col.col-proof {
+  width: 5.8rem;
+}
+
+.queue-grid col.col-why {
+  width: 22rem;
+}
+
+.queue-grid col.col-move {
+  width: 4.8rem;
+}
+
+.queue-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 2.5rem;
+  padding: 0 0.7rem;
+  border-bottom: 0;
+  background: var(--neutral-950);
+  color: var(--neutral-0);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.queue-grid thead th:first-child {
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+.queue-grid thead th:last-child {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+.queue-grid thead th.why-head {
+  text-align: left;
+}
+
+.queue-grid tbody td,
+.queue-grid tbody th[scope="row"] {
+  height: auto;
+  padding: 0.75rem 0.5rem;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.queue-grid tbody td .axis-pair {
+  white-space: normal;
+}
+
+.queue-grid tbody th.case-cell,
+.queue-grid tbody td.why-cell {
+  white-space: normal;
+  vertical-align: top;
 }
 
 .queue-grid .case-cell {
   display: grid;
   gap: 2px;
-  min-width: 12rem;
   font-size: var(--font-size-13);
   font-weight: 400;
   text-align: left;
+}
+
+.queue-grid .check {
+  text-align: center;
+  padding-inline: 0.4rem;
+}
+
+.queue-grid tbody tr.lane-harm_priority > :first-child {
+  box-shadow: inset 3px 0 0 var(--harm-solid);
 }
 
 .case-id-row {
@@ -92,11 +339,37 @@
   font-variant-numeric: tabular-nums;
 }
 
-
-
-
 .factors-cell {
-  min-width: 9rem;
+  min-width: 0;
+}
+
+.factor-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.factor-strip-track {
+  display: flex;
+  flex: 1;
+  height: 6px;
+  min-width: 3.5rem;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--color-surface-sunken);
+}
+
+.factor-strip-track i {
+  display: block;
+  height: 100%;
+  flex: none;
+}
+
+.queue-grid .evidence {
+  width: 100%;
+  min-width: 0;
 }
 
 .policy {
@@ -122,5 +395,8 @@
 @media (max-width: 720px) {
   .kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .lane-pills {
+    grid-template-columns: 1fr 1fr;
   }
 }

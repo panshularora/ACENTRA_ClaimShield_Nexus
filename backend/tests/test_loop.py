@@ -56,6 +56,42 @@ def test_audit_rbac(client: TestClient) -> None:
     assert verify.json()["intact"] is True
 
 
+def test_case_history_lists_investigations_and_decided_cases(client: TestClient) -> None:
+    run_id, queue = _load_tiny(client)
+    hist = client.get("/api/v1/cases/history")
+    assert hist.status_code == 200, hist.text
+    body = hist.json()
+    assert body["counts"]["investigations"] >= 1
+    assert body["current_run_id"] == run_id
+    inv = next(row for row in body["items"] if row["kind"] == "investigation")
+    assert inv["outcome"] in {"substantiated", "education", "referred", "unsubstantiated"}
+    assert all(
+        row.get("outcome") in {None, "substantiated", "education", "referred", "unsubstantiated"}
+        for row in body["items"]
+    )
+    assert inv["provider_name"]
+
+    source = queue[0]["case_id"]
+    _logout(client)
+    _login(client, "investigator@demo.claimshield", "demo-investigator")
+    assert client.get("/api/v1/cases/history").status_code == 200
+    assert client.post(f"/api/v1/cases/{source}/assign", json={}).status_code == 200
+    decided = client.post(
+        f"/api/v1/cases/{source}/decisions",
+        json={
+            "action": "dismiss",
+            "reason": "Shared detector evidence does not support keeping this potential FWA pattern open.",
+        },
+    )
+    assert decided.status_code == 200, decided.text
+    after = client.get("/api/v1/cases/history").json()
+    hit = next(row for row in after["items"] if row["id"] == source)
+    assert hit["kind"] == "case"
+    assert hit["status"] == "dismissed"
+    assert hit["outcome"] == "unsubstantiated"
+    assert hit["outcome_label"] == "Unsubstantiated"
+
+
 def test_recompute_run_endpoint_and_current_run(client: TestClient) -> None:
     _run_id, _rows = _load_tiny(client)
     members_before = client.get("/api/v1/batches")

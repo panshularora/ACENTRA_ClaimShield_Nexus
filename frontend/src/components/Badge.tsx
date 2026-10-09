@@ -1,6 +1,14 @@
 import type { Lane } from "../api/types";
 import { laneLabel } from "../lib/format";
-import { RISK_GLYPH, RISK_LABEL, riskLevel, type RiskLevel } from "../lib/risk";
+import {
+  CONFIRM_BAND_LABEL,
+  confirmBand,
+  RISK_GLYPH,
+  RISK_LABEL,
+  riskLevel,
+  type ConfirmBand,
+  type RiskLevel,
+} from "../lib/risk";
 
 /** Workflow lane as a neutral chip (lanes are not risk). */
 export function LaneBadge({ lane }: { lane: Lane }) {
@@ -8,7 +16,7 @@ export function LaneBadge({ lane }: { lane: Lane }) {
 }
 
 export function StatusBadge({ status }: { status: string }) {
-  return <span className="badge status">{status}</span>;
+  return <span className="badge status">{status.replaceAll("_", " ")}</span>;
 }
 
 /** Case risk level from API severity (1–4): glyph + label + colour, never colour alone. */
@@ -18,27 +26,28 @@ export function RiskBadge({ severity }: { severity: number }) {
 
 export function RiskLevelBadge({ level, title }: { level: RiskLevel; title?: string }) {
   return (
-    <span className={`badge risk-${level}`} title={title}>
+    <span className={`badge risk-${level}`} title={title ?? `${RISK_LABEL[level]} severity`}>
       <span aria-hidden="true">{RISK_GLYPH[level]}</span>
       {RISK_LABEL[level]}
-      <span className="sr-only"> risk</span>
     </span>
   );
 }
 
 /** Patient harm, a separate axis from risk. Flagged at 3 and above; lower levels print as muted numbers. */
-export function HarmFlag({ harm }: { harm: number }) {
-  if (harm < 3) {
-    return (
-      <span className="harm-level num" title="Patient-harm level (separate from financial risk)">
-        <span className="sr-only">Harm </span>
-        {harm}
-      </span>
-    );
-  }
+export function ConfirmBandBadge({ p }: { p: number }) {
+  const band: ConfirmBand = confirmBand(p);
   return (
-    <span className="badge harm" title="Patient-harm level (separate from financial risk)">
-      <span aria-hidden="true">✚</span>Harm {harm}
+    <span className={`badge confirm-${band}`} title="Suspicion score for review">
+      {CONFIRM_BAND_LABEL[band]}
+    </span>
+  );
+}
+
+export function HarmFlag({ harm }: { harm: number }) {
+  const tone = harm >= 4 ? "harm" : harm >= 3 ? "tone-warning" : "status";
+  return (
+    <span className={`badge ${tone}`} title="Patient-harm level (separate from money risk)">
+      Harm {harm}
     </span>
   );
 }

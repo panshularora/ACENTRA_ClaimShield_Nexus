@@ -6,13 +6,12 @@ import {
   ErrorBar,
   LabelList,
   ReferenceLine,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import { axisTitle, categoryAxis, chartTheme, valueAxis } from "../../lib/chartTheme";
-import { ChartFrame, ChartLegend } from "./ChartFrame";
+import { ChartFrame, ChartLegend, ChartPlot } from "./ChartFrame";
 import { TooltipCard } from "./ChartTooltip";
 
 /** Peer statistics exactly as sent in an anomaly alert's evidence payload. */
@@ -39,13 +38,13 @@ function fmt(value: number): string {
   return value.toLocaleString("en-US", { maximumFractionDigits: 2 });
 }
 
-/** Provider vs peer median with the peer inter-quartile range and outlier fence. */
+/** This provider vs the typical similar provider, with the middle range of the group. */
 export function PeerComparisonChart({ stats }: { stats: PeerStats }) {
-  const unit = stats.metric ?? "metric value (unit not provided by the API)";
+  const unit = stats.metric ?? "value";
   const data: PeerDatum[] = [
     { name: "This provider", value: stats.providerValue },
     {
-      name: `Peer median (n=${stats.nPeers})`,
+      name: `Typical similar provider (${stats.nPeers})`,
       value: stats.median,
       iqr: [stats.median - stats.q1, stats.q3 - stats.median],
     },
@@ -59,42 +58,44 @@ export function PeerComparisonChart({ stats }: { stats: PeerStats }) {
 
   return (
     <ChartFrame
-      title="Provider vs like-for-like peers"
-      summary={`This provider: ${fmt(stats.providerValue)}; peer median ${fmt(stats.median)} (IQR ${fmt(stats.q1)}–${fmt(stats.q3)}, ${stats.nPeers} peers)${
-        ratio !== null ? `, ${fmt(ratio)}× the median` : ""
-      }. Unit: ${unit}.`}
+      title="This provider vs similar providers"
+      summary={`This provider: ${fmt(stats.providerValue)}. Typical similar provider: ${fmt(stats.median)} (middle range ${fmt(stats.q1)}–${fmt(stats.q3)}, ${stats.nPeers} providers)${
+        ratio !== null ? `, ${fmt(ratio)}× typical` : ""
+      }. ${unit}.`}
       legend={
         <ChartLegend
           items={[
             { label: "This provider", color: provider },
-            { label: "Peer median, whisker = IQR", color: peer },
-            ...(stats.fence !== null ? [{ label: `Outlier fence (${fmt(stats.fence)})`, color: fence, shape: "dashed" as const }] : []),
+            { label: "Typical similar provider, bar = middle range", color: peer },
+            ...(stats.fence !== null
+              ? [{ label: `Unusual if above ${fmt(stats.fence)}`, color: fence, shape: "dashed" as const }]
+              : []),
           ]}
         />
       }
       table={{
-        caption: `Peer comparison (${unit})`,
+        caption: `Compared with similar providers (${unit})`,
         columns: ["Measure", "Value"],
         rows: [
           ["This provider", fmt(stats.providerValue)],
-          ["Peer median", fmt(stats.median)],
-          ["Peer Q1", fmt(stats.q1)],
-          ["Peer Q3", fmt(stats.q3)],
-          ...(stats.min !== null ? [["Peer min", fmt(stats.min)] as [string, string]] : []),
-          ...(stats.max !== null ? [["Peer max", fmt(stats.max)] as [string, string]] : []),
-          ...(stats.fence !== null ? [["Outlier fence", fmt(stats.fence)] as [string, string]] : []),
-          ["Peers", stats.nPeers],
+          ["Typical similar provider", fmt(stats.median)],
+          ["Lower end of the middle range", fmt(stats.q1)],
+          ["Upper end of the middle range", fmt(stats.q3)],
+          ...(stats.min !== null ? [["Lowest in the group", fmt(stats.min)] as [string, string]] : []),
+          ...(stats.max !== null ? [["Highest in the group", fmt(stats.max)] as [string, string]] : []),
+          ...(stats.fence !== null ? [["Unusual if above", fmt(stats.fence)] as [string, string]] : []),
+          ["Similar providers", stats.nPeers],
         ],
       }}
     >
-      <ResponsiveContainer width="100%" height={150}>
+      <ChartPlot height={150}>
         <BarChart
           data={data}
           layout="vertical"
           barCategoryGap="35%"
           margin={{ top: 4, right: 56, bottom: 24, left: 0 }}
           accessibilityLayer
-          title="Provider vs like-for-like peers"
+          title="This provider vs similar providers"
         >
           <CartesianGrid horizontal={false} stroke={t.grid} />
           <XAxis
@@ -125,7 +126,9 @@ export function PeerComparisonChart({ stats }: { stats: PeerStats }) {
                   title={datum.name}
                   rows={[
                     { label: "Value", value: `${fmt(datum.value)} ${stats.metric ?? ""}` },
-                    ...(datum.iqr ? [{ label: "Peer IQR", value: `${fmt(stats.q1)}–${fmt(stats.q3)}` }] : []),
+                    ...(datum.iqr
+                      ? [{ label: "Middle range of similar providers", value: `${fmt(stats.q1)}–${fmt(stats.q3)}` }]
+                      : []),
                   ]}
                 />
               );
@@ -138,14 +141,17 @@ export function PeerComparisonChart({ stats }: { stats: PeerStats }) {
             <LabelList
               dataKey="value"
               position="right"
-              formatter={(value) => (typeof value === "number" ? fmt(value) : "")}
+              formatter={(value) => {
+                const n = typeof value === "number" ? value : Number(value);
+                return Number.isFinite(n) ? fmt(n) : "";
+              }}
               fill={t.text}
               fontSize={12}
               fontWeight={500}
             />
           </Bar>
         </BarChart>
-      </ResponsiveContainer>
+      </ChartPlot>
     </ChartFrame>
   );
 }

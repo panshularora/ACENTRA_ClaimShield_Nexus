@@ -142,6 +142,29 @@ def test_successful_ingest_and_duplicate(aws_client: TestClient, tmp_path) -> No
     assert second.json()["batch_id"] == payload["batch_id"]
 
 
+def test_aws_status_requires_login_and_hides_token(aws_client: TestClient) -> None:
+    denied = aws_client.get("/api/v1/aws/status")
+    assert denied.status_code == 401
+    login = aws_client.post(
+        "/api/v1/auth/login",
+        json={"email": "manager@demo.claimshield", "password": "demo-manager"},
+    )
+    assert login.status_code == 200
+    res = aws_client.get("/api/v1/aws/status")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["bucket"] == "claimshield-nexus-data-2026"
+    assert body["region"] == "ap-south-1"
+    assert body["incoming_prefix"] == "incoming/"
+    assert body["processed_prefix"] == "processed/"
+    assert body["results_prefix"] == "results/"
+    assert body["lambda_function"] == "claimshield-s3-processor"
+    assert body["token_configured"] is True
+    assert body["store"] == "local_dir"
+    assert "internal_token" not in body
+    assert TOKEN not in res.text
+
+
 def test_processing_failure(aws_client: TestClient, tmp_path, monkeypatch) -> None:
     _copy_extract(tmp_path / "incoming")
 

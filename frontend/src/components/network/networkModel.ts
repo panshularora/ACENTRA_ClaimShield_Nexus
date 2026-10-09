@@ -34,6 +34,9 @@ export const EDGE_TYPES: Record<string, EdgeTypeMeta> = {
   billed: { label: "Billed", meaning: "Billing provider on a flagged claim for this member.", family: "claim" },
   rendered: { label: "Rendered", meaning: "Rendering provider on a flagged claim line for this member.", family: "claim" },
   at_facility: { label: "At facility", meaning: "Flagged line was rendered at this facility.", family: "claim" },
+  located_at: { label: "Practice address", meaning: "Provider enrolled at this address hub.", family: "shared" },
+  prescribed: { label: "Prescribed", meaning: "Prescriber wrote a fill for this member.", family: "claim" },
+  dispensed: { label: "Dispensed", meaning: "Pharmacy dispensed a fill for this member.", family: "claim" },
 };
 
 export function edgeMeta(kind: string): EdgeTypeMeta {

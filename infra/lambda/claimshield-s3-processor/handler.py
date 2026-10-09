@@ -223,12 +223,21 @@ def _public(body: dict[str, Any]) -> dict[str, Any]:
     return {key: body[key] for key in keep if key in body}
 
 
+def _env(*names: str, default: str = "") -> str:
+    for name in names:
+        value = os.environ.get(name)
+        if value:
+            return value
+    return default
+
+
 def lambda_handler(event: dict[str, Any], _context: Any) -> dict[str, Any]:
+    # CLAIMSHIELD_INTERNAL_TOKEN must match FastAPI. S3_INPUT_PREFIX is the run-sheet name for incoming/.
     return handle_event(
         event,
-        api_url=os.environ.get("CLAIMSHIELD_API_URL", ""),
-        token=os.environ.get("CLAIMSHIELD_INTERNAL_TOKEN", ""),
-        allowed_bucket=os.environ.get("CLAIMSHIELD_S3_BUCKET", DEFAULT_BUCKET),
-        incoming_prefix=os.environ.get("CLAIMSHIELD_S3_INCOMING_PREFIX", INCOMING_PREFIX),
-        environment=os.environ.get("CLAIMSHIELD_ENVIRONMENT", "hackathon"),
+        api_url=_env("CLAIMSHIELD_API_URL"),
+        token=_env("CLAIMSHIELD_INTERNAL_TOKEN"),
+        allowed_bucket=_env("CLAIMSHIELD_S3_BUCKET", "S3_BUCKET", default=DEFAULT_BUCKET),
+        incoming_prefix=_env("CLAIMSHIELD_S3_INCOMING_PREFIX", "S3_INPUT_PREFIX", default=INCOMING_PREFIX),
+        environment=_env("CLAIMSHIELD_ENVIRONMENT", default="hackathon"),
     )

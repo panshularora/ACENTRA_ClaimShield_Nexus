@@ -13,6 +13,22 @@ S3 incoming/*.csv
 
 Do not recreate the bucket, Lambda, or CloudWatch dashboard. They already exist in `ap-south-1`.
 
+## Live wiring (hackathon sheet)
+
+| Name | Value |
+| --- | --- |
+| AWS_REGION | ap-south-1 |
+| S3_BUCKET | claimshield-nexus-data-2026 |
+| S3_INPUT_PREFIX | incoming/ |
+| S3_PROCESSED_PREFIX | processed/ |
+| S3_RESULTS_PREFIX | results/ |
+| LAMBDA_FUNCTION | claimshield-s3-processor |
+| CLAIMSHIELD_API_URL | https://claimshield-nexus-api.vercel.app |
+
+`CLAIMSHIELD_INTERNAL_TOKEN` is set on **both** Lambda and FastAPI and must match. It is never committed, never returned by `GET /api/v1/aws/status`, and never written to logs (the Lambda handler redacts token-like fields).
+
+The API also accepts `CLAIMSHIELD_AWS_REGION`, `CLAIMSHIELD_S3_BUCKET`, `CLAIMSHIELD_S3_INCOMING_PREFIX` (same as `S3_INPUT_PREFIX`), `CLAIMSHIELD_S3_PROCESSED_PREFIX`, `CLAIMSHIELD_S3_RESULTS_PREFIX`, and `CLAIMSHIELD_LAMBDA_FUNCTION`.
+
 ## What to upload
 
 The pipeline needs a **full extract directory**, the same CSVs `python -m claimshield generate` writes:

@@ -232,8 +232,8 @@
           @fontsource/roboto-mono     -> family "Roboto Mono" (IDs/NPIs/amounts; monospace digits)
         IBM Plex Mono (index.html Google link) is kept only as a fallback.
      --------------------------------------------------------------------------- */
-  --font-sans: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "Roboto Mono", "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   --font-features-data: "tnum" 1, "lnum" 1;   /* use with font-feature-settings where variant-numeric is unavailable (SVG) */
 
   --font-size-12: 0.75rem;   /* 12px caption, chart ticks, table header, overline */

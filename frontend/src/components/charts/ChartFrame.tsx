@@ -1,4 +1,5 @@
-import { useId, type ReactNode } from "react";
+import { useId, type ReactElement, type ReactNode } from "react";
+import { ResponsiveContainer } from "recharts";
 import "./charts.css";
 
 export interface DataTableSpec {
@@ -88,6 +89,24 @@ export interface LegendItem {
 }
 
 /** Static legend (Recharts' built-in legend is not keyboard/AT friendly). */
+/**
+ * Sized plot so Recharts does not start at −1×−1 inside a CSS grid and stay
+ * stuck there until a later resize.
+ */
+export function ChartPlot({ height, children }: { height: number; children: ReactElement }) {
+  return (
+    <ResponsiveContainer
+      width="100%"
+      height={height}
+      minWidth={0}
+      minHeight={height}
+      initialDimension={{ width: 480, height }}
+    >
+      {children}
+    </ResponsiveContainer>
+  );
+}
+
 export function ChartLegend({ items }: { items: LegendItem[] }) {
   return (
     <ul className="chart-legend">

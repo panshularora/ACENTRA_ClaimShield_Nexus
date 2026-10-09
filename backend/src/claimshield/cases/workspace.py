@@ -28,6 +28,7 @@ from claimshield.cases.decisions import (
     serialize_decision,
 )
 from claimshield.cases.network import network_edge, node_detail
+from claimshield.cases.plain import GAP_BY_KIND, finding_copy, kind_title
 from claimshield.cases.provenance import alert_lineage, case_provenance, grouping_from_alerts
 from claimshield.core.errors import Forbidden, NotFound, ValidationFailed
 from claimshield.core.ids import new_id
@@ -52,6 +53,7 @@ from claimshield.db.models import (
 from claimshield.queue.explain import LANE_LABELS, override_text, screening_days_left, why_rank
 from claimshield.queue.rank import rank_pack_for_case, recommendation_for
 from claimshield.risk.present import case_risk, risk_fields, score_label
+from claimshield.risk.scoring import display_pct
 from claimshield.wiki.service import (
     label_for_case,
     match_precedents,
@@ -61,36 +63,6 @@ from claimshield.wiki.service import (
     serialize_proposal,
 )
 
-GAP_BY_KIND = {
-    "evv_missing": "EVV visit records with the six CURES elements for the flagged home-health dates.",
-    "after_death": "Date-of-death source and eligibility span overlapping the date of service.",
-    "excluded_party": "LEIE match packet (NPI, name, exclusion type and effective date).",
-    "duplicate": "Original vs resubmitted claim images for the duplicate member/provider/code/DOS set.",
-    "ptp_pair": (
-        "Indicator 0: the column-two code is not separately payable with the column-one code under any "
-        "modifier. Request the claim images to confirm the pair was paid together and the amount to recover. "
-        "(For indicator-1 pairs, request records supporting a distinct-procedural-service modifier.)"
-    ),
-    "unit_cap": "Documentation of units billed against the synthetic MUE cap.",
-    "inpatient_overlap": "Inpatient census for the overlapping stay.",
-    "clone_billing": (
-        "Visit notes for a sample of the same-day services, to check volume against staffing and for "
-        "cloned documentation."
-    ),
-    "ambulance_overlap": (
-        "Trip sheets with vehicle, crew, pickup and drop-off times; the extract cannot test overlap."
-    ),
-    "sex_implausible": (
-        "Coding check only: confirm the member's sex on file and whether a KX modifier or condition code 45 "
-        "was omitted. Not evidence of FWA."
-    ),
-    "daily_minutes_cap": "Clinician time log for the day that exceeds 960 billed minutes.",
-    "doctor_shopping": (
-        "PDMP-equivalent fill history across the listed prescribers and pharmacies; consider pharmacy "
-        "lock-in or care-coordination review for the member."
-    ),
-}
-
 
 def evidence_gaps(alerts: list[Alert], case: Case) -> list[str]:
     gaps: list[str] = []
@@ -99,9 +71,9 @@ def evidence_gaps(alerts: list[Alert], case: Case) -> list[str]:
         if isinstance(kind, str) and kind in GAP_BY_KIND:
             gaps.append(GAP_BY_KIND[kind])
     if case.evidence_strength < 0.4:
-        gaps.append("Corroborating records to lift evidence strength above the 0.40 floor.")
+        gaps.append("More records are needed before this is ready to screen.")
     if not gaps:
-        gaps.append("Medical records for the flagged claim lines, if the investigator still has residual uncertainty.")
+        gaps.append("Visit notes or claim images for the flagged lines, if anything is still unclear.")
     # unique, stable
     out: list[str] = []
     for g in gaps:
@@ -379,49 +351,56 @@ def template_brief(session: Session, case: Case, user: User) -> dict[str, Any]:
     serialized = [serialize_alert(a) for a in alerts]
     provider = session.get(Provider, case.primary_entity_id)
     name = provider.name if provider else case.primary_entity_id
-    signal_cites = [_cite(f"alert:{a['alert_id']}", "alert", a["rule_id"] or a["detector"]) for a in serialized]
-    metric_cite = [_cite("metric:harm", "metric", "case metrics")]
-    top_kind = serialized[0]["label"] if serialized else "detector output"
-    approaches = ", ".join(sorted({str(a.get("approach") or a["detector"]) for a in serialized}))
+    def _kind(alert: dict[str, Any]) -> str:
+        evidence = alert.get("evidence") or {}
+        return str(evidence.get("kind") or alert.get("kind") or "")
+
+    signal_cites = [
+        _cite(f"alert:{a['alert_id']}", "alert", kind_title(_kind(a), a.get("label") or "pattern"))
+        for a in serialized
+    ]
+    metric_cite = [_cite("metric:harm", "metric", "case scores")]
+    top = finding_copy(_kind(serialized[0]), serialized[0].get("label") or "pattern") if serialized else None
     n_lines = len(line_ids_for(alerts))
     why_lane = (
         override_text(case)
         if case.lane == "harm_priority"
         else (
-            "Evidence strength is below the 0.40 floor, so the knapsack left this case in needs-evidence."
+            "Evidence is still thin, so this waits for more records rather than today's desk."
             if case.lane == "needs_evidence"
             else (
-                "The case is on the tracked backlog because it fell outside remaining investigator hours "
-                "after knapsack fill."
+                "This sat outside remaining investigator hours after today's desk was filled."
                 if case.lane == "overflow"
-                else "The capacity knapsack selected this case on its combined rank score within remaining hours."
+                else (
+                    "This sits on today's desk on combined rank: scheme severity, financial exposure, "
+                    "member impact, evidence strength, and urgency."
+                )
             )
         )
     )
     if case.primary_entity_type == "member":
         action = (
-            "Refer this member-level pattern for pharmacy lock-in or care-coordination review; "
+            "Send this member-level pattern for pharmacy lock-in or care-coordination review; "
             "prescribers and pharmacies are context, not subjects."
         )
     elif case.harm >= 4 or case.override_kinds:
-        action = "Escalate for human review of a potential FWA pattern requiring investigation."
+        action = "Escalate for a person to review. The product only recommends."
     elif case.evidence_strength < 0.4:
-        action = "Needs more evidence before a screening recommendation can be made."
+        action = "Collect more records before a screening recommendation."
     else:
-        action = "Monitor pending investigator review of a potential FWA pattern requiring investigation."
+        action = "Keep on the desk for a person to review. Scores do not close the case."
 
     key_sentences = []
     for a in serialized[:8]:
         n = len(a["line_ids"])
-        policy = a.get("policy_ref")
-        policy_bit = f" Policy {policy}." if policy else ""
+        copy = finding_copy(_kind(a), a.get("label") or "pattern")
         key_sentences.append(
             {
                 "text": (
-                    f"{a['label']} ({a['rule_id'] or a['detector']}) on {n} claim line(s) "
-                    f"for entity {a['entity_id']}.{policy_bit}"
+                    f"{copy['title']}: {copy['what']} {n} paid claim line"
+                    f"{'' if n == 1 else 's'} sit under this pattern. {copy['check']}"
                 ),
-                "cites": [_cite(f"alert:{a['alert_id']}", "alert", a["rule_id"] or a["detector"])],
+                "cites": [_cite(f"alert:{a['alert_id']}", "alert", copy["title"])],
             }
         )
     if not key_sentences:
@@ -437,6 +416,18 @@ def template_brief(session: Session, case: Case, user: User) -> dict[str, Any]:
         if n_lines
         else "No flagged claim lines are attached; timeline is empty."
     )
+    days_left = screening_days_left(case)
+    urgency_text = "no screening clock" if days_left is None else f"{days_left} days on the 45-day clock"
+    score_text = (
+        f"Suspicion {display_pct(case.p_confirm)} ({score_label(case_risk(session, case.case_id))}); "
+        f"scheme severity {case.severity} of 4; "
+        f"financial exposure ${case.flagged_dollars:,.0f}; "
+        f"member impact harm {case.harm} × {case.members_affected} people; "
+        f"evidence strength {display_pct(case.evidence_strength)}; "
+        f"urgency {urgency_text}; "
+        f"30/60/90-day suspicion {display_pct(case.f30)} / "
+        f"{display_pct(case.f60)} / {display_pct(case.f90)}."
+    )
 
     sections = [
         {
@@ -444,9 +435,9 @@ def template_brief(session: Session, case: Case, user: User) -> dict[str, Any]:
             "sentences": [
                 {
                     "text": (
-                        f"Case {case.case_id} is a potential FWA pattern requiring investigation involving "
-                        f"{name} ({case.primary_entity_id}). {len(serialized)} detection signal(s) flag "
-                        f"${case.flagged_dollars:,.0f} paid across {case.members_affected} member(s)."
+                        f"Case {case.case_id} is about {name} ({case.primary_entity_id}). "
+                        f"{len(serialized)} pattern(s) flag ${case.flagged_dollars:,.0f} already paid "
+                        f"across {case.members_affected} member(s). Scores rank the work; a person still decides."
                     ),
                     "cites": metric_cite + signal_cites[:3],
                 }
@@ -457,9 +448,12 @@ def template_brief(session: Session, case: Case, user: User) -> dict[str, Any]:
             "sentences": [
                 {
                     "text": (
-                        f"Primary signal family: {top_kind}. "
-                        f"Approaches used: {approaches or 'none'}. "
-                        "A flag is a reason to review evidence, not a finding of fraud."
+                        (
+                            f"Main pattern: {top['title']}. {top['what']}"
+                            if top
+                            else "No pattern is attached to this case."
+                        )
+                        + " A flag is a reason to look at the claims."
                     ),
                     "cites": signal_cites[:4] or metric_cite,
                 },
@@ -472,20 +466,14 @@ def template_brief(session: Session, case: Case, user: User) -> dict[str, Any]:
             "sentences": [{"text": timeline_text, "cites": [_cite("metric:timeline", "metric", "flagged lines")]}],
         },
         {
-            "title": "Risk / confidence",
+            "title": "Case scores",
             "sentences": [
                 {
-                    "text": (
-                        f"P(confirm) {case.p_confirm:.0%} ({score_label(case_risk(session, case.case_id))}); "
-                        f"evidence strength {case.evidence_strength:.0%}; "
-                        f"30/60/90-day risk {case.f30 if case.f30 is not None else '—'} / "
-                        f"{case.f60 if case.f60 is not None else '—'} / "
-                        f"{case.f90 if case.f90 is not None else '—'}."
-                    ),
-                    "cites": [_cite("metric:p_confirm", "metric", "risk scores")],
+                    "text": score_text,
+                    "cites": [_cite("metric:p_confirm", "metric", "case scores")],
                 },
                 {
-                    "text": "These scores are screening aids. They are not a fraud label.",
+                    "text": "These scores rank the case for a person to review. They do not close it.",
                     "cites": metric_cite,
                 },
             ],
@@ -495,8 +483,8 @@ def template_brief(session: Session, case: Case, user: User) -> dict[str, Any]:
             "sentences": [
                 {
                     "text": (
-                        "This brief is a template assembled only from stored case metrics and detector evidence. "
-                        "It does not use ground-truth labels as features."
+                        "This note is assembled from stored scores and the patterns we flagged. "
+                        "Scores come from models trained on synthetic data. It is not a finding."
                     ),
                     "cites": metric_cite,
                 },

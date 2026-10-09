@@ -6,7 +6,6 @@ import { AppLogo } from "./ui/AppLogo";
 interface NavItem {
   to: "/manager/queue" | "/investigator/cases" | "/wiki/proposals" | "/audit";
   label: string;
-  /** Path prefix that marks this item as the current section. */
   section: string;
   permission: string;
 }
@@ -33,13 +32,14 @@ export function Shell() {
     return (
       <div className="boot" role="status">
         <AppLogo />
-        <p>ClaimShield Nexus</p>
         <p>Checking session…</p>
       </div>
     );
   }
 
   if (!user) return null;
+
+  const visibleNav = NAV_ITEMS.filter((item) => allowed(item.permission));
 
   return (
     <div className="app">
@@ -49,13 +49,9 @@ export function Shell() {
       <header className="mast">
         <Link to="/" className="mast-brand">
           <AppLogo />
-          <span>
-            <strong>ClaimShield Nexus</strong>
-            <small>SIU case prioritisation · prototype</small>
-          </span>
         </Link>
         <nav className="mast-nav" aria-label="Primary">
-          {NAV_ITEMS.filter((item) => allowed(item.permission)).map((item) => (
+          {visibleNav.map((item) => (
             <Link
               key={item.to}
               to={item.to}
@@ -68,7 +64,7 @@ export function Shell() {
         <div className="mast-user">
           <span className="mast-user-name">
             {user.display_name}
-            <span>{user.role}</span>
+            <span>{user.role.replaceAll("_", " ")}</span>
           </span>
           <button
             type="button"

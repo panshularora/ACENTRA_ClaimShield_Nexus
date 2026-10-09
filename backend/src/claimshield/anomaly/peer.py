@@ -176,7 +176,7 @@ def _em_level_z(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
                 evidence={
                     "kind": "em_upcode_z",
                     "approach": "behavioral_anomaly",
-                    "metric": "share of established E/M billed as EM-EST-5",
+                    "metric": "share of highest-level office visits",
                     "provider_value": round(float(frac), 4),
                     "robust_z": round(z, 3),
                     "review_reason": (
@@ -231,12 +231,12 @@ def _home_health_iqr(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
                 evidence={
                     "kind": "hh_iqr",
                     "approach": "behavioral_anomaly",
-                    "metric": "home-health visit lines in the extract window",
+                    "metric": "home-health visits in this window",
                     "provider_value": int(n),
                     "fence": round(float(fence), 2),
                     "robust_z": round(z, 3),
                     "review_reason": (
-                        "Visit volume sits above the peer IQR fence for the same specialty/type/geography cell."
+                        "Home-health visit volume sits well above similar providers in the same specialty and setting."
                     ),
                     **stats,
                     "peer_group": group,
@@ -288,7 +288,7 @@ def _genetic_spike(tables: dict[str, pd.DataFrame]) -> list[AlertDraft]:
                 evidence={
                     "kind": "genetic_mill",
                     "approach": "behavioral_anomaly",
-                    "metric": "distinct members billed LAB-GEN-01",
+                    "metric": "members billed a genetic test",
                     "provider_value": int(n),
                     "robust_z": round(z, 3),
                     "review_reason": (
