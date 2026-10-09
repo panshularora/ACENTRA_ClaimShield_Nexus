@@ -27,7 +27,8 @@ def create_engine(settings: Settings | None = None) -> Engine:
 
 def _sqlite_default_sql(col: Column[object]) -> str | None:
     """Literal DEFAULT for ALTER TABLE ADD COLUMN on an existing SQLite file."""
-    arg = col.default.arg if col.default is not None else None
+    default = col.default
+    arg = getattr(default, "arg", None) if default is not None else None
     if callable(arg):
         try:
             arg = arg()
@@ -68,18 +69,13 @@ def ensure_sqlite_columns(engine: Engine) -> None:
                 if col.name in existing:
                     continue
                 type_sql = col.type.compile(dialect=engine.dialect)
-                ddl = (
-                    f"ALTER TABLE {preparer.quote(table.name)} "
-                    f"ADD COLUMN {preparer.quote(col.name)} {type_sql}"
-                )
+                ddl = f"ALTER TABLE {preparer.quote(table.name)} ADD COLUMN {preparer.quote(col.name)} {type_sql}"
                 if col.nullable:
                     ddl += " NULL"
                 else:
                     default_sql = _sqlite_default_sql(col)
                     if default_sql is None:
-                        raise RuntimeError(
-                            f"cannot add NOT NULL {table.name}.{col.name} without a default"
-                        )
+                        raise RuntimeError(f"cannot add NOT NULL {table.name}.{col.name} without a default")
                     ddl += f" NOT NULL DEFAULT {default_sql}"
                 conn.execute(text(ddl))
             insp.clear_cache()

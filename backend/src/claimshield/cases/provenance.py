@@ -211,9 +211,7 @@ def case_provenance(
         {
             "step": 4,
             "name": "Linked providers",
-            "detail": (
-                f"{by_detector.get('graph', 0)} link(s) by ownership, shared contact, or referrals."
-            ),
+            "detail": (f"{by_detector.get('graph', 0)} link(s) by ownership, shared contact, or referrals."),
         },
         {
             "step": 5,

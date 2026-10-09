@@ -29,10 +29,7 @@ TOP_FACTORS = 5
 # Shown probabilities are clipped so the API never claims certainty; clipping is monotone, so
 # 30 <= 60 <= 90 still holds.
 PROB_FLOOR, PROB_CEIL = 0.001, 0.99
-HEURISTIC_NOTE = (
-    "No trained risk artifact was loaded. Suspicion and 30/60/90 are simple scores, "
-    "not probabilities."
-)
+HEURISTIC_NOTE = "No trained risk artifact was loaded. Suspicion and 30/60/90 are simple scores, not probabilities."
 
 
 def shown(p: float) -> float:

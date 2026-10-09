@@ -27,9 +27,7 @@ CASE_STATUS_OUTCOME = {
     "dismissed": "unsubstantiated",
     "monitor": "education",
 }
-DECIDED_STATUSES = frozenset(
-    {"escalated", "dismissed", "monitor", "needs_evidence", "pending_approval"}
-)
+DECIDED_STATUSES = frozenset({"escalated", "dismissed", "monitor", "needs_evidence", "pending_approval"})
 STATUS_LABELS = {
     "open": "Open (earlier run)",
     "needs_evidence": "Gather records",
@@ -105,9 +103,7 @@ def list_history(session: Session, *, limit: int = 200) -> dict[str, Any]:
     by_inv: dict[str, list[str]] = {}
     for subject in subjects:
         by_inv.setdefault(subject.investigation_id, []).append(subject.provider_id)
-    current_by_provider = {
-        case.primary_entity_id: case.case_id for case in cases if case.run_id == current_run_id
-    }
+    current_by_provider = {case.primary_entity_id: case.case_id for case in cases if case.run_id == current_run_id}
     investigations = list(session.execute(select(Investigation)).scalars().all())
     for inv in investigations:
         pids = by_inv.get(inv.investigation_id, [])

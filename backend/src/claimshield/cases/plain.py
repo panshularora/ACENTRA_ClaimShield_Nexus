@@ -116,8 +116,7 @@ GAP_BY_KIND: dict[str, str] = {
     "excluded_party": "Confirm NPI, legal name, and the exclusion date on the list.",
     "duplicate": "Pull the original and any resubmitted claim images for the same member, provider, code and date.",
     "ptp_pair": (
-        "Open the claim images and see if both codes were paid the same day, "
-        "and whether a modifier explains it."
+        "Open the claim images and see if both codes were paid the same day, and whether a modifier explains it."
     ),
     "unit_cap": "Confirm billed units against the visit notes.",
     "inpatient_overlap": "Confirm hospital admit and discharge against the outpatient date of service.",

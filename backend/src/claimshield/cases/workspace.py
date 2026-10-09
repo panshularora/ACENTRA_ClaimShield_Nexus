@@ -351,13 +351,13 @@ def template_brief(session: Session, case: Case, user: User) -> dict[str, Any]:
     serialized = [serialize_alert(a) for a in alerts]
     provider = session.get(Provider, case.primary_entity_id)
     name = provider.name if provider else case.primary_entity_id
+
     def _kind(alert: dict[str, Any]) -> str:
         evidence = alert.get("evidence") or {}
         return str(evidence.get("kind") or alert.get("kind") or "")
 
     signal_cites = [
-        _cite(f"alert:{a['alert_id']}", "alert", kind_title(_kind(a), a.get("label") or "pattern"))
-        for a in serialized
+        _cite(f"alert:{a['alert_id']}", "alert", kind_title(_kind(a), a.get("label") or "pattern")) for a in serialized
     ]
     metric_cite = [_cite("metric:harm", "metric", "case scores")]
     top = finding_copy(_kind(serialized[0]), serialized[0].get("label") or "pattern") if serialized else None

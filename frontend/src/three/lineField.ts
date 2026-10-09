@@ -32,8 +32,8 @@ export class LineField {
     for (let r = 0; r < LINE_ROWS; r++) {
       for (let c = 0; c < LINE_COLS; c++) {
         const i = r * LINE_COLS + c;
-        const nx = LINE_COLS === 1 ? 0 : c / (LINE_COLS - 1);
-        const nz = LINE_ROWS === 1 ? 0 : r / (LINE_ROWS - 1);
+        const nx = c / (LINE_COLS - 1);
+        const nz = r / (LINE_ROWS - 1);
         this.gx[i] = (nx - 0.5) * WIDTH;
         this.gz[i] = (nz - 0.5) * DEPTH;
         const radial = 1 - Math.min(1, Math.hypot(nx - 0.5, nz - 0.5) * 1.7);
