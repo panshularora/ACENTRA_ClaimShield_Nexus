@@ -21,6 +21,7 @@ Free Render can sleep; the first request after idle may take about 30 seconds. C
 | [HOW_IT_WORKS.md](HOW_IT_WORKS.md) | From-scratch explainer: alerts vs cases, grouping, evidence, queue |
 | [JUDGING.md](JUDGING.md) | Pitch, 90-second demo, judge Q&A |
 | [ClaimShield_Nexus_Judging.pptx](ClaimShield_Nexus_Judging.pptx) | Judge-facing slide deck |
+| [ClaimShield_Nexus_10slide.pptx](ClaimShield_Nexus_10slide.pptx) | 10-slide pitch deck |
 | [01_PS3_research_brief.md](01_PS3_research_brief.md) | Problem statement research brief |
 | [CLAIMSHIELD_NEXUS_PLAN.md](CLAIMSHIELD_NEXUS_PLAN.md) | Combined product and engineering plan |
 | [IDEATION_AND_IMPROVEMENTS.md](IDEATION_AND_IMPROVEMENTS.md) | Ideation notes |
