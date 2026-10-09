@@ -1,7 +1,8 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import type { CaseDetail, QueueCase } from "../../api/types";
-import { LaneBadge, StatusBadge } from "../../components/Badge";
-import { money, pct, pctNumber, screeningShort } from "../../lib/format";
+import { HarmFlag, LaneBadge, StatusBadge } from "../../components/Badge";
+import { money, pct, pctNumber, screeningLabel, screeningTone } from "../../lib/format";
+import "../queue/queue.css";
 
 interface WorklistTableProps {
   rows: QueueCase[];
@@ -10,24 +11,67 @@ interface WorklistTableProps {
   canAssign: boolean;
   /** Case id whose assignment request is in flight. */
   assigning?: string;
+  /** Case id whose release request is in flight. */
+  unassigning?: string;
   onAssign: (caseId: string) => void;
+  onUnassign: (caseId: string) => void;
 }
 
-/** Investigator worklist as a claims-style table. Same fields as before. */
-export function WorklistTable({ rows, details, userId, canAssign, assigning, onAssign }: WorklistTableProps) {
+function clockChip(days: number | null | undefined): string {
+  if (days === null || days === undefined) return "—";
+  if (days < 0) return `${Math.abs(days)}d past`;
+  return `${days}d`;
+}
+
+function groupLine(row: QueueCase): string | null {
+  const group = row.alert_group;
+  if (!group) return null;
+  const bits: string[] = [];
+  if (group.n_alerts) bits.push(`${group.n_alerts} grouped alert${group.n_alerts === 1 ? "" : "s"}`);
+  if (group.n_entities > 1) bits.push(`${group.n_entities} linked NPIs`);
+  if (group.urgent) bits.push("urgent still visible");
+  return bits.join(" · ") || group.text;
+}
+
+/** Investigator worklist as a compact ranked table, same visual language as the manager queue. */
+export function WorklistTable({
+  rows,
+  details,
+  userId,
+  canAssign,
+  assigning,
+  unassigning,
+  onAssign,
+  onUnassign,
+}: WorklistTableProps) {
+  const navigate = useNavigate();
   return (
     <div className="table-wrap work-wrap">
-      <table className="grid work-grid">
+      <table className="grid queue-grid work-grid">
         <caption className="sr-only">Desk cases with provider, amount, suspicion and status</caption>
+        <colgroup>
+          <col className="col-provider" />
+          <col className="col-case" />
+          <col className="col-lane" />
+          <col className="col-status" />
+          <col className="col-clock" />
+          <col className="col-money" />
+          <col className="col-suspicion" />
+          <col className="col-harm" />
+          <col className="col-move" />
+        </colgroup>
         <thead>
           <tr>
             <th scope="col">Provider</th>
             <th scope="col">Case</th>
+            <th scope="col">Lane</th>
+            <th scope="col">Status</th>
+            <th scope="col">45-day</th>
             <th scope="col" className="num">
-              Amount
+              Exposure
             </th>
             <th scope="col">Suspicion</th>
-            <th scope="col">Status</th>
+            <th scope="col">Harm</th>
             <th scope="col">
               <span className="sr-only">Actions</span>
             </th>
@@ -37,43 +81,65 @@ export function WorklistTable({ rows, details, userId, canAssign, assigning, onA
           {rows.map((row) => {
             const extra = details[row.case_id];
             const mine = extra?.assignee_id === userId;
-            const group = row.alert_group;
             const name = extra?.primary_entity?.name ?? row.primary_entity_id;
             const suspicion = pctNumber(row.p_confirm) ?? 0;
+            const grouped = groupLine(row);
             return (
-              <tr key={row.case_id} className={`lane-${row.lane}`}>
-                <th scope="row">
-                  <Link to="/investigator/workspace/$caseId" params={{ caseId: row.case_id }} className="work-card-name">
+              <tr
+                key={row.case_id}
+                className={`lane-${row.lane} is-clickable`}
+                tabIndex={0}
+                onClick={() =>
+                  void navigate({ to: "/investigator/workspace/$caseId", params: { caseId: row.case_id } })
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    void navigate({ to: "/investigator/workspace/$caseId", params: { caseId: row.case_id } });
+                  }
+                }}
+              >
+                <th scope="row" className="case-cell">
+                  <Link
+                    to="/investigator/workspace/$caseId"
+                    params={{ caseId: row.case_id }}
+                    className="work-card-name"
+                    onClick={(event) => event.stopPropagation()}
+                  >
                     {name}
                   </Link>
-                  <p className="work-card-meta">
-                    <span className="mono">{row.primary_entity_id}</span>
-                    {extra?.primary_entity?.specialty ? (
-                      <span>{extra.primary_entity.specialty.replaceAll("_", " ")}</span>
-                    ) : null}
-                    <span>Owner {mine ? "You" : (extra?.assignee_id ?? "Unassigned")}</span>
-                  </p>
-                  <p className="work-card-scores">
-                    <span>{row.severity}/4 severity</span>
-                    <span>
-                      {row.members_affected} people · harm {row.harm}
+                  <span className="mono muted">{row.primary_entity_id}</span>
+                  {grouped ? (
+                    <span className="muted case-group" title={row.alert_group?.text}>
+                      {grouped}
                     </span>
-                    <span>{screeningShort(row.screening_days_left)}</span>
-                    {group ? (
-                      <span title={group.text}>
-                        {group.n_alerts ? `${group.n_alerts} patterns` : "Grouped"}
-                        {group.n_entities > 1 ? ` · ${group.n_entities} linked` : ""}
-                      </span>
-                    ) : null}
-                  </p>
+                  ) : null}
                 </th>
                 <td>
-                  <span className="mono">{row.case_id}</span>
-                  <div className="chip-row">
-                    <LaneBadge lane={row.lane} />
-                  </div>
+                  <Link
+                    to="/investigator/workspace/$caseId"
+                    params={{ caseId: row.case_id }}
+                    className="link-button mono"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {row.case_id}
+                  </Link>
                 </td>
-                <td className="num">{money(row.flagged_dollars)}</td>
+                <td>
+                  <LaneBadge lane={row.lane} />
+                </td>
+                <td>
+                  <StatusBadge status={row.status} />
+                </td>
+                <td className="num">
+                  <span
+                    className={`sla-chip sla-${screeningTone(row.screening_days_left)}`}
+                    title={screeningLabel(row.screening_days_left)}
+                  >
+                    {clockChip(row.screening_days_left)}
+                  </span>
+                </td>
+                <td className="num dollars">{money(row.flagged_dollars)}</td>
                 <td>
                   <span className="risk-cell">
                     <span className="risk-n">{pct(row.p_confirm)}</span>
@@ -83,19 +149,37 @@ export function WorklistTable({ rows, details, userId, canAssign, assigning, onA
                   </span>
                 </td>
                 <td>
-                  <StatusBadge status={row.status} />
+                  <HarmFlag harm={row.harm} />
                 </td>
-                <td>
+                <td className="move-cell">
                   {canAssign && !mine ? (
                     <button
                       type="button"
                       className="btn small ghost"
                       disabled={assigning === row.case_id}
                       aria-label={`Take ownership of ${row.case_id}`}
-                      onClick={() => onAssign(row.case_id)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onAssign(row.case_id);
+                      }}
                     >
                       {assigning === row.case_id ? "Assigning…" : "Take"}
                     </button>
+                  ) : canAssign && mine ? (
+                    <button
+                      type="button"
+                      className="btn small ghost"
+                      disabled={unassigning === row.case_id}
+                      aria-label={`Release ownership of ${row.case_id}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onUnassign(row.case_id);
+                      }}
+                    >
+                      {unassigning === row.case_id ? "Releasing…" : "Release"}
+                    </button>
+                  ) : mine ? (
+                    <span className="muted">Yours</span>
                   ) : null}
                 </td>
               </tr>

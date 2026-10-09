@@ -177,6 +177,25 @@ def test_investigator_can_take_ownership(client: TestClient) -> None:
     assert taken.json()["assignee_id"] == me["id"]
     other = client.post(f"/api/v1/cases/{case_id}/assign", json={"assignee_id": "USR-NOPE"})
     assert other.status_code in {403, 422}
+    released = client.post(f"/api/v1/cases/{case_id}/unassign", json={})
+    assert released.status_code == 200, released.text
+    assert released.json()["assignee_id"] is None
+    again = client.post(f"/api/v1/cases/{case_id}/unassign", json={})
+    assert again.status_code == 200
+    assert again.json()["assignee_id"] is None
+
+
+def test_investigator_cannot_unassign_another_owners_case(client: TestClient) -> None:
+    _run_id, case_id = _load_tiny(client)
+    taken = client.post(f"/api/v1/cases/{case_id}/assign", json={})
+    assert taken.status_code == 200, taken.text
+    client.post("/api/v1/auth/logout")
+    _login(client, "investigator@demo.claimshield", "demo-investigator")
+    denied = client.post(f"/api/v1/cases/{case_id}/unassign", json={})
+    assert denied.status_code == 403
+    still = client.get(f"/api/v1/cases/{case_id}")
+    assert still.status_code == 200
+    assert still.json()["assignee_id"] is not None
 
 
 def test_investigator_can_read_workspace_analyst_cannot(client: TestClient) -> None:

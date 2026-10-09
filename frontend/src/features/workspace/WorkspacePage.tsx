@@ -86,7 +86,18 @@ export function WorkspacePage() {
     mutationFn: () => api.assignCase(caseId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["case", caseId] });
+      void queryClient.invalidateQueries({ queryKey: ["decision-options", caseId] });
       void queryClient.invalidateQueries({ queryKey: ["queue"] });
+    },
+  });
+  const unassignMut = useMutation({
+    mutationFn: () => api.unassignCase(caseId),
+    onSuccess: () => {
+      setUnmask(false);
+      void queryClient.invalidateQueries({ queryKey: ["case", caseId] });
+      void queryClient.invalidateQueries({ queryKey: ["decision-options", caseId] });
+      void queryClient.invalidateQueries({ queryKey: ["queue"] });
+      void queryClient.invalidateQueries({ queryKey: ["work-details"] });
     },
   });
 
@@ -246,6 +257,8 @@ export function WorkspacePage() {
       ) : caseQuery.error ? (
         <ErrorState title="Case unavailable" error={caseQuery.error} onRetry={() => void caseQuery.refetch()} />
       ) : null}
+      {assignMut.error ? <ErrorState title="Could not take ownership" error={assignMut.error} /> : null}
+      {unassignMut.error ? <ErrorState title="Could not release ownership" error={unassignMut.error} /> : null}
       {data ? (
         <>
           <CaseHeader
@@ -253,7 +266,9 @@ export function WorkspacePage() {
             user={user}
             canAssign={canAssign}
             assigning={assignMut.isPending}
+            unassigning={unassignMut.isPending}
             onAssign={() => assignMut.mutate()}
+            onUnassign={() => unassignMut.mutate()}
             onDecide={() => openTab("decide")}
             unmask={unmask}
             onUnmaskChange={setUnmask}

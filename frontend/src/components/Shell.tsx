@@ -1,5 +1,6 @@
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { canVisit, homeFor } from "../auth/access";
 import { useAuth } from "../auth/AuthProvider";
 import { AppLogo } from "./ui/AppLogo";
 
@@ -11,7 +12,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: "/manager/queue", label: "Queue", section: "/manager/queue", permission: "queue:read" },
+  { to: "/manager/queue", label: "Queue", section: "/manager/queue", permission: "queue:configure" },
   { to: "/investigator/cases", label: "Cases", section: "/investigator/", permission: "case:read" },
   { to: "/wiki/proposals", label: "Precedents", section: "/wiki/", permission: "wiki:read" },
   { to: "/audit", label: "Audit", section: "/audit", permission: "audit:read" },
@@ -23,8 +24,13 @@ export function Shell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (loading) return;
+    if (!user) {
       void navigate({ to: "/login" });
+      return;
+    }
+    if (!canVisit(user, pathname)) {
+      void navigate({ to: homeFor(user) });
     }
   }, [loading, user, pathname, navigate]);
 

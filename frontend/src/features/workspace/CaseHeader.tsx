@@ -9,7 +9,9 @@ interface CaseHeaderProps {
   user: SessionUser;
   canAssign: boolean;
   assigning: boolean;
+  unassigning: boolean;
   onAssign: () => void;
+  onUnassign: () => void;
   onDecide: () => void;
   unmask: boolean;
   onUnmaskChange: (value: boolean) => void;
@@ -21,7 +23,9 @@ export function CaseHeader({
   user,
   canAssign,
   assigning,
+  unassigning,
   onAssign,
+  onUnassign,
   onDecide,
   unmask,
   onUnmaskChange,
@@ -59,6 +63,11 @@ export function CaseHeader({
           {canAssign && data.assignee_id !== user.id ? (
             <button type="button" className="btn" disabled={assigning} onClick={onAssign}>
               {assigning ? "Taking…" : "Take ownership"}
+            </button>
+          ) : null}
+          {canAssign && data.assignee_id === user.id ? (
+            <button type="button" className="btn ghost" disabled={unassigning} onClick={onUnassign}>
+              {unassigning ? "Releasing…" : "Release ownership"}
             </button>
           ) : null}
           <button type="button" className="btn solid" onClick={onDecide}>

@@ -7,7 +7,7 @@ import { ErrorState } from "../../components/ui/States";
 /** Live S3 → Lambda → API wiring. Shown so judges can see ingest is implemented, not stubbed. */
 export function AwsIngestPanel() {
   const { user } = useAuth();
-  const allowed = can(user, "queue:read");
+  const allowed = can(user, "batch:load");
   const query = useQuery({
     queryKey: ["aws-status"],
     queryFn: api.getAwsStatus,

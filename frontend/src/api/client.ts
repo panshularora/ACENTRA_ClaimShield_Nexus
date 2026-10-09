@@ -215,6 +215,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(assigneeId ? { assignee_id: assigneeId } : {}),
     }),
+  unassignCase: (caseId: string) =>
+    request<CaseDetail>(`/api/v1/cases/${caseId}/unassign`, {
+      method: "POST",
+      body: "{}",
+    }),
   decide: (
     caseId: string,
     body: {

@@ -23,6 +23,7 @@ export function InvestigatorCasesPage() {
   const stored = readStoredRun();
   const canCases = can(user, "case:read");
   const canQueue = can(user, "queue:read");
+  const canManageDesk = can(user, "queue:configure");
   const canReadBatches = can(user, "batch:read");
   const canAssign = can(user, "case:assign");
 
@@ -83,6 +84,14 @@ export function InvestigatorCasesPage() {
       void queryClient.invalidateQueries({ queryKey: ["queue"] });
     },
   });
+  const unassignMut = useMutation({
+    mutationFn: (caseId: string) => api.unassignCase(caseId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["work-details"] });
+      void queryClient.invalidateQueries({ queryKey: ["case"] });
+      void queryClient.invalidateQueries({ queryKey: ["queue"] });
+    },
+  });
 
   if (!user) return null;
   if (!canCases) {
@@ -110,7 +119,7 @@ export function InvestigatorCasesPage() {
       extra?.assignee_id ?? "",
     ].some((value) => value.toLowerCase().includes(q));
   });
-  const error = queueQuery.error ?? detailsQuery.error ?? assignMut.error;
+  const error = queueQuery.error ?? detailsQuery.error ?? assignMut.error ?? unassignMut.error;
 
   return (
     <main id="main" className="page cases-page">
@@ -119,7 +128,7 @@ export function InvestigatorCasesPage() {
         title="Worklist"
         description="The same ranked cases as the manager queue. Open a case to review evidence, network, claims and the brief."
         actions={
-          canQueue ? (
+          canManageDesk ? (
             <Link to="/manager/queue" className="btn ghost">
               Team queue
             </Link>
@@ -136,11 +145,12 @@ export function InvestigatorCasesPage() {
       ) : (
         <Panel
           id="worklist"
+          className="dash-panel"
           eyebrow="Cases"
           title="Ranked cases"
           description={
             mine.length > 0
-              ? `${count(mine.length, "case")} assigned to you. Unassigned work stays in the list until someone takes it.`
+              ? `${count(mine.length, "case")} assigned to you. Release a case to put it back on the unassigned list.`
               : "Nothing is assigned to you yet. Open a case and take ownership, or claim it from this list."
           }
           actions={<span className="badge">{visible.length} of {slots} slots</span>}
@@ -180,7 +190,9 @@ export function InvestigatorCasesPage() {
               userId={user.id}
               canAssign={canAssign}
               assigning={assignMut.isPending ? assignMut.variables : undefined}
+              unassigning={unassignMut.isPending ? unassignMut.variables : undefined}
               onAssign={(caseId) => assignMut.mutate(caseId)}
+              onUnassign={(caseId) => unassignMut.mutate(caseId)}
             />
           ) : null}
         </Panel>

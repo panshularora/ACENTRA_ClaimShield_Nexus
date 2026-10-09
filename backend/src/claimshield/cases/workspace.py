@@ -803,3 +803,32 @@ def assign_case(
     )
     session.flush()
     return serialize_case(session, case, user)
+
+
+def unassign_case(
+    session: Session,
+    *,
+    case: Case,
+    user: User,
+    now: datetime,
+) -> dict[str, Any]:
+    if not has_permission(user.role, "case:assign") and not has_permission(user.role, "admin:*"):
+        raise Forbidden("role lacks case:assign")
+    if case.assignee_id is None:
+        return serialize_case(session, case, user)
+    if user.role == "investigator" and case.assignee_id != user.id:
+        raise Forbidden("you can only release a case you own; ask a manager to reassign it")
+    previous = case.assignee_id
+    case.assignee_id = None
+    append_event(
+        session,
+        actor_id=user.id,
+        role=user.role,
+        action="case.unassign",
+        object_type="case",
+        object_id=case.case_id,
+        payload={"previous_assignee_id": previous},
+        ts=now,
+    )
+    session.flush()
+    return serialize_case(session, case, user)

@@ -28,6 +28,7 @@ from claimshield.cases.workspace import (
     serialize_case,
     template_brief,
     timeline_pack,
+    unassign_case,
 )
 from claimshield.core.errors import Forbidden
 from claimshield.db.models import User
@@ -173,6 +174,16 @@ def post_assign(
         assignee_id=body.assignee_id or user.id,
         now=datetime.now(UTC),
     )
+
+
+@router.post("/{case_id}/unassign", dependencies=[Depends(check_csrf)])
+def post_unassign(
+    case_id: str,
+    session: Session = Depends(get_db),
+    user: User = Depends(require("case:assign")),
+) -> dict[str, Any]:
+    case = get_case_or_404(session, case_id)
+    return unassign_case(session, case=case, user=user, now=datetime.now(UTC))
 
 
 @router.post("/{case_id}/rank", dependencies=[Depends(check_csrf)])

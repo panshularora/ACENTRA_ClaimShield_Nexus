@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import { api, ApiError, can } from "../../api/client";
+import { canOpenManagerDesk } from "../../auth/access";
 import type { Lane, QueueCase } from "../../api/types";
 import { useAuth } from "../../auth/AuthProvider";
 import { CaseDrawer } from "../../components/CaseDrawer";
@@ -42,11 +43,11 @@ function sortRows(rows: QueueCase[], key: SortKey): QueueCase[] {
 export function ManagerQueuePage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const canQueue = can(user, "queue:read");
+  const canQueue = canOpenManagerDesk(user);
   const canLoad = can(user, "batch:load");
   const canStart = can(user, "run:start");
   const canReadBatches = can(user, "batch:read");
-  const canOverride = can(user, "queue:configure") || can(user, "case:decide");
+  const canOverride = can(user, "queue:configure");
 
   const [queryText, setQueryText] = useState("");
   const [laneFilter, setLaneFilter] = useState<"all" | Lane>("all");
@@ -200,14 +201,7 @@ export function ManagerQueuePage() {
   }, [rows, todayRows, todayIds, queryText, laneFilter, statusFilter, sortKey]);
 
   if (!user) return null;
-  if (!canQueue) {
-    return (
-      <main id="main" className="page">
-        <PageHeader eyebrow="Manager desk" title="SIU queue" />
-        <ErrorState title="Access denied" error="Your role cannot read the SIU queue." />
-      </main>
-    );
-  }
+  if (!canQueue) return null;
 
   const hoursByLane = Object.fromEntries(LANE_ORDER.map((lane) => [lane, sumHours(rows, lane)])) as Record<Lane, number>;
   const casesByLane = Object.fromEntries(
@@ -219,7 +213,6 @@ export function ManagerQueuePage() {
   const selectedHours = capacityPack?.selected_hours ?? hoursByLane.selected;
   const deskHours = capacityPack?.capacity_used_hours ?? overrideHours + selectedHours;
   const overCapacity = capacityPack?.over_capacity_hours ?? Math.max(0, deskHours - capacityHours);
-  const overrideWarn = capacityPack?.override_share_warning ?? false;
   const nAlerts = runQuery.data?.n_alerts ?? runQuery.data?.summary.n_alerts ?? 0;
   const nCases = todayRows.length;
 
@@ -295,18 +288,6 @@ export function ManagerQueuePage() {
           <SlotFillCard filled={todayRows.length} slots={draft.slots} />
         </section>
       ) : null}
-      {overCapacity > 0 ? (
-        <p className="banner warn">
-          Today&apos;s desk uses {hours(deskHours)} against {hours(capacityHours)} of capacity, {hours(overCapacity)}{" "}
-          over.
-        </p>
-      ) : null}
-      {overrideWarn ? (
-        <p className="banner warn">
-          Harm-priority hours are more than 35% of capacity.
-        </p>
-      ) : null}
-
       <DeskSettings
         draft={draft}
         applied={applied}
