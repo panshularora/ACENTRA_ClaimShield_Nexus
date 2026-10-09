@@ -25,6 +25,7 @@ from claimshield.core.errors import ClaimShieldError
 from claimshield.db import models as _models  # noqa: F401
 from claimshield.db.base import Base
 from claimshield.db.models import Batch, User
+from claimshield.db.session import ensure_sqlite_columns
 from claimshield.pipeline.service import load_synthetic_batch
 
 
@@ -36,6 +37,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     engine = get_engine()
     assert engine is not None
     Base.metadata.create_all(bind=engine)
+    ensure_sqlite_columns(engine)
     with factory() as session:
         if settings.demo_mode:
             # Demo accounts have published passwords; never create them in a real deployment.
