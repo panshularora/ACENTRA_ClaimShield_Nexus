@@ -107,4 +107,4 @@ Decision workflow: the assigned investigator posts `POST /api/v1/cases/{id}/deci
 
 ## Dataset notes
 
-Planted schemes S01–S21, rings G1–G3, camouflage C1, hard negatives HN1–HN2. S06 ambulance providers are excluded from risk-model training and scored as an unseen scheme in the backtest (still visible to rules; see [docs/MODEL_CARD.md](docs/MODEL_CARD.md)). No CPT. Synthetic NPIs pass Luhn. Ground truth is labels only and is not a feature table.
+Planted schemes S01–S21, rings G1–G3, camouflage C1, hard negatives HN1–HN2. S06 ambulance providers are excluded from risk-model training and scored as an unseen scheme in the backtest (still visible to rules; see [docs/MODEL_CARD.md](docs/MODEL_CARD.md)). No CPT. Synthetic NPIs pass Luhn. Ground truth is labels only and is not a feature table
